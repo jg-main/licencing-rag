@@ -1,0 +1,1 @@
+"""Licencing RAG application package."""
