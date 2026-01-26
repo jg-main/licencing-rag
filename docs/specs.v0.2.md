@@ -19,15 +19,19 @@ Build a **local, private legal Q&A system** that answers questions **exclusively
 
 ### Supported Providers (Current & Planned)
 
-| Provider | Status | Document Count | | ----------|--------|----------------| | CME Group | Active | ~35 documents | | OPRA | Planned | TBD | | CTA/UTP | Planned | TBD |
+| Provider  | Status  | Document Count |
+| --------- | ------- | -------------- |
+| CME Group | Active  | ~35 documents  |
+| OPRA      | Planned | TBD            |
+| CTA/UTP   | Planned | TBD            |
 
 The system must:
 
 - Respond **only** using the provided documents
 - Explicitly refuse to answer when the documents are silent
 - Always provide **citations** (provider, document name, section, page)
-- Run **entirely locally** by default (no cloud, no external APIs)
-- Support optional Claude API for development/testing (see Configuration)
+- Use Claude API for answer generation (with local Ollama as fallback option)
+- Use local embeddings via Ollama (nomic-embed-text)
 - Be maintainable as documents are updated
 - Support querying across providers or within a specific provider
 
@@ -38,8 +42,8 @@ ______________________________________________________________________
 ## 2. Non-Goals (Explicitly Out of Scope)
 
 - No model training or fine-tuning
-- No external data sources
-- No internet access
+- No external data sources (documents are curated locally)
+- No web scraping or internet content retrieval
 - No legal advice generation beyond document interpretation
 - No "best practice" or industry commentary unless explicitly stated in the documents
 - No cross-provider comparison or harmonization (Phase 1)
@@ -88,36 +92,43 @@ ______________________________________________________________________
 - Python 3.13+
 - Local execution on developer machine (macOS / Windows / Linux)
 
-### Models (Local via Ollama)
+### Models
 
-| Purpose | Model | Notes | |---------|-------|-------| | LLM | `llama3.1:8b` | Reasoning and answer generation | | Embeddings | `nomic-embed-text` | 768-dim vectors, good for legal text |
+| Purpose        | Model              | Notes                                              |
+| -------------- | ------------------ | -------------------------------------------------- |
+| LLM (Primary)  | Claude Sonnet 4    | Via Anthropic API, reasoning and answer generation |
+| LLM (Fallback) | `llama3.1:8b`      | Local via Ollama, for offline use                  |
+| Embeddings     | `nomic-embed-text` | Local via Ollama, 768-dim vectors                  |
 
 ### Libraries
 
-| Library       | Purpose                         | Version |
-| ------------- | ------------------------------- | ------- |
-| `ollama`      | LLM and embeddings (direct API) | 0.6+    |
-| `chromadb`    | Vector database                 | 1.4+    |
-| `pymupdf`     | PDF text extraction             | 1.26+   |
-| `python-docx` | DOCX text extraction            | 1.2+    |
-| `tqdm`        | Progress bars                   | 4.67+   |
-| `anthropic`   | Claude API (optional, for dev)  | 0.50+   |
-| `structlog`   | Structured logging              | 25.0+   |
+| Library       | Purpose                   | Version |
+| ------------- | ------------------------- | ------- |
+| `anthropic`   | Claude API (primary LLM)  | 0.76+   |
+| `ollama`      | Embeddings + fallback LLM | 0.6+    |
+| `chromadb`    | Vector database           | 1.4+    |
+| `pymupdf`     | PDF text extraction       | 1.26+   |
+| `python-docx` | DOCX text extraction      | 1.2+    |
+| `rich`        | Console output formatting | 14.0+   |
+| `tqdm`        | Progress bars             | 4.67+   |
+| `structlog`   | Structured logging        | 25.0+   |
 
-### Removed Dependencies
+### LLM Provider Configuration
 
-- **LangChain** — Unnecessary abstraction for this use case. Use `ollama` package directly.
-
-### Optional: Claude API for Development
-
-For faster iteration during development, the system supports Claude API as an alternative to local Ollama:
+The system uses Claude API by default for answer generation:
 
 ```bash
-export LLM_PROVIDER="anthropic"
+export LLM_PROVIDER="anthropic"  # default
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-**Production Recommendation:** Use Ollama for production deployments to maintain fully local execution.
+For offline or local-only execution, switch to Ollama:
+
+```bash
+export LLM_PROVIDER="ollama"
+```
+
+**Note:** Embeddings always use local Ollama (nomic-embed-text) regardless of LLM provider.
 
 ______________________________________________________________________
 
@@ -162,7 +173,10 @@ ______________________________________________________________________
 
 ### Supported Formats
 
-| Format | Extractor | Notes | |--------|-----------|-------| | PDF | PyMuPDF | Native text extraction, no OCR | | DOCX | python-docx | Paragraph-based extraction |
+| Format | Extractor   | Notes                          |
+| ------ | ----------- | ------------------------------ |
+| PDF    | PyMuPDF     | Native text extraction, no OCR |
+| DOCX   | python-docx | Paragraph-based extraction     |
 
 ### Extraction Output
 
@@ -194,7 +208,11 @@ ______________________________________________________________________
 
 ### Chunk Parameters
 
-| Parameter | Value | Rationale | |-----------|-------|-----------| | Target size | 500-800 words | Balance context vs. precision | | Overlap | 100-150 words | Preserve clause continuity | | Min chunk | 100 words | Avoid tiny fragments |
+| Parameter   | Value         | Rationale                     |
+| ----------- | ------------- | ----------------------------- |
+| Target size | 500-800 words | Balance context vs. precision |
+| Overlap     | 100-150 words | Preserve clause continuity    |
+| Min chunk   | 100 words     | Avoid tiny fragments          |
 
 ### Chunk Boundaries (Priority Order)
 
@@ -287,7 +305,10 @@ ______________________________________________________________________
 
 ### Retrieval Parameters
 
-| Parameter | Default | Notes | |-----------|---------|-------| | top_k | 5 | Number of chunks to retrieve | | provider_filter | None | Optional: limit to specific provider(s) |
+| Parameter       | Default | Notes                                   |
+| --------------- | ------- | --------------------------------------- |
+| top_k           | 5       | Number of chunks to retrieve            |
+| provider_filter | None    | Optional: limit to specific provider(s) |
 
 ### Answer Constraints (Hard Rules)
 
@@ -365,7 +386,12 @@ python main.py list --provider cme
 
 ### Exit Codes
 
-| Code | Meaning | |------|---------| | 0 | Success | | 1 | General error | | 2 | No documents found | | 3 | Provider not indexed |
+| Code | Meaning              |
+| ---- | -------------------- |
+| 0    | Success              |
+| 1    | General error        |
+| 2    | No documents found   |
+| 3    | Provider not indexed |
 
 ______________________________________________________________________
 
@@ -383,13 +409,28 @@ ______________________________________________________________________
 
 The system is successful if:
 
-| Criterion | Measurement | |-----------|-------------| | Grounding | Never answers beyond provided documents | | Citations | Every answer includes document + section | | Refusal | Correctly refuses when info not found | | Maintainability | Adding documents requires re-ingestion only | | Performance | \<10s response time on standard laptop | | Extensibility | New provider added without code changes |
+| Criterion       | Measurement                                 |
+| --------------- | ------------------------------------------- |
+| Grounding       | Never answers beyond provided documents     |
+| Citations       | Every answer includes document + section    |
+| Refusal         | Correctly refuses when info not found       |
+| Maintainability | Adding documents requires re-ingestion only |
+| Performance     | \<10s response time on standard laptop      |
+| Extensibility   | New provider added without code changes     |
 
 ______________________________________________________________________
 
 ## 14. Future Enhancements (Deferred)
 
-| Enhancement | Priority | Notes | |-------------|----------|-------| | OPRA document ingestion | High | Next provider | | CTA/UTP document ingestion | Medium | After OPRA | | Hybrid search (BM25 + vector) | Medium | Better keyword matching | | Definitions auto-linking | Medium | Auto-include defined terms | | Clause comparison | Low | Cross-document analysis | | Risk flag extraction | Low | Audit, termination triggers | | Version diffing | Low | Compare document versions | | Web UI (Streamlit) | Low | After CLI is stable |
+| Enhancement                   | Priority | Notes                       |
+| ----------------------------- | -------- | --------------------------- |
+| CTA/UTP document ingestion    | Medium   | After OPRA                  |
+| Hybrid search (BM25 + vector) | Medium   | Better keyword matching     |
+| Definitions auto-linking      | Medium   | Auto-include defined terms  |
+| Clause comparison             | Low      | Cross-document analysis     |
+| Risk flag extraction          | Low      | Audit, termination triggers |
+| Version diffing               | Low      | Compare document versions   |
+| Web UI (Streamlit)            | Low      | After CLI is stable         |
 
 ______________________________________________________________________
 
