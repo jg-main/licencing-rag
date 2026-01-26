@@ -63,11 +63,11 @@ ______________________________________________________________________
 
 - [x] Remove LangChain dependency entirely
 - [x] Update `pyproject.toml`
-- [ ] Add `structlog` logging
-- [ ] Improve error handling (corrupted PDFs, Ollama down)
-- [ ] Enhance prompts with stricter guardrails
-- [ ] Add extraction quality validation
-- [ ] Document common issues in README
+- [x] Add `structlog` logging
+- [x] Improve error handling (corrupted PDFs, Ollama down)
+- [x] Enhance prompts with stricter guardrails
+- [x] Add extraction quality validation
+- [x] Document common issues in README
 
 ### Phase 3: Multi-Provider (Week 3)
 
