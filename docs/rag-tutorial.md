@@ -423,7 +423,18 @@ ______________________________________________________________________
 
 ## Part 9: Glossary
 
-| Term | Meaning | |------|---------| | **LLM** | Large Language Model - AI that generates text (Claude, GPT) | | **RAG** | Retrieval-Augmented Generation - find docs, then ask LLM | | **Embedding** | Converting text to numbers that capture meaning | | **Vector** | A list of numbers representing text meaning | | **Chunk** | A small piece of a document (~400 words) | | **ChromaDB** | Database that stores and searches vectors | | **Ollama** | Tool to run AI models locally | | **Context** | The documents/chunks sent to Claude with your question | | **Hallucination** | When an LLM makes up false information | | **Token** | A word or word-piece (billing unit for APIs) |
+| Term              | Meaning                                                     |
+| ----------------- | ----------------------------------------------------------- |
+| **LLM**           | Large Language Model - AI that generates text (Claude, GPT) |
+| **RAG**           | Retrieval-Augmented Generation - find docs, then ask LLM    |
+| **Embedding**     | Converting text to numbers that capture meaning             |
+| **Vector**        | A list of numbers representing text meaning                 |
+| **Chunk**         | A small piece of a document (~400 words)                    |
+| **ChromaDB**      | Database that stores and searches vectors                   |
+| **Ollama**        | Tool to run AI models locally                               |
+| **Context**       | The documents/chunks sent to Claude with your question      |
+| **Hallucination** | When an LLM makes up false information                      |
+| **Token**         | A word or word-piece (billing unit for APIs)                |
 
 ______________________________________________________________________
 
