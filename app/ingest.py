@@ -9,12 +9,18 @@ from tqdm import tqdm
 
 from app.chunking import Chunk
 from app.chunking import chunk_document
+from app.chunking import save_chunks_artifacts
 from app.config import CHROMA_DIR
+from app.config import CHUNKS_DATA_DIR
 from app.config import PROVIDERS
 from app.config import RAW_DATA_DIR
+from app.config import TEXT_DATA_DIR
 from app.embed import OllamaEmbeddingFunction
 from app.extract import ExtractionError
+from app.extract import detect_document_version
 from app.extract import extract_document
+from app.extract import save_extraction_artifacts
+from app.extract import validate_extraction
 from app.logging import get_logger
 
 log = get_logger(__name__)
@@ -30,6 +36,30 @@ def get_provider_raw_dir(provider: str) -> Path:
         Path to the provider's raw documents directory.
     """
     return RAW_DATA_DIR / provider
+
+
+def get_provider_text_dir(provider: str) -> Path:
+    """Get the extracted text directory for a provider.
+
+    Args:
+        provider: Provider identifier (e.g., "cme").
+
+    Returns:
+        Path to the provider's text output directory.
+    """
+    return TEXT_DATA_DIR / provider
+
+
+def get_provider_chunks_dir(provider: str) -> Path:
+    """Get the chunks directory for a provider.
+
+    Args:
+        provider: Provider identifier (e.g., "cme").
+
+    Returns:
+        Path to the provider's chunks output directory.
+    """
+    return CHUNKS_DATA_DIR / provider
 
 
 def get_collection_name(provider: str) -> str:
@@ -72,6 +102,7 @@ def chunks_to_chroma_format(
                 "chunk_index": chunk.chunk_index,
                 "word_count": chunk.word_count,
                 "is_definitions": chunk.is_definitions,
+                "document_version": chunk.document_version,
             }
         )
         ids.append(chunk.chunk_id)
@@ -128,11 +159,12 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     )
     log.info("collection_ready", collection=collection_name, provider=provider)
 
-    # Find all supported documents
+    # Find all supported documents (sorted for deterministic ordering)
     supported_extensions = {".pdf", ".docx"}
-    doc_files = [
-        f for f in raw_dir.iterdir() if f.suffix.lower() in supported_extensions
-    ]
+    doc_files = sorted(
+        [f for f in raw_dir.iterdir() if f.suffix.lower() in supported_extensions],
+        key=lambda p: p.name.lower(),
+    )
 
     if not doc_files:
         log.warning("no_documents_found", provider=provider, path=str(raw_dir))
@@ -150,21 +182,57 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     )
     print(f"Ingesting {len(doc_files)} documents for provider: {provider}")
 
+    # Get text output directory for extraction artifacts
+    text_dir = get_provider_text_dir(provider)
+
     for doc_path in tqdm(doc_files, desc=f"Processing {provider}"):
         try:
             # Extract document
             log.debug("extracting_document", filename=doc_path.name)
             extracted = extract_document(doc_path)
 
-            # Chunk document
-            chunks = chunk_document(extracted, provider)
+            # Validate extraction quality and log any warnings
+            extraction_warnings = validate_extraction(extracted)
+            if extraction_warnings:
+                errors.extend(extraction_warnings)
+
+            # Detect document version for chunk metadata
+            doc_version = detect_document_version(extracted.full_text)
+
+            # Save extraction artifacts (.txt and .meta.json) per spec
+            save_extraction_artifacts(extracted, text_dir, provider)
+
+            # Chunk document with version info
+            chunks = chunk_document(extracted, provider, document_version=doc_version)
 
             if not chunks:
                 log.warning("no_chunks_generated", filename=doc_path.name)
                 continue
 
+            # Save chunk artifacts for visibility into chunking process
+            chunks_dir = get_provider_chunks_dir(provider)
+            save_chunks_artifacts(chunks, doc_path.name, chunks_dir)
+
             # Convert to ChromaDB format
             documents, metadatas, ids = chunks_to_chroma_format(chunks)
+
+            # Delete existing chunks for this document before adding (upsert behavior)
+            # This prevents duplicates when re-ingesting without --force
+            if not force:
+                try:
+                    existing = collection.get(
+                        where={"document_name": doc_path.name},
+                        include=[],
+                    )
+                    if existing and existing.get("ids"):
+                        collection.delete(ids=existing["ids"])
+                        log.debug(
+                            "deleted_existing_chunks",
+                            filename=doc_path.name,
+                            count=len(existing["ids"]),
+                        )
+                except Exception:
+                    pass  # Ignore errors during cleanup
 
             # Add to collection
             collection.add(
