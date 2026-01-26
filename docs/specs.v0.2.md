@@ -26,7 +26,8 @@ The system must:
 - Respond **only** using the provided documents
 - Explicitly refuse to answer when the documents are silent
 - Always provide **citations** (provider, document name, section, page)
-- Run **entirely locally** (no cloud, no external APIs)
+- Run **entirely locally** by default (no cloud, no external APIs)
+- Support optional Claude API for development/testing (see Configuration)
 - Be maintainable as documents are updated
 - Support querying across providers or within a specific provider
 
@@ -93,11 +94,30 @@ ______________________________________________________________________
 
 ### Libraries
 
-| Library | Purpose | Version | |---------|---------|---------| | `ollama` | LLM and embeddings (direct API) | 0.6+ | | `chromadb` | Vector database | 1.4+ | | `pymupdf` | PDF text extraction | 1.26+ | | `python-docx` | DOCX text extraction | 1.2+ | | `tqdm` | Progress bars | 4.67+ |
+| Library       | Purpose                         | Version |
+| ------------- | ------------------------------- | ------- |
+| `ollama`      | LLM and embeddings (direct API) | 0.6+    |
+| `chromadb`    | Vector database                 | 1.4+    |
+| `pymupdf`     | PDF text extraction             | 1.26+   |
+| `python-docx` | DOCX text extraction            | 1.2+    |
+| `tqdm`        | Progress bars                   | 4.67+   |
+| `anthropic`   | Claude API (optional, for dev)  | 0.50+   |
+| `structlog`   | Structured logging              | 25.0+   |
 
 ### Removed Dependencies
 
 - **LangChain** — Unnecessary abstraction for this use case. Use `ollama` package directly.
+
+### Optional: Claude API for Development
+
+For faster iteration during development, the system supports Claude API as an alternative to local Ollama:
+
+```bash
+export LLM_PROVIDER="anthropic"
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+**Production Recommendation:** Use Ollama for production deployments to maintain fully local execution.
 
 ______________________________________________________________________
 
