@@ -6,6 +6,7 @@ import argparse
 import sys
 
 from app.config import PROVIDERS
+from app.logging import configure_logging
 
 
 def cmd_ingest(args: argparse.Namespace) -> int:
@@ -185,7 +186,17 @@ Examples:
         help="Provider to list (default: all)",
     )
 
+    # Global options
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging",
+    )
+
     args = parser.parse_args()
+
+    # Initialize logging
+    configure_logging(debug=args.debug)
 
     if args.command is None:
         parser.print_help()
