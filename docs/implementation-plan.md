@@ -52,12 +52,12 @@ ______________________________________________________________________
 
 #### 1.7 Claude API Integration
 
-- [ ] Add `anthropic` to dependencies
-- [ ] Create `app/llm.py` with provider abstraction
-- [ ] Add `LLM_PROVIDER` config (ollama/anthropic)
-- [ ] Update `query.py` to use LLM abstraction
+- [x] Add `anthropic` to dependencies
+- [x] Create `app/llm.py` with provider abstraction
+- [x] Add `LLM_PROVIDER` config (ollama/anthropic)
+- [x] Update `query.py` to use LLM abstraction
 - [ ] Test with Claude API
-- [ ] Document API key setup in README
+- [x] Document API key setup in README
 
 ### Phase 2: Robustness (Week 2)
 
