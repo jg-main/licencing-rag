@@ -1,13 +1,11 @@
 [project]
 name = "licencing-rag"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Local RAG system for license agreement analysis"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "chromadb>=1.4.1",
-    "langchain>=1.2.7",
-    "langchain-community>=0.4.1",
     "ollama>=0.6.1",
     "pymupdf>=1.26.7",
     "python-docx>=1.2.0",
@@ -29,3 +27,8 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+
+[tool.isort]
+profile = "black"
+line_length = 120
+force_single_line = true

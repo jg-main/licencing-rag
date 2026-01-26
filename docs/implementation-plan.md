@@ -12,36 +12,36 @@ ______________________________________________________________________
 
 #### 1.1 Critical Bug Fixes
 
-- [ ] Rename `promps.py` → `prompts.py`
-- [ ] Update import in `query.py`
-- [ ] Replace ChromaDB `Client` → `PersistentClient`
-- [ ] Remove deprecated `client.persist()` calls
-- [ ] Fix path: `RAW_DATA_DIR` to support provider subdirs
+- [x] Rename `promps.py` → `prompts.py`
+- [x] Update import in `query.py`
+- [x] Replace ChromaDB `Client` → `PersistentClient`
+- [x] Remove deprecated `client.persist()` calls
+- [x] Fix path: `RAW_DATA_DIR` to support provider subdirs
 
 #### 1.2 Core Infrastructure
 
-- [ ] Create `app/embed.py` with `OllamaEmbeddingFunction`
-- [ ] Create `app/extract.py` with PDF page tracking
-- [ ] Add DOCX extraction support
+- [x] Create `app/embed.py` with `OllamaEmbeddingFunction`
+- [x] Create `app/extract.py` with PDF page tracking
+- [x] Add DOCX extraction support
 
 #### 1.3 Chunking Improvements
 
-- [ ] Capture section headings in metadata
-- [ ] Track page numbers per chunk
-- [ ] Expand section detection regex patterns
+- [x] Capture section headings in metadata
+- [x] Track page numbers per chunk
+- [x] Expand section detection regex patterns
 
 #### 1.4 Pipeline Refactoring
 
-- [ ] Refactor `ingest.py` for multi-provider support
-- [ ] Refactor `query.py` with embedding function
-- [ ] Add provider-based collection naming
+- [x] Refactor `ingest.py` for multi-provider support
+- [x] Refactor `query.py` with embedding function
+- [x] Add provider-based collection naming
 
 #### 1.5 CLI Implementation
 
-- [ ] Implement `main.py` with argparse
-- [ ] Add `ingest` command
-- [ ] Add `query` command
-- [ ] Add `list` command
+- [x] Implement `main.py` with argparse
+- [x] Add `ingest` command
+- [x] Add `query` command
+- [x] Add `list` command
 
 #### 1.6 Verification
 
@@ -52,8 +52,8 @@ ______________________________________________________________________
 
 ### Phase 2: Robustness (Week 2)
 
-- [ ] Remove LangChain dependency entirely
-- [ ] Update `pyproject.toml`
+- [x] Remove LangChain dependency entirely
+- [x] Update `pyproject.toml`
 - [ ] Add `structlog` logging
 - [ ] Improve error handling (corrupted PDFs, Ollama down)
 - [ ] Enhance prompts with stricter guardrails
