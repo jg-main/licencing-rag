@@ -373,9 +373,15 @@ ______________________________________________________________________
 
 You might ask: "Why not just train Claude on my documents?"
 
-| Approach | RAG | Fine-Tuning | |----------|-----|-------------| | Cost | ~$0.003/query | $1,000+ to train | | Update docs | Just re-ingest | Retrain model | | Citations | ✅ Knows source | ❌ Can't cite | | Hallucination | Rare (has context) | More common | | Setup time | Hours | Days/weeks |
+| Approach      | RAG                | Fine-Tuning      |
+| ------------- | ------------------ | ---------------- |
+| Cost          | ~$0.003/query      | $1,000+ to train |
+| Update docs   | Just re-ingest     | Retrain model    |
+| Citations     | ✅ Knows source    | ❌ Can't cite    |
+| Hallucination | Rare (has context) | More common      |
+| Setup time    | Hours              | Days/weeks       |
 
-**RAG is almost always the right choice for document Q&A.**
+**RAG is the right choice for document Q&A.**
 
 ______________________________________________________________________
 
