@@ -1,9 +1,13 @@
 # app/query.py
 """Query pipeline for the License Intelligence System."""
 
+import sys
 from typing import Any
 
 import chromadb
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.table import Table
 
 from app.config import CHROMA_DIR
 from app.config import DEFAULT_PROVIDERS
@@ -14,10 +18,11 @@ from app.llm import LLMConnectionError
 from app.llm import get_llm
 from app.logging import get_logger
 from app.prompts import QA_PROMPT
-from app.prompts import REFUSAL_MESSAGE
 from app.prompts import SYSTEM_PROMPT
+from app.prompts import get_refusal_message
 
 log = get_logger(__name__)
+console = Console()
 
 
 def format_context(
@@ -35,6 +40,7 @@ def format_context(
     """
     context_parts = []
     for doc, meta in zip(documents, metadatas):
+        provider = meta.get("provider", "unknown").upper()
         source = meta.get("document_name", "Unknown")
         section = meta.get("section_heading", "N/A")
         page_start = meta.get("page_start", "?")
@@ -45,7 +51,7 @@ def format_context(
         else:
             page_info = f"Pages {page_start}-{page_end}"
 
-        header = f"--- {source} | {section} | {page_info} ---"
+        header = f"--- [{provider}] {source} | {section} | {page_info} ---"
         context_parts.append(f"{header}\n{doc}")
 
     return "\n\n".join(context_parts)
@@ -128,10 +134,11 @@ def query(
     if not all_documents:
         log.info("no_chunks_retrieved", question=question[:100])
         return {
-            "answer": REFUSAL_MESSAGE,
+            "answer": get_refusal_message(providers),
             "context": "",
             "citations": [],
             "chunks_retrieved": 0,
+            "providers": providers,
         }
 
     log.debug("chunks_retrieved", count=len(all_documents))
@@ -139,8 +146,13 @@ def query(
     # Format context
     context = format_context(all_documents, all_metadatas)
 
-    # Build prompt
-    prompt = QA_PROMPT.format(context=context, question=question)
+    # Build prompt with provider context
+    provider_label = ", ".join(p.upper() for p in providers)
+    prompt = QA_PROMPT.format(
+        context=context,
+        question=question,
+        provider=provider_label,
+    )
 
     # Call LLM
     log.debug("calling_llm")
@@ -164,14 +176,18 @@ def query(
         doc_name = meta.get("document_name", "Unknown")
         section = meta.get("section_heading", "N/A")
         page_start = meta.get("page_start", "?")
-        key = (doc_name, section, page_start)
+        page_end = meta.get("page_end", page_start)  # Default to start if no end
+        provider = meta.get("provider", "unknown")
+        # Include provider in key to prevent cross-provider collisions
+        key = (provider, doc_name, section, page_start, page_end)
         if key not in seen:
             seen.add(key)
             citations.append(
                 {
                     "document": doc_name,
                     "section": section,
-                    "page": page_start,
+                    "page_start": page_start,
+                    "page_end": page_end,
                     "provider": meta.get("provider", "unknown"),
                 }
             )
@@ -181,28 +197,58 @@ def query(
         "context": context,
         "citations": citations,
         "chunks_retrieved": len(all_documents),
+        "providers": providers,
     }
 
 
 def print_response(result: dict) -> None:
-    """Print a formatted response.
+    """Print a formatted response using Rich console output.
 
     Args:
         result: Query result dictionary.
     """
-    print("\n" + "=" * 60)
-    print("ANSWER")
-    print("=" * 60)
-    print(result["answer"])
+    providers = result.get("providers", [])
+    provider_label = ", ".join(p.upper() for p in providers) if providers else ""
 
+    # Header with provider info
+    title = f"RESPONSE (Sources: {provider_label})" if provider_label else "RESPONSE"
+    console.print()
+    console.rule(f"[bold blue]{title}[/bold blue]")
+
+    # Render the LLM response as Markdown for proper formatting
+    answer_md = Markdown(result["answer"])
+    console.print(answer_md)
+
+    # Retrieved chunks summary
+    console.print()
+    console.rule("[dim]Source Information[/dim]")
+    console.print(f"[dim]Retrieved {result['chunks_retrieved']} chunks[/dim]")
+
+    # Print citation table with provider and page ranges
     if result["citations"]:
-        print("\n" + "-" * 60)
-        print("CITATIONS")
-        print("-" * 60)
-        for cit in result["citations"]:
-            print(f"  • {cit['document']} | {cit['section']} | Page {cit['page']}")
+        table = Table(title="Source Documents", show_header=True, header_style="bold")
+        table.add_column("Provider", style="cyan", width=10)
+        table.add_column("Document", style="green")
+        table.add_column("Section", style="yellow")
+        table.add_column("Pages", style="magenta", justify="right")
 
-    print("\n" + f"[Retrieved {result['chunks_retrieved']} chunks]")
+        for cit in result["citations"]:
+            provider = cit.get("provider", "").upper()
+            page_start = cit.get("page_start", "?")
+            page_end = cit.get("page_end", page_start)
+            if page_start != page_end and page_end != "?":
+                page_str = f"{page_start}–{page_end}"
+            else:
+                page_str = str(page_start)
+
+            table.add_row(
+                provider,
+                cit["document"],
+                cit["section"],
+                page_str,
+            )
+
+        console.print(table)
 
 
 def main(question: str) -> None:
@@ -216,8 +262,6 @@ def main(question: str) -> None:
 
 
 if __name__ == "__main__":
-    import sys
-
     if len(sys.argv) > 1:
         main(sys.argv[1])
     else:
