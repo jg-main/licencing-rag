@@ -47,8 +47,8 @@ ______________________________________________________________________
 
 - [x] Successfully ingest all 35 CME documents
 - [x] Test query returns grounded answer with citations
-- [ ] Test refusal for out-of-scope questions
-- [ ] Response time < 15 seconds
+- [x] Test refusal for out-of-scope questions
+- [x] Response time < 15 seconds (14.4s achieved)
 
 #### 1.7 Claude API Integration
 
@@ -56,7 +56,7 @@ ______________________________________________________________________
 - [x] Create `app/llm.py` with provider abstraction
 - [x] Add `LLM_PROVIDER` config (ollama/anthropic)
 - [x] Update `query.py` to use LLM abstraction
-- [ ] Test with Claude API
+- [x] Test with Claude API (claude-sonnet-4-5-20250929)
 - [x] Document API key setup in README
 
 ### Phase 2: Robustness (Week 2)
