@@ -1,7 +1,11 @@
 # app/extract.py
 """Document text extraction with page tracking and quality validation."""
 
+import json
+import re
 from dataclasses import dataclass
+from datetime import datetime
+from datetime import timezone
 from pathlib import Path
 
 import fitz
@@ -137,8 +141,29 @@ def extract_docx(path: Path) -> ExtractedDocument:
 
     try:
         doc = Document(str(path))
-        paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-        full_text = "\n".join(paragraphs)
+
+        # Extract paragraphs
+        content_parts = []
+        for p in doc.paragraphs:
+            if p.text.strip():
+                content_parts.append(p.text)
+
+        # Extract tables (often contain fee schedules, definitions, etc.)
+        for table in doc.tables:
+            table_rows: list[str] = []
+            for row in table.rows:
+                cells = [cell.text.strip() for cell in row.cells]
+                # Dedupe adjacent cells (merged cells repeat)
+                deduped: list[str] = []
+                for c in cells:
+                    if not deduped or c != deduped[-1]:
+                        deduped.append(c)
+                if any(deduped):  # Skip empty rows
+                    table_rows.append(" | ".join(deduped))
+            if table_rows:
+                content_parts.append("\n".join(table_rows))
+
+        full_text = "\n".join(content_parts)
 
         # DOCX doesn't have page boundaries, treat as single page
         pages = [PageContent(page_num=1, text=full_text)]
@@ -215,3 +240,84 @@ def validate_extraction(extracted: ExtractedDocument) -> list[str]:
         log.warning("extraction_validation", message=warning)
 
     return warnings
+
+
+def detect_document_version(text: str) -> str | None:
+    """Attempt to detect document version from text content.
+
+    Looks for common version patterns like:
+    - Version 1.0, Version 2.3.4
+    - v1.0, v2.3
+    - Effective Date patterns
+
+    Args:
+        text: The document text to search.
+
+    Returns:
+        Detected version string or None if not found.
+    """
+
+    # Check first 2000 chars (usually contains version info)
+    sample = text[:2000]
+
+    # Common version patterns (case-insensitive)
+    patterns = [
+        r"[Vv][Ee][Rr][Ss][Ii][Oo][Nn]\s*:?\s*(\d+(?:\.\d+)*)",  # Version 1.0, VERSION: 2.3.4
+        r"\b[Vv](\d+(?:\.\d+)+)\b",  # v1.0, v2.3
+        r"[Rr][Ee][Vv][Ii][Ss][Ii][Oo][Nn]\s*:?\s*(\d+(?:\.\d+)*)",  # Revision 1.0
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, sample)
+        if match:
+            return match.group(1)
+
+    return None
+
+
+def save_extraction_artifacts(
+    extracted: ExtractedDocument,
+    output_dir: Path,
+    provider: str,
+) -> tuple[Path, Path]:
+    """Save extraction artifacts (.txt and .meta.json) as per spec.
+
+    Args:
+        extracted: The extracted document.
+        output_dir: Directory to save artifacts (e.g., data/text/cme/).
+        provider: Provider identifier (e.g., "cme").
+
+    Returns:
+        Tuple of (text_path, meta_path) for saved files.
+    """
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Use full filename (with extension) to avoid collisions between .pdf and .docx
+    # e.g., "document.pdf" -> "document.pdf.txt" and "document.pdf.meta.json"
+    source_name = Path(extracted.source_file).name
+
+    # Save text file
+    text_path = output_dir / f"{source_name}.txt"
+    text_path.write_text(extracted.full_text, encoding="utf-8")
+
+    # Save metadata JSON
+    meta_path = output_dir / f"{source_name}.meta.json"
+    metadata = {
+        "source_file": extracted.source_file,
+        "provider": provider,
+        "extracted_at": datetime.now(timezone.utc).isoformat(),
+        "page_count": extracted.page_count,
+        "extraction_method": extracted.extraction_method,
+        "word_count": extracted.word_count,
+        "document_version": detect_document_version(extracted.full_text),
+    }
+    meta_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+    log.debug(
+        "extraction_artifacts_saved",
+        text_file=str(text_path),
+        meta_file=str(meta_path),
+    )
+
+    return text_path, meta_path
