@@ -182,8 +182,10 @@ ______________________________________________________________________
 
 For each source document, produce:
 
-1. **Clean text file** — `data/text/{provider}/{filename}.txt`
-1. **Metadata JSON** — `data/text/{provider}/{filename}.meta.json`
+1. **Clean text file** — `data/text/{provider}/{source_filename}.txt`
+1. **Metadata JSON** — `data/text/{provider}/{source_filename}.meta.json`
+
+Note: The full source filename is preserved (e.g., `document.pdf.txt`) to maintain traceability.
 
 Metadata JSON schema:
 
