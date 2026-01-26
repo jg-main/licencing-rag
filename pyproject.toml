@@ -10,6 +10,7 @@ dependencies = [
     "ollama>=0.6.1",
     "pymupdf>=1.26.7",
     "python-docx>=1.2.0",
+    "rich>=14.0.0",
     "structlog>=25.5.0",
     "tqdm>=4.67.1",
 ]
@@ -21,6 +22,8 @@ dev = [
     "mdformat-gfm>=1.0.0",
     "mypy>=1.19.1",
     "pre-commit>=4.5.1",
+    "pytest>=8.0.0",
+    "pytest-cov>=6.0.0",
     "ruff>=0.14.14",
 ]
 
@@ -30,6 +33,12 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+addopts = "-v --tb=short"
 
 [tool.isort]
 profile = "black"
