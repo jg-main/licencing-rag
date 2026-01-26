@@ -22,3 +22,9 @@ def sample_pdf(fixtures_dir: Path) -> Path:
 def fee_list_pdf(fixtures_dir: Path) -> Path:
     """Return path to fee list PDF fixture."""
     return fixtures_dir / "january-2025-market-data-fee-list.pdf"
+
+
+@pytest.fixture
+def sample_docx(fixtures_dir: Path) -> Path:
+    """Return path to sample DOCX fixture with tables."""
+    return fixtures_dir / "sample-agreement.docx"

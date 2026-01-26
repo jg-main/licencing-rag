@@ -9,6 +9,7 @@ from app.extract import (
     ExtractedDocument,
     ExtractionError,
     detect_document_version,
+    extract_docx,
     extract_document,
     extract_pdf,
     validate_extraction,
@@ -128,3 +129,53 @@ class TestDetectDocumentVersion:
         # The fixture is "information-policies-v5-04.pdf" so it may contain version info
         # Just verify it returns str or None without error
         assert version is None or isinstance(version, str)
+
+
+class TestExtractDocx:
+    """Tests for DOCX extraction with table support."""
+
+    def test_extract_docx_returns_extracted_document(self, sample_docx: Path) -> None:
+        """DOCX extraction returns ExtractedDocument."""
+        result = extract_docx(sample_docx)
+
+        assert isinstance(result, ExtractedDocument)
+        assert result.page_count == 1  # DOCX treated as single page
+        assert result.source_file == sample_docx.name
+        assert result.extraction_method == "python-docx"
+
+    def test_extract_docx_has_content(self, sample_docx: Path) -> None:
+        """Extracted DOCX contains text content."""
+        result = extract_docx(sample_docx)
+
+        assert result.word_count > 0
+        assert len(result.full_text) > 0
+        assert not result.is_empty
+
+    def test_extract_docx_table_extraction(self, sample_docx: Path) -> None:
+        """Tables in DOCX are extracted as pipe-delimited rows."""
+        result = extract_docx(sample_docx)
+
+        # Table header and data should be present
+        assert "Data Type" in result.full_text
+        assert "Monthly Fee" in result.full_text
+        assert "|" in result.full_text  # Pipe delimiter from table extraction
+        # Fee values from the table
+        assert "$500" in result.full_text or "500" in result.full_text
+
+    def test_extract_docx_paragraphs_extracted(self, sample_docx: Path) -> None:
+        """Paragraphs in DOCX are extracted."""
+        result = extract_docx(sample_docx)
+
+        assert "DEFINITIONS" in result.full_text
+        assert "Distributor" in result.full_text
+        assert "TERMINATION" in result.full_text
+
+    def test_extract_docx_not_found(self, tmp_path: Path) -> None:
+        """Extraction raises FileNotFoundError for missing file."""
+        with pytest.raises(FileNotFoundError):
+            extract_docx(tmp_path / "nonexistent.docx")
+
+    def test_extract_document_docx(self, sample_docx: Path) -> None:
+        """extract_document handles DOCX files."""
+        result = extract_document(sample_docx)
+        assert result.extraction_method == "python-docx"
