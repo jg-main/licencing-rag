@@ -45,10 +45,19 @@ ______________________________________________________________________
 
 #### 1.6 Verification
 
-- [ ] Successfully ingest all 35 CME documents
-- [ ] Test query returns grounded answer with citations
+- [x] Successfully ingest all 35 CME documents
+- [x] Test query returns grounded answer with citations
 - [ ] Test refusal for out-of-scope questions
 - [ ] Response time < 15 seconds
+
+#### 1.7 Claude API Integration
+
+- [ ] Add `anthropic` to dependencies
+- [ ] Create `app/llm.py` with provider abstraction
+- [ ] Add `LLM_PROVIDER` config (ollama/anthropic)
+- [ ] Update `query.py` to use LLM abstraction
+- [ ] Test with Claude API
+- [ ] Document API key setup in README
 
 ### Phase 2: Robustness (Week 2)
 
@@ -76,6 +85,7 @@ ______________________________________________________________________
 - [ ] Query logging to `logs/queries.jsonl`
 - [ ] CTA/UTP document support
 - [ ] Web UI (Streamlit)
+- [ ] OpenAI API support (alternative to Claude)
 
 ______________________________________________________________________
 
@@ -278,9 +288,9 @@ def query(question: str, providers: list[str] = None) -> str:
     # Build context and call LLM
 ```
 
-### 1.6 Build CLI (Day 5)
+### 1.5 Build CLI (Day 5)
 
-#### Task 1.6.1: Implement `main.py` with argparse
+#### Task 1.5.1: Implement `main.py` with argparse
 
 ```python
 def main():
@@ -306,11 +316,114 @@ def main():
     # Dispatch to handlers
 ```
 
-### 1.7 Verification (Day 5)
+### 1.6 Verification (Day 5)
 
 #### Test Cases
 
 | Test | Expected | |------|----------| | `python main.py ingest --provider cme` | Ingests 35 docs, no errors | | `python main.py list --provider cme` | Shows 35 documents | | `python main.py query "What is a subscriber?"` | Returns answer with citations | | `python main.py query "What is Bitcoin?"` | Returns refusal message |
+
+### 1.7 Claude API Integration (Day 6)
+
+**Goal:** Use Claude API for answer generation (better quality, faster for dev)
+
+#### Architecture Decision
+
+| Component | Tool | Reason | |-----------|------|--------| | Embeddings | Ollama (nomic-embed-text) | Free, fast, runs locally | | Answer Generation | Claude API | Better quality, no GPU needed | | Vector Storage | ChromaDB | Local, persistent |
+
+#### Task 1.7.1: Add anthropic dependency
+
+```bash
+uv add anthropic
+```
+
+#### Task 1.7.2: Create `app/llm.py`
+
+```python
+# app/llm.py
+"""LLM provider abstraction for answer generation."""
+
+import os
+from abc import ABC, abstractmethod
+
+import anthropic
+import ollama
+
+from app.config import LLM_MODEL, LLM_PROVIDER
+
+
+class LLMProvider(ABC):
+    @abstractmethod
+    def generate(self, system: str, prompt: str) -> str:
+        """Generate a response given system prompt and user prompt."""
+        pass
+
+
+class OllamaProvider(LLMProvider):
+    def __init__(self, model: str = LLM_MODEL):
+        self.model = model
+
+    def generate(self, system: str, prompt: str) -> str:
+        response = ollama.generate(
+            model=self.model,
+            system=system,
+            prompt=prompt,
+        )
+        return response["response"]
+
+
+class AnthropicProvider(LLMProvider):
+    def __init__(self, model: str = "claude-sonnet-4-20250514"):
+        self.client = anthropic.Anthropic()  # Uses ANTHROPIC_API_KEY env var
+        self.model = model
+
+    def generate(self, system: str, prompt: str) -> str:
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=2048,
+            system=system,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.content[0].text
+
+
+def get_llm() -> LLMProvider:
+    """Get the configured LLM provider."""
+    if LLM_PROVIDER == "anthropic":
+        return AnthropicProvider()
+    return OllamaProvider()
+```
+
+#### Task 1.7.3: Update config
+
+```python
+# app/config.py
+import os
+
+# LLM Provider: "ollama" or "anthropic"
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+
+# For Ollama
+LLM_MODEL = "llama3.2:3b"  # or llama3.1:8b with more RAM
+
+# For Anthropic (uses ANTHROPIC_API_KEY env var)
+ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
+```
+
+#### Task 1.7.4: Usage
+
+```bash
+# Use Ollama (default, free but slow on limited hardware)
+python main.py query "What are the CME fees?"
+
+# Use Claude API (fast, ~$0.003/query)
+export ANTHROPIC_API_KEY="sk-ant-..."
+export LLM_PROVIDER="anthropic"
+python main.py query "What are the CME fees?"
+```
+
+#### Cost Estimate (Claude API)
+
+| Usage | Tokens/query | Cost/query | Monthly (100 queries/day) | |-------|--------------|------------|---------------------------| | Light | ~2,000 | ~$0.003 | ~$9 | | Heavy | ~5,000 | ~$0.008 | ~$24 |
 
 ______________________________________________________________________
 
