@@ -35,8 +35,9 @@ def cmd_ingest(args: argparse.Namespace) -> int:
             print(f"Ingesting provider: {provider}")
             print("=" * 60)
             stats = ingest_provider(provider, force=args.force)
-            if stats.get("errors"):
-                print(f"Completed with {len(stats['errors'])} errors")
+            errors = stats.get("errors", [])
+            if errors and isinstance(errors, list) and len(errors) > 0:
+                print(f"Completed with {len(errors)} errors")
         except (ValueError, FileNotFoundError) as e:
             print(f"Error: {e}")
             return 1

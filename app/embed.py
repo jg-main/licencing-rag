@@ -8,6 +8,7 @@ from chromadb import EmbeddingFunction
 from chromadb import Embeddings
 
 from app.config import EMBED_MODEL
+from app.config import MAX_CHUNK_CHARS
 
 
 class OllamaEmbeddingFunction(EmbeddingFunction):  # type: ignore[type-arg]
@@ -36,6 +37,8 @@ class OllamaEmbeddingFunction(EmbeddingFunction):  # type: ignore[type-arg]
         """
         embeddings: Embeddings = []
         for text in input:
-            response = ollama.embed(model=self.model, input=text)
+            # Truncate to prevent context length errors
+            truncated = text[:MAX_CHUNK_CHARS] if len(text) > MAX_CHUNK_CHARS else text
+            response = ollama.embed(model=self.model, input=truncated)
             embeddings.append(response["embeddings"][0])
         return embeddings
