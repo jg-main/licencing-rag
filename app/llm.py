@@ -11,6 +11,15 @@ import ollama
 from app.config import ANTHROPIC_MODEL
 from app.config import LLM_MODEL
 from app.config import LLM_PROVIDER
+from app.logging import get_logger
+
+log = get_logger(__name__)
+
+
+class LLMConnectionError(Exception):
+    """Raised when LLM connection or generation fails."""
+
+    pass
 
 
 class LLMProvider(ABC):
@@ -26,6 +35,9 @@ class LLMProvider(ABC):
 
         Returns:
             Generated response text.
+
+        Raises:
+            LLMConnectionError: If generation fails.
         """
         pass
 
@@ -50,15 +62,27 @@ class OllamaProvider(LLMProvider):
 
         Returns:
             Generated text.
+
+        Raises:
+            LLMConnectionError: If Ollama is not running or generation fails.
         """
-        response = ollama.chat(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
-        )
-        return str(response["message"]["content"])
+        try:
+            response = ollama.chat(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            return str(response["message"]["content"])
+        except ollama.ResponseError as e:
+            log.error("ollama_response_error", model=self.model, error=str(e))
+            raise LLMConnectionError(f"Ollama error: {e}") from e
+        except Exception as e:
+            log.error("ollama_connection_failed", model=self.model, error=str(e))
+            raise LLMConnectionError(
+                f"Cannot connect to Ollama. Is it running? Error: {e}"
+            ) from e
 
 
 class AnthropicProvider(LLMProvider):
@@ -68,7 +92,7 @@ class AnthropicProvider(LLMProvider):
         """Initialize the Anthropic provider.
 
         Args:
-            model: Model name to use (e.g., 'claude-sonnet-4-20250514').
+            model: Model name to use (e.g., 'claude-sonnet-4-5-20250929').
 
         Raises:
             ValueError: If ANTHROPIC_API_KEY is not set.
@@ -91,18 +115,33 @@ class AnthropicProvider(LLMProvider):
 
         Returns:
             Generated text.
+
+        Raises:
+            LLMConnectionError: If API call fails.
         """
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=2048,
-            system=system,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        # Extract text from response
-        content = response.content[0]
-        if hasattr(content, "text"):
-            return str(content.text)
-        return str(content)
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=2048,
+                system=system,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            # Extract text from response
+            content = response.content[0]
+            if hasattr(content, "text"):
+                return str(content.text)
+            return str(content)
+        except anthropic.APIConnectionError as e:
+            log.error("anthropic_connection_error", error=str(e))
+            raise LLMConnectionError(f"Cannot connect to Anthropic API: {e}") from e
+        except anthropic.RateLimitError as e:
+            log.error("anthropic_rate_limit", error=str(e))
+            raise LLMConnectionError(f"Anthropic rate limit exceeded: {e}") from e
+        except anthropic.APIStatusError as e:
+            log.error("anthropic_api_error", status=e.status_code, error=str(e))
+            raise LLMConnectionError(
+                f"Anthropic API error ({e.status_code}): {e}"
+            ) from e
 
 
 def get_llm() -> LLMProvider:
@@ -110,7 +149,11 @@ def get_llm() -> LLMProvider:
 
     Returns:
         LLMProvider instance based on LLM_PROVIDER config.
+
+    Raises:
+        ValueError: If provider requires missing configuration.
     """
+    log.debug("initializing_llm", provider=LLM_PROVIDER)
     if LLM_PROVIDER == "anthropic":
         return AnthropicProvider()
     return OllamaProvider()
