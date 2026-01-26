@@ -218,3 +218,9 @@ __marimo__/
 # Project specific ignores
 index/
 data/
+# Quarto build outputs
+README.html
+README_files/
+
+# VSCode settings
+.vscode/
