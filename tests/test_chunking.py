@@ -9,6 +9,7 @@ from app.chunking import (
     Chunk,
     _build_page_positions,
     _find_page_range_by_position,
+    _is_important_short_section,
     chunk_document,
     detect_section_heading,
     is_definitions_section,
@@ -87,6 +88,43 @@ class TestWindowChunk:
         starts = [start for _, start, _ in result]
         assert len(set(starts)) == len(starts)
 
+    def test_window_chunk_allow_short_preserves_tail(self) -> None:
+        """With allow_short=True, short tail windows are preserved."""
+        # Create text that will produce a chunk + short tail
+        # 150 words = 1 full chunk of 100 + 50 word tail (below MIN_CHUNK_SIZE of 50)
+        text = " ".join(f"word{i}" for i in range(150))
+
+        # Without allow_short, tail may be dropped
+        result_normal = window_chunk(text, size=100, overlap=20)
+
+        # With allow_short, tail should be preserved
+        result_short = window_chunk(text, size=100, overlap=20, allow_short=True)
+
+        # allow_short should produce at least as many chunks
+        # The key is that the tail window (words 80-149 = 70 words) is kept
+        assert len(result_short) >= len(result_normal)
+
+        # Verify last chunk exists and has content
+        if result_short:
+            last_chunk_text, _, _ = result_short[-1]
+            assert len(last_chunk_text.split()) > 0
+
+    def test_window_chunk_allow_short_single_small_chunk(self) -> None:
+        """With allow_short=True, very short text is preserved."""
+        # Just 10 words - below MIN_CHUNK_SIZE
+        text = " ".join(f"word{i}" for i in range(10))
+
+        # Without allow_short, would return empty
+        result_normal = window_chunk(text, size=100, overlap=20, allow_short=False)
+
+        # With allow_short, should preserve the content
+        result_short = window_chunk(text, size=100, overlap=20, allow_short=True)
+
+        assert len(result_short) == 1
+        chunk_text, start, end = result_short[0]
+        assert "word0" in chunk_text
+        assert "word9" in chunk_text
+
 
 class TestSplitBySections:
     """Tests for section splitting."""
@@ -114,7 +152,7 @@ Content of section 2."""
 
         # Should have preamble + 2 sections
         assert len(result) >= 2
-        headings = [h for h, _ in result]
+        headings = [h for h, _, _, _ in result]
         assert any("SECTION 1" in h for h in headings)
         assert any("SECTION 2" in h for h in headings)
 
@@ -128,7 +166,7 @@ Content of section 2."""
         result = split_by_sections(text)
 
         # Should detect indented section
-        headings = [h for h, _ in result]
+        headings = [h for h, _, _, _ in result]
         assert any("SECTION" in h for h in headings)
 
 
@@ -159,6 +197,102 @@ class TestIsDefinitionsSection:
         """Non-definitions sections return False."""
         assert not is_definitions_section("General provisions apply")
         assert not is_definitions_section("Fee schedule for 2025")
+
+
+class TestIsImportantShortSection:
+    """Tests for _is_important_short_section body-text scanning."""
+
+    def test_heading_keyword_detected(self) -> None:
+        """Heading with fee keyword returns True."""
+        assert _is_important_short_section("Fee Schedule", "Some content")
+        assert _is_important_short_section("EXHIBIT A", "Details")
+        assert _is_important_short_section("SCHEDULE OF RATES", "Rate info")
+
+    def test_body_text_keyword_detected(self) -> None:
+        """Body text containing fee keywords returns True even without heading keywords."""
+        # Heading has no keywords, but body mentions fees
+        assert _is_important_short_section(
+            "SECTION 5",
+            "The monthly fee for data access shall be $500."
+        )
+        assert _is_important_short_section(
+            "Article VII",
+            "Payment is due within 30 days of invoice."
+        )
+        assert _is_important_short_section(
+            "Part 3",
+            "Termination of this agreement requires 90 days notice."
+        )
+
+    def test_definitions_section_detected(self) -> None:
+        """Definitions sections are detected as important."""
+        assert _is_important_short_section(
+            "ARTICLE I",
+            "Definitions. 'Data' means..."
+        )
+
+    def test_non_important_section(self) -> None:
+        """Sections without important keywords return False."""
+        assert not _is_important_short_section(
+            "SECTION 1",
+            "This agreement is entered into between the parties."
+        )
+        assert not _is_important_short_section(
+            "Background",
+            "The company was founded in 2020."
+        )
+
+    def test_body_scan_limited_to_500_chars(self) -> None:
+        """Keywords beyond 500 chars in body are not detected."""
+        # Fee keyword appears after 500 characters
+        filler = "x" * 510
+        assert not _is_important_short_section(
+            "SECTION 1",
+            f"{filler} The fee is $100."
+        )
+
+
+class TestSplitBySectionsOffsetAlignment:
+    """Tests for section offset alignment with trimmed content."""
+
+    def test_offsets_match_section_text(self) -> None:
+        """Returned offsets slice the original text to get section_text."""
+        text = """Preamble content here.
+
+SECTION 1 First Section
+   Content with leading whitespace.   
+
+SECTION 2 Second Section
+More content here."""
+
+        sections = split_by_sections(text)
+
+        for heading, section_text, content_start, content_end in sections:
+            # The slice from the original text must equal the section_text
+            sliced = text[content_start:content_end]
+            assert sliced == section_text, (
+                f"Offset mismatch for '{heading}': "
+                f"sliced={sliced!r}, section_text={section_text!r}"
+            )
+
+    def test_offsets_trim_whitespace(self) -> None:
+        """Offsets exclude leading/trailing whitespace from sections."""
+        text = """   
+SECTION 1 Test
+   
+   Some content here   
+   
+"""
+        sections = split_by_sections(text)
+
+        for heading, section_text, content_start, content_end in sections:
+            # section_text should have no leading/trailing whitespace
+            assert section_text == section_text.strip()
+            # Offsets should not include outer whitespace
+            if content_start > 0:
+                assert text[content_start - 1].isspace() or text[content_start - 1] == "\n"
+            if content_end < len(text):
+                assert text[content_end].isspace() or text[content_end] == "\n"
 
 
 class TestPagePositions:
