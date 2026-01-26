@@ -13,11 +13,11 @@ CHROMA_DIR = Path("index/chroma")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
 
 # Model configuration (Ollama)
-LLM_MODEL = "llama3.2:3b"  # Use 3B for limited RAM; upgrade to 8b/70b with more memory
+LLM_MODEL = "llama3.2:8b"  # Use 8B for limited RAM; upgrade to 70b with more memory
 EMBED_MODEL = "nomic-embed-text"
 
 # Model configuration (Anthropic)
-ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
+ANTHROPIC_MODEL = "claude-sonnet-4-5-20250929"  # Latest Sonnet, active until Sep 2026+
 
 # Chunking parameters
 CHUNK_SIZE = 400  # words (reduced to stay within embedding context)
