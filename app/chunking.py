@@ -87,34 +87,103 @@ def is_definitions_section(text: str) -> bool:
     return "definition" in lower_text or "defined term" in lower_text
 
 
-def split_by_sections(text: str) -> list[tuple[str, str]]:
-    """Split text by section boundaries.
+def _is_important_short_section(heading: str, text: str) -> bool:
+    """Check if a section is important enough to keep even if short.
+
+    Identifies sections that may be short but contain legally significant content
+    that should not be dropped due to minimum chunk size thresholds.
+
+    Args:
+        heading: Section heading.
+        text: Section text content.
+
+    Returns:
+        True if this section should allow shorter chunks.
+    """
+    # Check definitions
+    if is_definitions_section(text):
+        return True
+
+    # Important patterns that indicate legally significant content
+    important_patterns = [
+        "fee",
+        "schedule",
+        "exhibit",
+        "appendix",
+        "price",
+        "rate",
+        "charge",
+        "cost",
+        "payment",
+        "penalty",
+        "termination",
+        "liability",
+        "indemnif",
+    ]
+
+    # Check heading for important section types
+    heading_lower = heading.lower()
+    if any(pattern in heading_lower for pattern in important_patterns):
+        return True
+
+    # Also scan body text (first 500 chars) for important keywords
+    # This catches short sections without descriptive headings
+    body_lower = text[:500].lower()
+    return any(pattern in body_lower for pattern in important_patterns)
+
+
+def split_by_sections(text: str) -> list[tuple[str, str, int, int]]:
+    """Split text by section boundaries, returning exact character offsets.
 
     Args:
         text: Full document text.
 
     Returns:
-        List of (section_heading, section_text) tuples.
+        List of (section_heading, section_text, start_offset, end_offset) tuples.
+        Offsets are absolute character positions in the original text.
     """
     matches = list(SECTION_REGEX.finditer(text))
     if not matches:
-        return [("N/A", text)]
+        return [("N/A", text, 0, len(text))]
 
-    sections = []
+    sections: list[tuple[str, str, int, int]] = []
 
     # Add any text before the first section
     if matches[0].start() > 0:
-        preamble = text[: matches[0].start()].strip()
+        preamble_start = 0
+        preamble_end = matches[0].start()
+        preamble = text[preamble_start:preamble_end].strip()
         if preamble:
-            sections.append(("Preamble", preamble))
+            # Find actual content boundaries (excluding leading/trailing whitespace)
+            content_start = preamble_start
+            while content_start < preamble_end and text[content_start].isspace():
+                content_start += 1
+            content_end = preamble_end
+            while content_end > content_start and text[content_end - 1].isspace():
+                content_end -= 1
+            sections.append(("Preamble", preamble, content_start, content_end))
 
     # Process each section
     for i, match in enumerate(matches):
-        start = match.start()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        section_text = text[start:end].strip()
+        raw_start = match.start()
+        raw_end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         heading = match.group(0).strip()
-        sections.append((heading, section_text))
+
+        # Find actual content boundaries (excluding leading/trailing whitespace)
+        # This ensures section_text is an exact slice from content_start to content_end,
+        # so relative positions within section_text map correctly to absolute positions.
+        # Note: trailing newlines are trimmed, but this is intentional as they don't
+        # contain content and page boundaries are determined by character positions.
+        content_start = raw_start
+        while content_start < raw_end and text[content_start].isspace():
+            content_start += 1
+        content_end = raw_end
+        while content_end > content_start and text[content_end - 1].isspace():
+            content_end -= 1
+
+        # section_text is the exact slice [content_start:content_end] - not re-stripped
+        section_text = text[content_start:content_end]
+        sections.append((heading, section_text, content_start, content_end))
 
     return sections
 
@@ -123,6 +192,7 @@ def window_chunk(
     text: str,
     size: int = CHUNK_SIZE,
     overlap: int = CHUNK_OVERLAP,
+    allow_short: bool = False,
 ) -> list[tuple[str, int, int]]:
     """Split text into overlapping word windows, preserving original spans.
 
@@ -130,6 +200,7 @@ def window_chunk(
         text: Text to chunk.
         size: Target chunk size in words.
         overlap: Overlap between chunks in words.
+        allow_short: If True, keep sections shorter than MIN_CHUNK_SIZE (for definitions, etc.)
 
     Returns:
         List of (chunk_text, start_char, end_char) tuples with original text preserved.
@@ -149,8 +220,12 @@ def window_chunk(
             i += 1
         word_positions.append((text[start:i], start, i))
 
+    # Determine minimum size threshold
+    # For important sections (allow_short=True), set to 1 to never drop critical content
+    min_size = 1 if allow_short else MIN_CHUNK_SIZE
+
     if len(word_positions) <= size:
-        if len(word_positions) >= MIN_CHUNK_SIZE:
+        if len(word_positions) >= min_size:
             # Use actual word boundaries, not stripped text
             if word_positions:
                 first_start = word_positions[0][1]
@@ -172,7 +247,7 @@ def window_chunk(
     step = max(1, size - effective_overlap)  # Ensure we always advance
     while i < len(word_positions):
         window = word_positions[i : i + size]
-        if len(window) >= MIN_CHUNK_SIZE:
+        if len(window) >= min_size:
             start_char = window[0][1]
             end_char = window[-1][2]
             # Extract original text span (preserves whitespace)
@@ -259,20 +334,17 @@ def chunk_document(
     chunks: list[Chunk] = []
     chunk_index = 0
 
-    # Track section start offset in full document
-    section_offset = 0
-
-    for section_heading, section_text in sections:
-        # Find where this section starts in full_text
-        section_start = full_text.find(section_text, section_offset)
-        if section_start == -1:
-            section_start = section_offset  # Fallback
+    for section_heading, section_text, section_start, _section_end in sections:
+        # Check if this is an important section that should allow shorter chunks
+        # (definitions, fees, schedules, etc.)
+        is_important_short = _is_important_short_section(section_heading, section_text)
 
         # Get chunks with character positions relative to section
-        text_chunks = window_chunk(section_text)
+        # For important sections, allow smaller chunks to preserve legally significant content
+        text_chunks = window_chunk(section_text, allow_short=is_important_short)
 
         for text, rel_start, rel_end in text_chunks:
-            # Convert to absolute positions in full document
+            # Convert to absolute positions in full document using exact offsets
             abs_start = section_start + rel_start
             abs_end = section_start + rel_end
 
@@ -296,8 +368,6 @@ def chunk_document(
             )
             chunks.append(chunk)
             chunk_index += 1
-
-        section_offset = section_start + len(section_text)
 
     return chunks
 
