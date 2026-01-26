@@ -168,11 +168,12 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
 
     if not doc_files:
         log.warning("no_documents_found", provider=provider, path=str(raw_dir))
-        return {"documents": 0, "chunks": 0, "errors": []}
+        return {"documents": 0, "chunks": 0, "errors": [], "warnings": []}
 
     doc_count = 0
     chunk_count = 0
     errors: list[str] = []
+    warnings: list[str] = []
 
     log.info(
         "ingestion_started",
@@ -194,7 +195,7 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
             # Validate extraction quality and log any warnings
             extraction_warnings = validate_extraction(extracted)
             if extraction_warnings:
-                errors.extend(extraction_warnings)
+                warnings.extend(extraction_warnings)
 
             # Detect document version for chunk metadata
             doc_version = detect_document_version(extracted.full_text)
@@ -267,14 +268,22 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
         documents=doc_count,
         chunks=chunk_count,
         errors=len(errors),
+        warnings=len(warnings),
     )
     print("\nIngestion complete:")
     print(f"  Documents: {doc_count}")
     print(f"  Chunks: {chunk_count}")
+    if warnings:
+        print(f"  Warnings: {len(warnings)}")
     if errors:
         print(f"  Errors: {len(errors)}")
 
-    return {"documents": doc_count, "chunks": chunk_count, "errors": errors}
+    return {
+        "documents": doc_count,
+        "chunks": chunk_count,
+        "errors": errors,
+        "warnings": warnings,
+    }
 
 
 def list_indexed_documents(provider: str) -> list[str]:
