@@ -5,6 +5,7 @@ description = "Local RAG system for license agreement analysis"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "anthropic>=0.76.0",
     "chromadb>=1.4.1",
     "ollama>=0.6.1",
     "pymupdf>=1.26.7",

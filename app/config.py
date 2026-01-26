@@ -1,6 +1,7 @@
 # app/config.py
 """Configuration constants for the License Intelligence System."""
 
+import os
 from pathlib import Path
 
 # Directory paths
@@ -8,9 +9,15 @@ RAW_DATA_DIR = Path("data/raw")
 TEXT_DATA_DIR = Path("data/text")
 CHROMA_DIR = Path("index/chroma")
 
-# Model configuration
+# LLM Provider: "ollama" or "anthropic"
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+
+# Model configuration (Ollama)
 LLM_MODEL = "llama3.2:3b"  # Use 3B for limited RAM; upgrade to 8b/70b with more memory
 EMBED_MODEL = "nomic-embed-text"
+
+# Model configuration (Anthropic)
+ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
 
 # Chunking parameters
 CHUNK_SIZE = 400  # words (reduced to stay within embedding context)

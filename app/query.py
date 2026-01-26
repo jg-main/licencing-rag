@@ -4,14 +4,13 @@
 from typing import Any
 
 import chromadb
-import ollama
 
 from app.config import CHROMA_DIR
 from app.config import DEFAULT_PROVIDERS
-from app.config import LLM_MODEL
 from app.config import PROVIDERS
 from app.config import TOP_K
 from app.embed import OllamaEmbeddingFunction
+from app.llm import get_llm
 from app.prompts import QA_PROMPT
 from app.prompts import REFUSAL_MESSAGE
 from app.prompts import SYSTEM_PROMPT
@@ -129,15 +128,8 @@ def query(
     prompt = QA_PROMPT.format(context=context, question=question)
 
     # Call LLM
-    response = ollama.chat(
-        model=LLM_MODEL,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-    )
-
-    answer = response["message"]["content"]
+    llm = get_llm()
+    answer = llm.generate(system=SYSTEM_PROMPT, prompt=prompt)
 
     # Extract citations
     citations = []
