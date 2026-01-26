@@ -1,0 +1,31 @@
+[project]
+name = "licencing-rag"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "chromadb>=1.4.1",
+    "langchain>=1.2.7",
+    "langchain-community>=0.4.1",
+    "ollama>=0.6.1",
+    "pymupdf>=1.26.7",
+    "python-docx>=1.2.0",
+    "tqdm>=4.67.1",
+]
+
+[dependency-groups]
+dev = [
+    "isort>=7.0.0",
+    "mdformat>=1.0.0",
+    "mypy>=1.19.1",
+    "pre-commit>=4.5.1",
+    "ruff>=0.14.14",
+]
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
