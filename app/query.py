@@ -10,10 +10,14 @@ from app.config import DEFAULT_PROVIDERS
 from app.config import PROVIDERS
 from app.config import TOP_K
 from app.embed import OllamaEmbeddingFunction
+from app.llm import LLMConnectionError
 from app.llm import get_llm
+from app.logging import get_logger
 from app.prompts import QA_PROMPT
 from app.prompts import REFUSAL_MESSAGE
 from app.prompts import SYSTEM_PROMPT
+
+log = get_logger(__name__)
 
 
 def format_context(
@@ -71,14 +75,20 @@ def query(
     # Validate providers
     invalid = [p for p in providers if p not in PROVIDERS]
     if invalid:
+        log.error(
+            "invalid_providers", invalid=invalid, available=list(PROVIDERS.keys())
+        )
         raise ValueError(
             f"Unknown providers: {invalid}. Available: {list(PROVIDERS.keys())}"
         )
 
     if not CHROMA_DIR.exists():
+        log.error("no_index_found", path=str(CHROMA_DIR))
         raise RuntimeError(
             "No index found. Run 'python main.py ingest --provider <name>' first."
         )
+
+    log.info("query_started", question=question[:100], providers=providers, top_k=top_k)
 
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
     embed_fn = OllamaEmbeddingFunction()
@@ -95,7 +105,9 @@ def query(
                 embedding_function=embed_fn,  # type: ignore[arg-type]
             )
         except ValueError:
-            print(f"Warning: Collection '{collection_name}' not found. Skipping.")
+            log.warning(
+                "collection_not_found", collection=collection_name, provider=provider
+            )
             continue
 
         results = collection.query(
@@ -114,12 +126,15 @@ def query(
                         all_metadatas.append(dict(m))
 
     if not all_documents:
+        log.info("no_chunks_retrieved", question=question[:100])
         return {
             "answer": REFUSAL_MESSAGE,
             "context": "",
             "citations": [],
             "chunks_retrieved": 0,
         }
+
+    log.debug("chunks_retrieved", count=len(all_documents))
 
     # Format context
     context = format_context(all_documents, all_metadatas)
@@ -128,8 +143,19 @@ def query(
     prompt = QA_PROMPT.format(context=context, question=question)
 
     # Call LLM
-    llm = get_llm()
-    answer = llm.generate(system=SYSTEM_PROMPT, prompt=prompt)
+    log.debug("calling_llm")
+    try:
+        llm = get_llm()
+        answer = llm.generate(system=SYSTEM_PROMPT, prompt=prompt)
+    except LLMConnectionError as e:
+        log.error("llm_connection_failed", error=str(e))
+        raise RuntimeError(f"LLM connection failed: {e}") from e
+
+    log.info(
+        "query_complete",
+        chunks=len(all_documents),
+        answer_length=len(answer),
+    )
 
     # Extract citations
     citations = []

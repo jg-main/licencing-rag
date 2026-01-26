@@ -13,7 +13,11 @@ from app.config import CHROMA_DIR
 from app.config import PROVIDERS
 from app.config import RAW_DATA_DIR
 from app.embed import OllamaEmbeddingFunction
+from app.extract import ExtractionError
 from app.extract import extract_document
+from app.logging import get_logger
+
+log = get_logger(__name__)
 
 
 def get_provider_raw_dir(provider: str) -> Path:
@@ -90,12 +94,16 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
         FileNotFoundError: If provider directory doesn't exist.
     """
     if provider not in PROVIDERS:
+        log.error(
+            "unknown_provider", provider=provider, available=list(PROVIDERS.keys())
+        )
         raise ValueError(
             f"Unknown provider: {provider}. Available: {list(PROVIDERS.keys())}"
         )
 
     raw_dir = get_provider_raw_dir(provider)
     if not raw_dir.exists():
+        log.error("provider_directory_not_found", provider=provider, path=str(raw_dir))
         raise FileNotFoundError(f"Provider directory not found: {raw_dir}")
 
     # Initialize ChromaDB
@@ -109,15 +117,16 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     if force:
         try:
             client.delete_collection(collection_name)
-            print(f"Deleted existing collection: {collection_name}")
+            log.info("collection_deleted", collection=collection_name)
         except ValueError:
-            pass  # Collection doesn't exist
+            log.debug("collection_not_found_for_deletion", collection=collection_name)
 
     collection = client.get_or_create_collection(
         name=collection_name,
         embedding_function=embed_fn,  # type: ignore[arg-type]
         metadata={"provider": provider},
     )
+    log.info("collection_ready", collection=collection_name, provider=provider)
 
     # Find all supported documents
     supported_extensions = {".pdf", ".docx"}
@@ -126,25 +135,32 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     ]
 
     if not doc_files:
-        print(f"No documents found in {raw_dir}")
+        log.warning("no_documents_found", provider=provider, path=str(raw_dir))
         return {"documents": 0, "chunks": 0, "errors": []}
 
     doc_count = 0
     chunk_count = 0
     errors: list[str] = []
 
+    log.info(
+        "ingestion_started",
+        provider=provider,
+        document_count=len(doc_files),
+        force=force,
+    )
     print(f"Ingesting {len(doc_files)} documents for provider: {provider}")
 
     for doc_path in tqdm(doc_files, desc=f"Processing {provider}"):
         try:
             # Extract document
+            log.debug("extracting_document", filename=doc_path.name)
             extracted = extract_document(doc_path)
 
             # Chunk document
             chunks = chunk_document(extracted, provider)
 
             if not chunks:
-                print(f"  Warning: No chunks from {doc_path.name}")
+                log.warning("no_chunks_generated", filename=doc_path.name)
                 continue
 
             # Convert to ChromaDB format
@@ -159,12 +175,31 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
 
             doc_count += 1
             chunk_count += len(chunks)
+            log.debug(
+                "document_ingested",
+                filename=doc_path.name,
+                chunks=len(chunks),
+                pages=extracted.page_count,
+            )
 
+        except ExtractionError as e:
+            error_msg = f"Extraction failed for {doc_path.name}: {e}"
+            errors.append(error_msg)
+            log.error("extraction_failed", filename=doc_path.name, error=str(e))
         except Exception as e:
             error_msg = f"Error processing {doc_path.name}: {e}"
             errors.append(error_msg)
-            print(f"  {error_msg}")
+            log.error(
+                "document_processing_failed", filename=doc_path.name, error=str(e)
+            )
 
+    log.info(
+        "ingestion_complete",
+        provider=provider,
+        documents=doc_count,
+        chunks=chunk_count,
+        errors=len(errors),
+    )
     print("\nIngestion complete:")
     print(f"  Documents: {doc_count}")
     print(f"  Chunks: {chunk_count}")
