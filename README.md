@@ -65,9 +65,82 @@ uv run python main.py list --provider cme
 
 Environment variables:
 
-| Variable | Default | Description | |----------|---------|-------------| | `LLM_PROVIDER` | `ollama` | LLM provider: `ollama` or `anthropic` | | `ANTHROPIC_API_KEY` | - | Required for Claude API |
+| Variable            | Default  | Description                           |
+| ------------------- | -------- | ------------------------------------- |
+| `LLM_PROVIDER`      | `ollama` | LLM provider: `ollama` or `anthropic` |
+| `ANTHROPIC_API_KEY` | -        | Required for Claude API               |
 
 Edit `app/config.py` for model selection and chunking parameters.
+
+## Troubleshooting
+
+### Common Issues
+
+#### "Cannot connect to Ollama"
+
+Ollama server is not running.
+
+```bash
+# Start Ollama
+ollama serve
+
+# Or on macOS, ensure the Ollama app is running
+```
+
+#### "Model not found" (Ollama)
+
+The required model hasn't been downloaded.
+
+```bash
+# Pull embedding model (required)
+ollama pull nomic-embed-text
+
+# Pull LLM model
+ollama pull llama3.2:8b
+```
+
+#### "ANTHROPIC_API_KEY environment variable is required"
+
+Claude API key not configured.
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+export LLM_PROVIDER="anthropic"
+```
+
+#### "No index found"
+
+Documents haven't been ingested yet.
+
+```bash
+uv run python main.py ingest --provider cme
+```
+
+#### "Rate limit exceeded" (Claude API)
+
+Too many requests. Wait a minute and try again, or upgrade your API plan.
+
+#### Empty or poor extraction results
+
+Some PDFs may be scanned images without text. Check the extraction:
+
+```bash
+# Enable debug logging to see extraction details
+uv run python main.py --debug ingest --provider cme
+```
+
+### Debug Mode
+
+Enable verbose logging with `--debug`:
+
+```bash
+uv run python main.py --debug query "What are the fees?"
+```
+
+### Getting Help
+
+- Check the [RAG Tutorial](docs/rag-tutorial.md) for concepts
+- Review [Implementation Plan](docs/implementation-plan.md) for architecture
 
 ## Documentation
 
