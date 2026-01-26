@@ -7,6 +7,7 @@ from pathlib import Path
 # Directory paths
 RAW_DATA_DIR = Path("data/raw")
 TEXT_DATA_DIR = Path("data/text")
+CHUNKS_DATA_DIR = Path("data/chunks")
 CHROMA_DIR = Path("index/chroma")
 
 # LLM Provider: "ollama" or "anthropic"
@@ -19,10 +20,11 @@ EMBED_MODEL = "nomic-embed-text"
 # Model configuration (Anthropic)
 ANTHROPIC_MODEL = "claude-sonnet-4-5-20250929"  # Latest Sonnet, active until Sep 2026+
 
-# Chunking parameters
-CHUNK_SIZE = 400  # words (reduced to stay within embedding context)
-CHUNK_OVERLAP = 60  # words
-MIN_CHUNK_SIZE = 50  # words
+# Chunking parameters (spec: 500-800 words target, 100-150 overlap, 100 min)
+# Using lower values to stay within embedding model context limits
+CHUNK_SIZE = 500  # words (spec: 500-800)
+CHUNK_OVERLAP = 100  # words (spec: 100-150)
+MIN_CHUNK_SIZE = 100  # words (spec: 100)
 MAX_CHUNK_CHARS = 6000  # hard limit to prevent embedding overflow
 
 # Retrieval parameters
