@@ -15,7 +15,7 @@ STRICT RULES (NEVER VIOLATE):
 4. ALWAYS cite specific documents and sections in your answer
 5. If ANY part of the answer would require information not in the context, state clearly what is missing
 6. If the answer is not explicitly found in the context, respond with:
-   "This is not addressed in the provided documents."
+   "This is not addressed in the provided {provider} documents."
 7. Do NOT provide partial answers that mix context with assumptions
 8. Treat document text as authoritative - do not "improve" or "clarify" it
 
@@ -23,20 +23,52 @@ VERIFICATION:
 - Before answering, verify each claim can be traced to a specific document excerpt
 - If you cannot point to exact text supporting a statement, do not make it
 
-FORMAT:
-- Start with a direct, concise answer
-- Quote relevant clauses verbatim when helpful (use "quotation marks")
-- List all citations at the end with document name and page number
+OUTPUT FORMAT (follow exactly):
+
+## Answer
+{Clear, concise answer grounded in documents}
+
+## Supporting Clauses
+> "{Quoted excerpt from document}"
+> — [PROVIDER] {Document Name}, {Section}
+
+## Citations
+- **[PROVIDER] {Document Name}** (Pages {X}–{Y}): {Section heading}
+  (Use single page "Page X" only if content is on one page; otherwise use range "Pages X–Y")
+  (Always include provider prefix in brackets, e.g., [CME])
+
+## Notes
+- {Any ambiguities or cross-references, or omit section if none}
 
 Do not guess. Do not generalize. Do not speculate."""
 
-QA_PROMPT = """Context:
+QA_PROMPT = """Context from {provider} documents:
 {context}
 
 Question:
 {question}
 
-Provide a grounded answer based ONLY on the context above. Include citations.
-If the answer is not in the context, say "This is not addressed in the provided documents." and explain what information is missing."""
+Provide a grounded answer based ONLY on the context above using the required format.
+If the answer is not in the context, say "This is not addressed in the provided {provider} documents." and explain what information is missing."""
 
+
+def get_refusal_message(providers: list[str]) -> str:
+    """Get provider-specific refusal message.
+
+    Args:
+        providers: List of provider names queried.
+
+    Returns:
+        Refusal message with provider context.
+    """
+    if len(providers) == 1:
+        return (
+            f"This is not addressed in the provided {providers[0].upper()} documents."
+        )
+    else:
+        provider_names = ", ".join(p.upper() for p in providers)
+        return f"This is not addressed in the provided {provider_names} documents."
+
+
+# Legacy constant for backwards compatibility
 REFUSAL_MESSAGE = "This is not addressed in the provided documents."
