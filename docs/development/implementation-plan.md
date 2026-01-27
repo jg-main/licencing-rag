@@ -90,28 +90,16 @@ ______________________________________________________________________
 
 #### 3.2 Definitions Auto-Linking
 
-- [ ] Create `app/definitions.py` module
-- [ ] Implement quoted term extraction from text
-- [ ] Build definitions index (chunks with `is_definitions=true`)
-- [ ] Implement definition retrieval by term matching
-- [ ] Update prompt to include definitions section
-- [ ] Add definition caching to reduce redundant retrievals
-- [ ] Test with common defined terms (Subscriber, Redistribution, etc.)
-- [ ] Update output format to include Definitions section
+- [x] Create `app/definitions.py` module
+- [x] Implement quoted term extraction from text
+- [x] Build definitions index (chunks with `is_definitions=true`)
+- [x] Implement definition retrieval by term matching
+- [x] Update prompt to include definitions section
+- [x] Add definition caching to reduce redundant retrievals
+- [x] Test with common defined terms (Subscriber, Redistribution, etc.)
+- [x] Update output format to include Definitions section
 
-#### 3.3 Query Logging
-
-- [ ] Create `app/logging_util.py` module
-- [ ] Implement JSONL log writer
-- [ ] Define log entry schema (query_id, timestamp, chunks, etc.)
-- [ ] Add logging to query pipeline
-- [ ] Implement log rotation (monthly)
-- [ ] Add privacy controls (disable logging flag)
-- [ ] Create `logs/` directory structure
-- [ ] Add CLI command: `rag logs --tail N`
-- [ ] Test log integrity and parsing
-
-#### 3.4 Output Formats
+#### 3.3 Output Formats
 
 - [ ] Create `app/output.py` module
 - [ ] Implement console output formatter using Rich library
@@ -122,7 +110,7 @@ ______________________________________________________________________
 - [ ] Test both output formats
 - [ ] Update documentation with format examples
 
-#### 3.5 Integration & Testing
+#### 3.4 Integration & Testing
 
 - [ ] Update all tests for hybrid search
 - [ ] Add integration tests for definitions auto-linking
@@ -265,6 +253,18 @@ ______________________________________________________________________
 - [ ] Add provider-aware prompt formatting
 - [ ] Update documentation for multi-provider usage
 
+#### Future: Query Logging
+
+- [ ] Create `app/logging_util.py` module
+- [ ] Implement JSONL log writer
+- [ ] Define log entry schema (query_id, timestamp, chunks, etc.)
+- [ ] Add logging to query pipeline
+- [ ] Implement log rotation (monthly)
+- [ ] Add privacy controls (disable logging flag)
+- [ ] Create `logs/` directory structure
+- [ ] Add CLI command: `rag logs --tail N`
+- [ ] Test log integrity and parsing
+
 ______________________________________________________________________
 
 ## Executive Summary
@@ -272,21 +272,6 @@ ______________________________________________________________________
 This plan outlines a phased approach to build a working local RAG system for license agreement analysis. The plan prioritizes getting a minimal working system first, then iterating to add robustness and features.
 
 **Estimated Timeline:** 2-3 weeks for Phase 1 (MVP)
-
-______________________________________________________________________
-
-## Current State Assessment
-
-### What Exists
-
-| Component | Status | Issues | |-----------|--------|--------| | Project structure | ✅ Good | Clean separation | | Dependencies | ⚠️ Partial | LangChain unnecessary | | Config | ✅ Good | Needs path updates | | PDF extraction | ⚠️ Partial | Missing page tracking | | Chunking | ⚠️ Partial | Missing metadata capture | | Ingestion | ❌ Broken | ChromaDB API outdated | | Query | ❌ Broken | Missing embedding function | | CLI | ❌ Missing | Placeholder only | | Prompts | ✅ Good | Minor rename needed |
-
-### Blocking Issues (Must Fix First)
-
-1. ChromaDB uses deprecated `Client()` — must use `PersistentClient()`
-1. Query doesn't embed the question — missing embedding function
-1. Path mismatch — code looks at `data/raw/` but docs are in `data/raw/cme/`
-1. Filename typo — `prompts.py` should be `prompts.py`
 
 ______________________________________________________________________
 
