@@ -60,7 +60,8 @@ def cmd_query(args: argparse.Namespace) -> int:
     Returns:
         Exit code.
     """
-    from app.query import print_response
+    from app.output import OutputFormat
+    from app.output import print_result
     from app.query import query
 
     providers = args.provider if args.provider else None
@@ -74,18 +75,12 @@ def cmd_query(args: argparse.Namespace) -> int:
             search_mode=search_mode,
         )
 
-        # Format selection (Sprint 3 - not fully implemented yet)
-        # For now, --format flag is accepted but both output the same way
-        if args.format == "json":
-            # TODO (Sprint 3): Implement JSON output formatter
-            print("Note: JSON output format will be implemented in Sprint 3")
-            print("Using console format for now...\n")
-        elif args.format == "console":
-            # TODO (Sprint 3): Implement Rich console formatter
-            # For now, using basic console output
-            pass
+        # Select output format
+        output_format = (
+            OutputFormat.JSON if args.format == "json" else OutputFormat.CONSOLE
+        )
 
-        print_response(result)
+        print_result(result, output_format)
         return 0
     except RuntimeError as e:
         print(f"Error: {e}")
@@ -210,7 +205,7 @@ Examples:
         type=str,
         choices=["console", "json"],
         default="console",
-        help="Output format: console (default) or json (Sprint 3 - not fully implemented)",
+        help="Output format: console (Rich styled, default) or json (structured)",
     )
 
     # List command
