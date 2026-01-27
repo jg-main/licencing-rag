@@ -8,6 +8,7 @@ import argparse
 import sys
 
 from app.config import PROVIDERS
+from app.config import TOP_K
 from app.logging import configure_logging
 
 
@@ -190,8 +191,8 @@ Examples:
     query_parser.add_argument(
         "--top-k",
         type=int,
-        default=5,
-        help="Number of chunks to retrieve (default: 5)",
+        default=TOP_K,
+        help=f"Number of chunks to retrieve (default: {TOP_K})",
     )
     query_parser.add_argument(
         "--search-mode",
