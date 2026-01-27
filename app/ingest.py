@@ -1,6 +1,7 @@
 # app/ingest.py
 """Document ingestion pipeline for the License Intelligence System."""
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,7 @@ from app.extract import extract_document
 from app.extract import save_extraction_artifacts
 from app.extract import validate_extraction
 from app.logging import get_logger
+from app.search import BM25_INDEX_DIR
 from app.search import BM25Index
 
 log = get_logger(__name__)
@@ -215,6 +217,22 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
         log.error("provider_directory_not_found", provider=provider, path=str(raw_dir))
         raise FileNotFoundError(f"Provider directory not found: {raw_dir}")
 
+    # Clean up all artifacts if force=True
+    if force:
+        # Clean text and chunks directories (provider-specific)
+        text_dir = get_provider_text_dir(provider)
+        chunks_dir = get_provider_chunks_dir(provider)
+        for artifact_dir in [text_dir, chunks_dir]:
+            if artifact_dir.exists():
+                shutil.rmtree(artifact_dir)
+                log.info("artifacts_deleted", directory=str(artifact_dir))
+
+        # Clean BM25 index (provider-specific)
+        bm25_path = BM25_INDEX_DIR / f"{provider}_index.pkl"
+        if bm25_path.exists():
+            bm25_path.unlink()
+            log.info("bm25_index_deleted", path=str(bm25_path))
+
     # Initialize ChromaDB
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
@@ -222,7 +240,8 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
 
     collection_name = get_collection_name(provider)
 
-    # Delete existing collection if force=True
+    # Delete existing collection if force=True (provider-specific)
+    # Note: This may leave orphaned segment folders, but preserves other providers' data
     if force:
         try:
             client.delete_collection(collection_name)
