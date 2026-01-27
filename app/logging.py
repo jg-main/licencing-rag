@@ -23,6 +23,11 @@ def configure_logging(*, debug: bool = False) -> None:
         level=log_level,
     )
 
+    # Suppress noisy third-party loggers
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("chromadb").setLevel(logging.WARNING)
+
     # Configure structlog
     structlog.configure(
         processors=[
