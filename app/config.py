@@ -29,7 +29,7 @@ MIN_CHUNK_SIZE = 100  # words (spec: 100)
 MAX_CHUNK_CHARS = 6000  # hard limit to prevent embedding overflow
 
 # Retrieval parameters
-TOP_K = 5
+TOP_K = 10  # Default chunks to retrieve (increased for better fee table coverage)
 
 # Provider configuration
 PROVIDERS: dict[str, dict[str, str]] = {

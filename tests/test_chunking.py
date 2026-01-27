@@ -13,6 +13,7 @@ from app.chunking import (
     chunk_document,
     detect_section_heading,
     is_definitions_section,
+    is_fee_table_content,
     split_by_sections,
     window_chunk,
 )
@@ -197,6 +198,34 @@ class TestIsDefinitionsSection:
         """Non-definitions sections return False."""
         assert not is_definitions_section("General provisions apply")
         assert not is_definitions_section("Fee schedule for 2025")
+
+
+class TestIsFeeTableContent:
+    """Tests for fee table detection."""
+
+    def test_fee_table_with_multiple_dollar_amounts(self) -> None:
+        """Detects fee tables with multiple dollar amounts."""
+        fee_table = """
+        Description         Monthly     Annually
+        Real Time           $134.50     $1,614
+        Delayed             $0          $0
+        Non-Display         $609        $7,308
+        """
+        assert is_fee_table_content(fee_table)
+
+    def test_fee_table_with_keywords(self) -> None:
+        """Detects fee tables with fee keywords and dollar amounts."""
+        text = "The monthly fee is $500 per device."
+        assert is_fee_table_content(text)
+
+    def test_non_fee_content(self) -> None:
+        """Non-fee content returns False."""
+        assert not is_fee_table_content("This is general license text without prices.")
+        assert not is_fee_table_content("The subscriber shall comply with all terms.")
+
+    def test_single_dollar_without_keywords(self) -> None:
+        """Single dollar amount without fee keywords is not a fee table."""
+        assert not is_fee_table_content("The value is $100.")
 
 
 class TestIsImportantShortSection:

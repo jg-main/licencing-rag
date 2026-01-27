@@ -88,6 +88,36 @@ def is_definitions_section(text: str) -> bool:
     return "definition" in lower_text or "defined term" in lower_text
 
 
+def is_fee_table_content(text: str) -> bool:
+    """Check if text appears to contain fee table data.
+
+    Fee tables are characterized by:
+    - Multiple dollar amounts ($X,XXX or $X.XX patterns)
+    - Words like 'fee', 'price', 'rate', 'monthly', 'annually'
+    - Tabular structure (short lines with prices)
+
+    Args:
+        text: Text to check.
+
+    Returns:
+        True if this appears to be fee table content.
+    """
+    # Count dollar amounts
+    dollar_pattern = r"\$[\d,]+(?:\.\d{2})?"
+    dollar_matches = re.findall(dollar_pattern, text)
+
+    # If we have 3+ dollar amounts, likely a fee table
+    if len(dollar_matches) >= 3:
+        return True
+
+    # Check for fee-related keywords with dollar amounts
+    lower_text = text.lower()
+    fee_keywords = ["fee", "price", "rate", "monthly", "annually", "per device", "per user"]
+    has_fee_keyword = any(kw in lower_text for kw in fee_keywords)
+
+    return has_fee_keyword and len(dollar_matches) >= 1
+
+
 def _is_important_short_section(heading: str, text: str) -> bool:
     """Check if a section is important enough to keep even if short.
 
@@ -194,6 +224,7 @@ def window_chunk(
     size: int = CHUNK_SIZE,
     overlap: int = CHUNK_OVERLAP,
     allow_short: bool = False,
+    is_fee_table: bool = False,
 ) -> list[tuple[str, int, int]]:
     """Split text into overlapping word windows, preserving original spans.
 
@@ -202,10 +233,16 @@ def window_chunk(
         size: Target chunk size in words.
         overlap: Overlap between chunks in words.
         allow_short: If True, keep sections shorter than MIN_CHUNK_SIZE (for definitions, etc.)
+        is_fee_table: If True, use larger chunk sizes to keep fee tables together.
 
     Returns:
         List of (chunk_text, start_char, end_char) tuples with original text preserved.
     """
+    # Use larger chunks for fee tables to keep pricing data together
+    if is_fee_table:
+        size = max(size, 800)  # At least 800 words for fee tables
+        overlap = max(overlap, 200)  # More overlap to ensure fee continuity
+
     # Build word positions list: [(word, start_pos, end_pos), ...]
     word_positions: list[tuple[str, int, int]] = []
     i = 0
@@ -342,9 +379,17 @@ def chunk_document(
         # (definitions, fees, schedules, etc.)
         is_important_short = _is_important_short_section(section_heading, section_text)
 
+        # Check if this section contains fee table data
+        is_fee_table = is_fee_table_content(section_text)
+
         # Get chunks with character positions relative to section
         # For important sections, allow smaller chunks to preserve legally significant content
-        text_chunks = window_chunk(section_text, allow_short=is_important_short)
+        # For fee tables, use larger chunks to keep pricing data together
+        text_chunks = window_chunk(
+            section_text,
+            allow_short=is_important_short,
+            is_fee_table=is_fee_table,
+        )
 
         for text, rel_start, rel_end in text_chunks:
             # Convert to absolute positions in full document using exact offsets
