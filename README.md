@@ -46,6 +46,8 @@ This is **not** a general chatbot and **not** a trained LLM. It is a **retrieval
 | OPRA      | ⏳ Planned | TBD            | P1       |
 | CTA/UTP   | ⏳ Planned | TBD            | P2       |
 
+**📋 [Data Sources Documentation](docs/data-sources.md)** — Track provider sources, update dates, and document retrieval information.
+
 ### Supported LLM Providers
 
 | Provider | Status     | Use Case                     |
