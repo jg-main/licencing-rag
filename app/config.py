@@ -11,7 +11,8 @@ CHUNKS_DATA_DIR = Path("data/chunks")
 CHROMA_DIR = Path("index/chroma")
 
 # LLM Provider: "ollama" or "anthropic"
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+# Default is anthropic (Claude API) per spec v0.3; set LLM_PROVIDER=ollama for local-only
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")
 
 # Model configuration (Ollama)
 LLM_MODEL = "llama3.2:8b"  # Use 8B for limited RAM; upgrade to 70b with more memory
