@@ -224,3 +224,10 @@ README_files/
 
 # VSCode settings
 .vscode/
+
+
+# Project specific ignores
+.envrc
+data/
+logs/
+index/
