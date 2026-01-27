@@ -15,6 +15,8 @@ from app.config import CHUNKS_DATA_DIR
 from app.config import PROVIDERS
 from app.config import RAW_DATA_DIR
 from app.config import TEXT_DATA_DIR
+from app.definitions import build_definitions_index
+from app.definitions import save_definitions_index
 from app.embed import OllamaEmbeddingFunction
 from app.extract import ExtractionError
 from app.extract import detect_document_version
@@ -377,6 +379,24 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     if chunk_count > 0:
         bm25_index.build()
         bm25_index.save()
+
+        # Build and save definitions index from definition chunks
+        all_chunks: list[dict[str, Any]] = []
+        results = collection.get(include=["documents", "metadatas"])
+        if results and results["documents"] and results["metadatas"]:
+            for doc, meta in zip(
+                results["documents"],
+                results["metadatas"],
+            ):
+                all_chunks.append({"text": doc, "metadata": dict(meta)})
+
+        if all_chunks:
+            definitions_index = build_definitions_index(provider, all_chunks)
+            if len(definitions_index) > 0:
+                save_definitions_index(definitions_index)
+                print(f"  Definitions index: {len(definitions_index)} terms")
+            else:
+                print("  Definitions index: no definitions found")
 
     log.info(
         "ingestion_complete",
