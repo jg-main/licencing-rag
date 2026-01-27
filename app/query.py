@@ -114,9 +114,7 @@ def query(
 
     if not CHROMA_DIR.exists():
         log.error("no_index_found", path=str(CHROMA_DIR))
-        raise RuntimeError(
-            "No index found. Run 'python main.py ingest --provider <name>' first."
-        )
+        raise RuntimeError("No index found. Run 'rag ingest --provider <name>' first.")
 
     log.info(
         "query_started",

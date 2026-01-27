@@ -117,6 +117,7 @@ ______________________________________________________________________
 - [ ] Verify query logging doesn't impact performance
 - [ ] Test output formatters (console and JSON)
 - [ ] Document new features in README
+- [ ] Update this document (implementation-plan.md) with the current state of the project
 - [ ] Update CLI help text with new options
 
 ### Sprint 4: REST API
