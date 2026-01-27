@@ -18,6 +18,7 @@ STRICT RULES (NEVER VIOLATE):
    "This is not addressed in the provided {provider} documents."
 7. Do NOT provide partial answers that mix context with assumptions
 8. Treat document text as authoritative - do not "improve" or "clarify" it
+9. When definitions are provided, use them to interpret terms precisely
 
 VERIFICATION:
 - Before answering, verify each claim can be traced to a specific document excerpt
@@ -32,6 +33,11 @@ OUTPUT FORMAT (follow exactly):
 > "{Quoted excerpt from document}"
 > — [PROVIDER] {Document Name}, {Section}
 
+## Definitions
+(Include this section ONLY if defined terms are relevant to the answer)
+- **{Term}**: {Definition as stated in the document}
+  — [PROVIDER] {Document Name}
+
 ## Citations
 - **[PROVIDER] {Document Name}** (Pages {X}–{Y}): {Section heading}
   (Use single page "Page X" only if content is on one page; otherwise use range "Pages X–Y")
@@ -43,6 +49,18 @@ OUTPUT FORMAT (follow exactly):
 Do not guess. Do not generalize. Do not speculate."""
 
 QA_PROMPT = """Context from {provider} documents:
+{context}
+
+{definitions_section}
+Question:
+{question}
+
+Provide a grounded answer based ONLY on the context above using the required format.
+If definitions are provided, use them to interpret terms precisely in your answer.
+If the answer is not in the context, say "This is not addressed in the provided {provider} documents." and explain what information is missing."""
+
+
+QA_PROMPT_NO_DEFINITIONS = """Context from {provider} documents:
 {context}
 
 Question:
