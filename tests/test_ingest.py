@@ -287,7 +287,9 @@ class TestStaleChunkCleanup:
             mock_collection.add.assert_not_called()
             
             # Verify error was reported
-            assert len(result["errors"]) == 1
-            assert "Extraction failed" in result["errors"][0]
+            errors = result["errors"]
+            assert isinstance(errors, list)
+            assert len(errors) == 1
+            assert "Extraction failed" in errors[0]
 
 
