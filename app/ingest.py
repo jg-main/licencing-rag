@@ -22,6 +22,7 @@ from app.extract import extract_document
 from app.extract import save_extraction_artifacts
 from app.extract import validate_extraction
 from app.logging import get_logger
+from app.search import BM25Index
 
 log = get_logger(__name__)
 
@@ -79,6 +80,8 @@ def chunks_to_chroma_format(
 ) -> tuple[list[str], list[dict[str, Any]], list[str]]:
     """Convert chunks to ChromaDB format.
 
+    Filters out metadata fields with None values since ChromaDB rejects them.
+
     Args:
         chunks: List of Chunk objects.
 
@@ -91,23 +94,96 @@ def chunks_to_chroma_format(
 
     for chunk in chunks:
         documents.append(chunk.text)
-        metadatas.append(
-            {
-                "chunk_id": chunk.chunk_id,
-                "provider": chunk.provider,
-                "document_name": chunk.document_name,
-                "section_heading": chunk.section_heading,
-                "page_start": chunk.page_start,
-                "page_end": chunk.page_end,
-                "chunk_index": chunk.chunk_index,
-                "word_count": chunk.word_count,
-                "is_definitions": chunk.is_definitions,
-                "document_version": chunk.document_version,
-            }
-        )
+        # Build metadata dict, excluding None values (ChromaDB rejects None)
+        meta: dict[str, Any] = {
+            "chunk_id": chunk.chunk_id,
+            "provider": chunk.provider,
+            "document_name": chunk.document_name,
+            "document_path": chunk.document_path,  # Relative path for unique identification
+            "section_heading": chunk.section_heading,
+            "page_start": chunk.page_start,
+            "page_end": chunk.page_end,
+            "chunk_index": chunk.chunk_index,
+            "word_count": chunk.word_count,
+            "is_definitions": chunk.is_definitions,
+        }
+        # Only add document_version if not None
+        if chunk.document_version is not None:
+            meta["document_version"] = chunk.document_version
+        metadatas.append(meta)
         ids.append(chunk.chunk_id)
 
     return documents, metadatas, ids
+
+
+def prune_deleted_documents(
+    provider: str,
+    collection: chromadb.Collection,
+    current_doc_paths: set[str],
+) -> int:
+    """Remove chunks for documents that no longer exist in data/raw.
+
+    This ensures that when documents are deleted from data/raw, their chunks
+    are also removed from ChromaDB during incremental ingestion.
+
+    Args:
+        provider: Provider identifier.
+        collection: ChromaDB collection to prune.
+        current_doc_paths: Set of document_path values for documents currently in data/raw.
+
+    Returns:
+        Number of chunks deleted.
+    """
+    # Get all metadatas from the collection
+    try:
+        results = collection.get(include=["metadatas"])
+    except Exception as e:
+        log.warning("failed_to_get_collection_data", provider=provider, error=str(e))
+        return 0
+
+    if not results or not results.get("metadatas"):
+        return 0
+
+    # Find IDs of chunks belonging to deleted documents
+    ids_to_delete: list[str] = []
+    deleted_docs: set[str] = set()
+
+    metadatas = results.get("metadatas", [])
+    all_ids = results.get("ids", [])
+
+    # Type guard for mypy - both should be lists if results is valid
+    if not isinstance(metadatas, list) or not isinstance(all_ids, list):
+        return 0
+
+    for chunk_id, meta in zip(all_ids, metadatas):
+        if not meta or not isinstance(chunk_id, str):
+            continue
+
+        # Get document_path (or fallback to document_name for backwards compat)
+        doc_path_raw = meta.get("document_path") or meta.get("document_name")
+        if not isinstance(doc_path_raw, str):
+            continue
+
+        # If this document is not in the current set, mark for deletion
+        if doc_path_raw not in current_doc_paths:
+            ids_to_delete.append(chunk_id)
+            deleted_docs.add(doc_path_raw)
+
+    # Delete chunks if any found
+    if ids_to_delete:
+        collection.delete(ids=ids_to_delete)
+        log.info(
+            "pruned_deleted_documents",
+            provider=provider,
+            documents=len(deleted_docs),
+            chunks=len(ids_to_delete),
+            deleted_docs=sorted(deleted_docs),
+        )
+        print(
+            f"Pruned {len(ids_to_delete)} chunks from {len(deleted_docs)} deleted document(s)"
+        )
+
+    return len(ids_to_delete)
 
 
 def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[str]]:
@@ -159,6 +235,11 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     )
     log.info("collection_ready", collection=collection_name, provider=provider)
 
+    # Initialize BM25 index for hybrid search
+    bm25_index = BM25Index(provider)
+    if force:
+        bm25_index.clear()
+
     # Find all supported documents recursively (sorted by relative path for deterministic ordering)
     supported_extensions = {".pdf", ".docx"}
     doc_files = sorted(
@@ -173,6 +254,12 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     if not doc_files:
         log.warning("no_documents_found", provider=provider, path=str(raw_dir))
         return {"documents": 0, "chunks": 0, "errors": [], "warnings": []}
+
+    # Prune deleted documents if not using --force (which rebuilds from scratch)
+    if not force:
+        # Build set of current document paths for pruning comparison
+        current_doc_paths = {str(doc.relative_to(raw_dir)) for doc in doc_files}
+        prune_deleted_documents(provider, collection, current_doc_paths)
 
     doc_count = 0
     chunk_count = 0
@@ -194,6 +281,29 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
         try:
             # Calculate relative path for subdirectory support
             relative_path = doc_path.relative_to(raw_dir)
+
+            # Delete existing chunks for this document BEFORE extraction
+            # This ensures consistency: if extraction/chunking fails, we don't
+            # have stale chunks from a previous version of the document
+            if not force:
+                try:
+                    existing = collection.get(
+                        where={"document_path": str(relative_path)},
+                        include=[],
+                    )
+                    if existing and existing.get("ids"):
+                        collection.delete(ids=existing["ids"])
+                        log.debug(
+                            "deleted_existing_chunks",
+                            document_path=str(relative_path),
+                            count=len(existing["ids"]),
+                        )
+                except Exception as e:
+                    log.warning(
+                        "failed_to_delete_existing_chunks",
+                        document_path=str(relative_path),
+                        error=str(e),
+                    )
 
             # Extract document
             log.debug(
@@ -233,30 +343,15 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
             # Convert to ChromaDB format
             documents, metadatas, ids = chunks_to_chroma_format(chunks)
 
-            # Delete existing chunks for this document before adding (upsert behavior)
-            # This prevents duplicates when re-ingesting without --force
-            if not force:
-                try:
-                    existing = collection.get(
-                        where={"document_name": doc_path.name},
-                        include=[],
-                    )
-                    if existing and existing.get("ids"):
-                        collection.delete(ids=existing["ids"])
-                        log.debug(
-                            "deleted_existing_chunks",
-                            filename=doc_path.name,
-                            count=len(existing["ids"]),
-                        )
-                except Exception:
-                    pass  # Ignore errors during cleanup
-
-            # Add to collection
+            # Add to collection (existing chunks already deleted earlier)
             collection.add(
                 documents=documents,
                 metadatas=metadatas,  # type: ignore[arg-type]
                 ids=ids,
             )
+
+            # Add to BM25 index for hybrid search
+            bm25_index.add_documents(ids, documents)
 
             doc_count += 1
             chunk_count += len(chunks)
@@ -278,6 +373,11 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
                 "document_processing_failed", filename=doc_path.name, error=str(e)
             )
 
+    # Build and save BM25 index
+    if chunk_count > 0:
+        bm25_index.build()
+        bm25_index.save()
+
     log.info(
         "ingestion_complete",
         provider=provider,
@@ -289,6 +389,7 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     print("\nIngestion complete:")
     print(f"  Documents: {doc_count}")
     print(f"  Chunks: {chunk_count}")
+    print(f"  BM25 index: {'built and saved' if chunk_count > 0 else 'skipped'}")
     if warnings:
         print(f"  Warnings: {len(warnings)}")
     if errors:
@@ -309,7 +410,7 @@ def list_indexed_documents(provider: str) -> list[str]:
         provider: Provider identifier.
 
     Returns:
-        List of unique document names.
+        List of unique document paths (relative to provider directory).
     """
     if not CHROMA_DIR.exists():
         return []
@@ -327,17 +428,18 @@ def list_indexed_documents(provider: str) -> list[str]:
     if not results or not results.get("metadatas"):
         return []
 
-    # Extract unique document names
-    doc_names: set[str] = set()
+    # Extract unique document paths (prefer document_path, fallback to document_name)
+    doc_paths: set[str] = set()
     metadatas = results.get("metadatas")
     if metadatas:
         for meta in metadatas:
-            if meta and "document_name" in meta:
-                name = meta["document_name"]
-                if isinstance(name, str):
-                    doc_names.add(name)
+            if meta:
+                # Prefer document_path (includes subdirectory), fall back to document_name
+                path = meta.get("document_path") or meta.get("document_name")
+                if isinstance(path, str):
+                    doc_paths.add(path)
 
-    return sorted(doc_names)
+    return sorted(doc_paths)
 
 
 def main() -> None:

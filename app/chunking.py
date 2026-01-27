@@ -42,6 +42,7 @@ class Chunk:
     chunk_id: str
     provider: str
     document_name: str
+    document_path: str  # Relative path from provider dir (e.g., "Fees/schedule.pdf")
     section_heading: str
     page_start: int
     page_end: int
@@ -358,14 +359,17 @@ def chunk_document(
             # Use encoded relative path in chunk_id to ensure uniqueness across subdirectories
             if relative_path:
                 safe_filename = str(relative_path).replace("/", "__")
+                doc_path = str(relative_path)
             else:
                 safe_filename = document.source_file
+                doc_path = document.source_file
 
             chunk = Chunk(
                 text=text,
                 chunk_id=f"{provider}_{safe_filename}_{chunk_index}",
                 provider=provider,
                 document_name=document.source_file,
+                document_path=doc_path,  # Relative path for unique identification
                 section_heading=section_heading,
                 page_start=page_start,
                 page_end=page_end,
