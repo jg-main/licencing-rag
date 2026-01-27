@@ -159,11 +159,15 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     )
     log.info("collection_ready", collection=collection_name, provider=provider)
 
-    # Find all supported documents (sorted for deterministic ordering)
+    # Find all supported documents recursively (sorted by relative path for deterministic ordering)
     supported_extensions = {".pdf", ".docx"}
     doc_files = sorted(
-        [f for f in raw_dir.iterdir() if f.suffix.lower() in supported_extensions],
-        key=lambda p: p.name.lower(),
+        [
+            f
+            for f in raw_dir.rglob("*")
+            if f.is_file() and f.suffix.lower() in supported_extensions
+        ],
+        key=lambda p: p.relative_to(raw_dir).as_posix().lower(),
     )
 
     if not doc_files:
@@ -188,8 +192,15 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
 
     for doc_path in tqdm(doc_files, desc=f"Processing {provider}"):
         try:
+            # Calculate relative path for subdirectory support
+            relative_path = doc_path.relative_to(raw_dir)
+
             # Extract document
-            log.debug("extracting_document", filename=doc_path.name)
+            log.debug(
+                "extracting_document",
+                filename=doc_path.name,
+                relative_path=str(relative_path),
+            )
             extracted = extract_document(doc_path)
 
             # Validate extraction quality and log any warnings
@@ -201,10 +212,15 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
             doc_version = detect_document_version(extracted.full_text)
 
             # Save extraction artifacts (.txt and .meta.json) per spec
-            save_extraction_artifacts(extracted, text_dir, provider)
+            save_extraction_artifacts(extracted, text_dir, provider, relative_path)
 
-            # Chunk document with version info
-            chunks = chunk_document(extracted, provider, document_version=doc_version)
+            # Chunk document with version info and relative path
+            chunks = chunk_document(
+                extracted,
+                provider,
+                document_version=doc_version,
+                relative_path=relative_path,
+            )
 
             if not chunks:
                 log.warning("no_chunks_generated", filename=doc_path.name)
@@ -212,7 +228,7 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
 
             # Save chunk artifacts for visibility into chunking process
             chunks_dir = get_provider_chunks_dir(provider)
-            save_chunks_artifacts(chunks, doc_path.name, chunks_dir)
+            save_chunks_artifacts(chunks, relative_path, chunks_dir)
 
             # Convert to ChromaDB format
             documents, metadatas, ids = chunks_to_chroma_format(chunks)

@@ -279,6 +279,7 @@ def save_extraction_artifacts(
     extracted: ExtractedDocument,
     output_dir: Path,
     provider: str,
+    relative_path: Path | None = None,
 ) -> tuple[Path, Path]:
     """Save extraction artifacts (.txt and .meta.json) as per spec.
 
@@ -286,6 +287,7 @@ def save_extraction_artifacts(
         extracted: The extracted document.
         output_dir: Directory to save artifacts (e.g., data/text/cme/).
         provider: Provider identifier (e.g., "cme").
+        relative_path: Relative path from provider raw directory (for subdirectory support).
 
     Returns:
         Tuple of (text_path, meta_path) for saved files.
@@ -293,9 +295,13 @@ def save_extraction_artifacts(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use full filename (with extension) to avoid collisions between .pdf and .docx
-    # e.g., "document.pdf" -> "document.pdf.txt" and "document.pdf.meta.json"
-    source_name = Path(extracted.source_file).name
+    # Use relative path if provided (encoded with __), else fall back to basename
+    # e.g., "Fees/document.pdf" -> "Fees__document.pdf.txt"
+    # This prevents collisions when same filename exists in different subdirectories
+    if relative_path:
+        source_name = str(relative_path).replace("/", "__")
+    else:
+        source_name = Path(extracted.source_file).name
 
     # Save text file
     text_path = output_dir / f"{source_name}.txt"

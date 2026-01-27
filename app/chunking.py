@@ -314,6 +314,7 @@ def chunk_document(
     document: ExtractedDocument,
     provider: str,
     document_version: str | None = None,
+    relative_path: Path | None = None,
 ) -> list[Chunk]:
     """Chunk a document with full metadata.
 
@@ -321,6 +322,7 @@ def chunk_document(
         document: Extracted document to chunk.
         provider: Provider identifier (e.g., \"cme\").
         document_version: Optional version string detected from document.
+        relative_path: Relative path from provider raw directory (for subdirectory support).
 
     Returns:
         List of Chunk objects with metadata.
@@ -353,9 +355,15 @@ def chunk_document(
             )
             word_count = len(text.split())
 
+            # Use encoded relative path in chunk_id to ensure uniqueness across subdirectories
+            if relative_path:
+                safe_filename = str(relative_path).replace("/", "__")
+            else:
+                safe_filename = document.source_file
+
             chunk = Chunk(
                 text=text,
-                chunk_id=f"{provider}_{document.source_file}_{chunk_index}",
+                chunk_id=f"{provider}_{safe_filename}_{chunk_index}",
                 provider=provider,
                 document_name=document.source_file,
                 section_heading=section_heading,
@@ -374,18 +382,18 @@ def chunk_document(
 
 def save_chunks_artifacts(
     chunks: list[Chunk],
-    document_name: str,
+    document_identifier: str | Path,
     output_dir: Path,
 ) -> tuple[Path, Path]:
     """Save chunk artifacts for visibility into the chunking process.
 
     Creates two files per document:
-    - {document_name}.chunks.jsonl: One JSON object per line for each chunk
-    - {document_name}.chunks.meta.json: Summary metadata about the chunking
+    - {base_name}.chunks.jsonl: One JSON object per line for each chunk
+    - {base_name}.chunks.meta.json: Summary metadata about the chunking
 
     Args:
         chunks: List of chunks from the document.
-        document_name: Original document filename.
+        document_identifier: Original document filename or relative path (for subdirectory support).
         output_dir: Directory to save artifacts (e.g., data/chunks/cme/).
 
     Returns:
@@ -397,8 +405,13 @@ def save_chunks_artifacts(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Derive base filename (without extension)
-    base_name = Path(document_name).stem
+    # Handle both string (legacy) and Path (subdirectory support)
+    # Encode path with __ separator: Fees/doc.pdf -> Fees__doc
+    if isinstance(document_identifier, Path):
+        safe_name = str(document_identifier).replace("/", "__")
+        base_name = Path(safe_name).stem
+    else:
+        base_name = Path(document_identifier).stem
 
     # Save chunks as JSONL (one chunk per line for easy inspection)
     chunks_path = output_dir / f"{base_name}.chunks.jsonl"
@@ -426,8 +439,11 @@ def save_chunks_artifacts(
     for c in chunks:
         pages_covered.update(range(c.page_start, c.page_end + 1))
 
+    # Get document name from chunks if available, else use the identifier
+    doc_name = chunks[0].document_name if chunks else str(document_identifier)
+
     metadata = {
-        "document_name": document_name,
+        "document_name": doc_name,
         "chunked_at": datetime.now(timezone.utc).isoformat(),
         "total_chunks": len(chunks),
         "total_words": total_words,
