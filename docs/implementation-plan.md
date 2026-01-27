@@ -1,6 +1,6 @@
 # Implementation Plan - License Intelligence System
 
-**Version:** 1.0 **Created:** 2026-01-26 **Target:** specs.v0.2.md
+**Version:** 1.1 **Created:** 2026-01-26 **Updated:** 2026-01-27 **Target:** specs.v0.3.md
 
 ______________________________________________________________________
 
@@ -8,7 +8,7 @@ ______________________________________________________________________
 
 > Update this checklist as tasks are completed. Use `[x]` to mark done.
 
-### Phase 1: MVP (Week 1)
+### Sprint 1: MVP
 
 #### 1.1 Critical Bug Fixes
 
@@ -42,6 +42,10 @@ ______________________________________________________________________
 - [x] Add `ingest` command
 - [x] Add `query` command
 - [x] Add `list` command
+- [ ] Create `app/cli.py` with main() entry point
+- [ ] Add `[project.scripts]` to pyproject.toml for `rag` command
+- [ ] Add `--format` flag for output (console/json)
+- [ ] Update commands to use `rag` instead of `python main.py`
 
 #### 1.6 Verification
 
@@ -59,7 +63,7 @@ ______________________________________________________________________
 - [x] Test with Claude API (claude-sonnet-4-5-20250929)
 - [x] Document API key setup in README
 
-### Phase 2: Robustness (Week 2)
+### Sprint 2: Robustness
 
 - [x] Remove LangChain dependency entirely
 - [x] Update `pyproject.toml`
@@ -69,23 +73,196 @@ ______________________________________________________________________
 - [x] Add extraction quality validation
 - [x] Document common issues in README
 
-### Phase 3: Multi-Provider (Week 3)
+### Sprint 3: Enhancements
 
-- [ ] Collect OPRA license documents
-- [ ] Place in `data/raw/opra/`
-- [ ] Ingest OPRA documents
+#### 3.1 Hybrid Search Implementation
+
+- [ ] Add `rank-bm25` dependency to pyproject.toml
+- [ ] Create `app/search.py` module
+- [ ] Implement BM25 index building during ingestion
+- [ ] Save BM25 index to `index/bm25/{provider}_index.pkl`
+- [ ] Implement Reciprocal Rank Fusion (RRF) algorithm
+- [ ] Update `query.py` to use hybrid search
+- [ ] Add search mode parameter (vector/keyword/hybrid)
+- [ ] Benchmark hybrid vs vector-only retrieval (target: >15% improvement)
+- [ ] Add tests for hybrid ranking
+
+#### 3.2 Definitions Auto-Linking
+
+- [ ] Create `app/definitions.py` module
+- [ ] Implement quoted term extraction from text
+- [ ] Build definitions index (chunks with `is_definitions=true`)
+- [ ] Implement definition retrieval by term matching
+- [ ] Update prompt to include definitions section
+- [ ] Add definition caching to reduce redundant retrievals
+- [ ] Test with common defined terms (Subscriber, Redistribution, etc.)
+- [ ] Update output format to include Definitions section
+
+#### 3.3 Query Logging
+
+- [ ] Create `app/logging_util.py` module
+- [ ] Implement JSONL log writer
+- [ ] Define log entry schema (query_id, timestamp, chunks, etc.)
+- [ ] Add logging to query pipeline
+- [ ] Implement log rotation (monthly)
+- [ ] Add privacy controls (disable logging flag)
+- [ ] Create `logs/` directory structure
+- [ ] Add CLI command: `rag logs --tail N`
+- [ ] Test log integrity and parsing
+
+#### 3.4 Output Formats
+
+- [ ] Create `app/output.py` module
+- [ ] Implement console output formatter using Rich library
+- [ ] Add panels, colors, and markdown styling for CLI
+- [ ] Implement JSON output formatter
+- [ ] Add structured JSON schema (answer, clauses, definitions, citations)
+- [ ] Add `--format` flag to query command (console/json)
+- [ ] Test both output formats
+- [ ] Update documentation with format examples
+
+#### 3.5 Integration & Testing
+
+- [ ] Update all tests for hybrid search
+- [ ] Add integration tests for definitions auto-linking
+- [ ] Verify query logging doesn't impact performance
+- [ ] Test output formatters (console and JSON)
+- [ ] Document new features in README
+- [ ] Update CLI help text with new options
+
+### Sprint 4: REST API
+
+#### 4.1 FastAPI Setup
+
+- [ ] Add `fastapi` and `uvicorn` to pyproject.toml
+- [ ] Create `api/` directory
+- [ ] Create `api/__init__.py`
+- [ ] Create `api/main.py` FastAPI application
+- [ ] Create `api/routes.py` for endpoint definitions
+- [ ] Configure CORS and middleware
+
+#### 4.2 Query Endpoint
+
+- [ ] Implement POST `/api/v1/query` endpoint
+- [ ] Define request schema (question, providers, search_mode, top_k)
+- [ ] Define response schema (answer, clauses, definitions, citations, metadata)
+- [ ] Add input validation with Pydantic models
+- [ ] Integrate with query.py business logic
+- [ ] Add error handling and status codes
+
+#### 4.3 Document & Stats Endpoints
+
+- [ ] Implement GET `/api/v1/documents` endpoint
+- [ ] Add provider filtering parameter
+- [ ] Return document metadata (filename, path, pages, chunks)
+- [ ] Implement GET `/api/v1/stats` endpoint
+- [ ] Return system statistics (doc count, chunk count, index size)
+- [ ] Add caching for expensive stats queries
+
+#### 4.4 Admin Endpoints
+
+- [ ] Implement POST `/api/v1/ingest/{provider}` endpoint
+- [ ] Add background job queue for ingestion
+- [ ] Return job_id and status for async tracking
+- [ ] Implement GET `/api/v1/logs` endpoint
+- [ ] Add pagination (limit, offset) for logs
+- [ ] Add provider and date filtering
+
+#### 4.5 Authentication & Security
+
+- [ ] Implement API Key authentication (X-API-Key header)
+- [ ] Add rate limiting (60 req/min default)
+- [ ] Configure RATE_LIMIT_RPM environment variable
+- [ ] Add request/response logging
+- [ ] Implement health check endpoint GET `/health`
+- [ ] Add API key management (optional for local dev)
+
+#### 4.6 API Documentation & Testing
+
+- [ ] Configure OpenAPI/Swagger UI (auto-generated)
+- [ ] Add endpoint descriptions and examples
+- [ ] Write integration tests for all endpoints
+- [ ] Test authentication and rate limiting
+- [ ] Test error responses (400, 401, 404, 500)
+- [ ] Performance testing (load, concurrent requests)
+- [ ] CLI command: `rag serve --port 8000 --host 0.0.0.0`
+
+### Sprint 5: AWS Deployment
+
+#### 5.1 Docker Containerization
+
+- [ ] Create `docker/Dockerfile`
+- [ ] Configure multi-stage build (builder + runtime)
+- [ ] Optimize image size (\<1GB)
+- [ ] Create `docker/docker-compose.yml` for local dev
+- [ ] Add `.dockerignore` file
+- [ ] Test local container build
+- [ ] Test local container run with volume mounts
+- [ ] Document environment variables
+
+#### 5.2 AWS Infrastructure Setup
+
+- [ ] Create AWS account / configure IAM
+- [ ] Set up VPC with public/private subnets
+- [ ] Configure security groups (ALB, ECS)
+- [ ] Create EFS file system for persistent storage
+- [ ] Set up ECR repository for Docker images
+- [ ] Create ECS cluster (Fargate)
+- [ ] Configure Application Load Balancer
+- [ ] Set up ACM certificate for HTTPS
+- [ ] Configure Route53 DNS (optional)
+
+#### 5.3 ECS Task Definition
+
+- [ ] Create task definition JSON
+- [ ] Configure CPU/Memory (2 vCPU, 4 GB)
+- [ ] Mount EFS volumes (/data, /index, /logs)
+- [ ] Set environment variables
+- [ ] Configure Secrets Manager for API keys
+- [ ] Set health check endpoint
+- [ ] Configure logging (CloudWatch)
+- [ ] Test task execution manually
+
+#### 5.4 ECS Service Configuration
+
+- [ ] Create ECS service
+- [ ] Configure auto-scaling (min: 1, max: 3)
+- [ ] Set up ALB target group
+- [ ] Configure health checks
+- [ ] Test load balancing
+- [ ] Configure blue/green deployment
+- [ ] Set up CloudWatch alarms (CPU, memory, errors)
+
+#### 5.5 CI/CD Pipeline
+
+- [ ] Create `.github/workflows/deploy.yml`
+- [ ] Add GitHub secrets (AWS credentials)
+- [ ] Implement test stage (pytest)
+- [ ] Implement build stage (Docker)
+- [ ] Implement push stage (ECR)
+- [ ] Implement deploy stage (ECS update)
+- [ ] Add deployment notifications (Slack/email)
+- [ ] Test full pipeline end-to-end
+- [ ] Document rollback procedure
+
+#### 5.6 Monitoring & Operations
+
+- [ ] Set up CloudWatch dashboard
+- [ ] Configure log aggregation
+- [ ] Set up cost monitoring
+- [ ] Create runbook for common issues
+- [ ] Document backup/restore procedures
+- [ ] Test disaster recovery scenario
+- [ ] Create operational metrics (uptime, query latency)
+- [ ] Set up alerting rules
+
+### Future: Multi-Provider
+
+- [ ] OpenAI API support (alternative to Claude)
+- [ ] Add other providers (OPRA, CTA, UTP)
 - [ ] Test cross-provider queries
 - [ ] Add provider-aware prompt formatting
 - [ ] Update documentation for multi-provider usage
-
-### Phase 4: Enhancements (Future)
-
-- [ ] Hybrid search (BM25 + vector)
-- [ ] Definitions auto-linking
-- [ ] Query logging to `logs/queries.jsonl`
-- [ ] CTA/UTP document support
-- [ ] Web UI (Streamlit)
-- [ ] OpenAI API support (alternative to Claude)
 
 ______________________________________________________________________
 
@@ -320,7 +497,12 @@ def main():
 
 #### Test Cases
 
-| Test | Expected | |------|----------| | `python main.py ingest --provider cme` | Ingests 35 docs, no errors | | `python main.py list --provider cme` | Shows 35 documents | | `python main.py query "What is a subscriber?"` | Returns answer with citations | | `python main.py query "What is Bitcoin?"` | Returns refusal message |
+| Test                                | Expected                      |
+| ----------------------------------- | ----------------------------- |
+| `rag ingest --provider cme`         | Ingests 35 docs, no errors    |
+| `rag list --provider cme`           | Shows 35 documents            |
+| `rag query "What is a subscriber?"` | Returns answer with citations |
+| `rag query "What is Bitcoin?"`      | Returns refusal message       |
 
 ### 1.7 Claude API Integration (Day 6)
 
@@ -413,17 +595,270 @@ ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
 
 ```bash
 # Use Ollama (default, free but slow on limited hardware)
-python main.py query "What are the CME fees?"
+rag query "What are the CME fees?"
 
 # Use Claude API (fast, ~$0.003/query)
 export ANTHROPIC_API_KEY="sk-ant-..."
 export LLM_PROVIDER="anthropic"
-python main.py query "What are the CME fees?"
+rag query "What are the CME fees?"
 ```
 
 #### Cost Estimate (Claude API)
 
 | Usage | Tokens/query | Cost/query | Monthly (100 queries/day) | |-------|--------------|------------|---------------------------| | Light | ~2,000 | ~$0.003 | ~$9 | | Heavy | ~5,000 | ~$0.008 | ~$24 |
+
+______________________________________________________________________
+
+## Phase 3: Enhanced Features (Sprint 3)
+
+**Goal:** Improve retrieval quality and add query logging
+
+### 3.1 Hybrid Search (BM25 + Vector)
+
+Combine semantic (vector) and keyword (BM25) search for better retrieval coverage.
+
+**Benefits:**
+
+- Better handling of exact keyword matches
+- Improved recall for technical terms
+- More robust against embedding model limitations
+
+**Implementation:**
+
+```python
+from rank_bm25 import BM25Okapi
+
+# Build BM25 index during ingestion
+tokenized_corpus = [chunk["text"].split() for chunk in chunks]
+bm25 = BM25Okapi(tokenized_corpus)
+
+# Query with hybrid approach
+vector_results = chroma_collection.query(question, n_results=10)
+bm25_scores = bm25.get_scores(question.split())
+
+# Reciprocal Rank Fusion (RRF)
+def rrf_score(rank: int, k: int = 60) -> float:
+    return 1.0 / (k + rank)
+
+# Combine and re-rank
+combined_scores = merge_results(vector_results, bm25_scores, rrf_score)
+top_chunks = sorted(combined_scores, reverse=True)[:5]
+```
+
+### 3.2 Definitions Auto-Linking
+
+Automatically retrieve and include definitions when query response contains defined terms.
+
+**Detection:**
+
+- Quoted terms in response (e.g., "Subscriber")
+- Initial caps technical terms
+- Terms in definitions index
+
+**Implementation:**
+
+```python
+# Build definitions index (chunks with is_definitions=true)
+definitions_index = {
+    "subscriber": chunk_id,
+    "redistribution": chunk_id,
+    ...
+}
+
+# After LLM generates answer, scan for terms
+quoted_terms = re.findall(r'"([^"]+)"', answer)
+
+# Retrieve definitions
+definitions = [
+    retrieve_chunk(definitions_index[term.lower()])
+    for term in quoted_terms
+    if term.lower() in definitions_index
+]
+
+# Add to response
+response += "\n\n## Definitions\n\n"
+for defn in definitions:
+    response += f"> **{term}**: {defn.text}\n"
+```
+
+### 3.3 Query Logging
+
+Log all queries to JSONL for audit, analysis, and compliance.
+
+**Schema:**
+
+```json
+{
+  "timestamp": "2026-01-27T14:30:00Z",
+  "query_id": "uuid",
+  "question": "What are CME fees?",
+  "providers": ["cme"],
+  "vector_chunks": ["id1", "id2"],
+  "bm25_chunks": ["id2", "id3"],
+  "final_chunks": ["id2", "id1", "id3"],
+  "definitions_linked": ["Fee", "Subscriber"],
+  "answer_length": 342,
+  "response_time_ms": 2847,
+  "llm_provider": "anthropic",
+  "error": null
+}
+```
+
+**Privacy:**
+
+- Local storage only
+- No PII beyond query text
+- Monthly rotation
+- Configurable disable flag
+
+### 3.4 Output Formats
+
+Support two output modes for different use cases.
+
+**Console Output (using Rich):**
+
+```python
+from rich.console import Console
+from rich.panel import Panel
+
+console = Console()
+console.print(Panel(answer_text, title="Answer", border_style="blue"))
+console.print(f'> [bold]{citation.document}[/bold] (Page {citation.page})')
+```
+
+**JSON Output:**
+
+```json
+{
+  "answer": "Clear, concise answer...",
+  "supporting_clauses": [...],
+  "definitions": [...],
+  "citations": [...],
+  "metadata": {...}
+}
+```
+
+**CLI Usage:**
+
+```bash
+rag query --format console "What are the fees?"  # default
+rag query --format json "What are the fees?" > result.json
+```
+
+______________________________________________________________________
+
+## Phase 4: REST API (Sprint 4)
+
+**Goal:** Provide programmatic API for integration and remote access
+
+### 4.1 Technology Choice: FastAPI
+
+**Rationale:**
+
+- Fast, modern Python framework
+- Auto-generated OpenAPI documentation
+- Built-in data validation (Pydantic)
+- High performance (ASGI server)
+- Easy to test and extend
+
+### 4.2 Core Endpoints
+
+#### Query Endpoint
+
+- POST `/api/v1/query`
+- Request: question, providers, search_mode, top_k, include_definitions
+- Response: answer, supporting_clauses, definitions, citations, metadata
+- Error handling: 400 (validation), 500 (processing)
+
+#### Document & Stats Endpoints
+
+- GET `/api/v1/documents?provider={provider}`
+- GET `/api/v1/stats`
+- Response: document metadata, system statistics
+
+#### Admin Endpoints
+
+- POST `/api/v1/ingest/{provider}` — Trigger re-ingestion
+- GET `/api/v1/logs?limit={limit}&offset={offset}` — Query logs
+
+#### Health Check
+
+- GET `/health` — Load balancer health check
+
+### 4.3 API Considerations
+
+- **Authentication** — API Key header (X-API-Key)
+- **Rate limiting** — 60 req/min default
+- **CORS** — Configurable allowed origins
+- **Error handling** — Consistent error response format
+- **Documentation** — Auto-generated Swagger UI
+
+______________________________________________________________________
+
+## Phase 5: Cloud Deployment (Sprint 5)
+
+**Goal:** Deploy to AWS for team access and higher availability
+
+### 5.1 Architecture Overview
+
+```
+Internet → Route53 → ALB (HTTPS) → ECS Fargate → EFS (storage)
+                                        ↓
+                                  CloudWatch Logs
+```
+
+### 5.2 Resource Specifications
+
+| Resource    | Spec         | Cost (monthly) |
+| ----------- | ------------ | -------------- |
+| ECS Fargate | 2 vCPU, 4 GB | ~$35           |
+| ALB         | 1 instance   | ~$20           |
+| EFS         | 20 GB        | ~$6            |
+| ECR         | \<1 GB       | ~$1            |
+| **Total**   |              | **~$62/month** |
+
+### 5.3 Deployment Strategy
+
+**Blue/Green Deployment:**
+
+1. Push new Docker image to ECR
+1. ECS creates new task with new image
+1. ALB routes traffic to new task
+1. Health checks pass → old task terminated
+1. Health checks fail → rollback to old task
+
+**CI/CD Pipeline:**
+
+- **Trigger**: Push to `main` branch
+- **Test**: Run pytest suite
+- **Build**: Docker image build
+- **Push**: Upload to ECR
+- **Deploy**: ECS service update
+- **Notify**: Slack/email notification
+
+### 5.4 Monitoring & Alerting
+
+**CloudWatch Metrics:**
+
+- CPU/Memory utilization (threshold: >80%)
+- Request count (track usage patterns)
+- Error rate (threshold: >5%)
+- Query latency (threshold: >10s)
+
+**Alarms:**
+
+- High CPU → Auto-scale up
+- Low CPU → Auto-scale down
+- High error rate → SNS notification
+- Health check failures → Automatic rollback
+
+### 5.5 Security Considerations
+
+- **VPC**: Private subnets for ECS tasks
+- **Secrets**: AWS Secrets Manager for API keys
+- **HTTPS**: ACM certificate on ALB
+- **IAM**: Least-privilege task role
+- **Network**: Security groups for egress control
 
 ______________________________________________________________________
 
@@ -496,48 +931,9 @@ log.info("ingesting_document",
 
 ______________________________________________________________________
 
-## Phase 3: Multi-Provider Support (Week 3)
+## Phase 3: Enhanced Features (Sprint 3)
 
-**Goal:** Add OPRA documents, validate extensibility
-
-### 3.1 OPRA Document Collection
-
-- Gather OPRA license agreements
-- Place in `data/raw/opra/`
-- Verify extraction quality
-
-### 3.2 Provider Configuration
-
-```python
-# config.py
-PROVIDERS = {
-    "cme": {
-        "name": "CME Group",
-        "collection": "cme_docs",
-        "raw_dir": "data/raw/cme",
-    },
-    "opra": {
-        "name": "OPRA",
-        "collection": "opra_docs",
-        "raw_dir": "data/raw/opra",
-    },
-}
-```
-
-### 3.3 Cross-Provider Query
-
-```bash
-python main.py query --provider cme --provider opra \
-    "What are the subscriber reporting requirements?"
-```
-
-### 3.4 Provider-Aware Prompts
-
-Adjust prompts to clarify which provider's documents are being cited.
-
-______________________________________________________________________
-
-## Phase 4: Enhanced Features (Future)
+**Goal:** Improve retrieval quality and add query logging
 
 ### 4.1 Hybrid Search
 
@@ -575,37 +971,122 @@ ______________________________________________________________________
 
 ## Task Checklist
 
-### Phase 1 (MVP)
+### Phase 1 (MVP) - ✅ COMPLETE
 
-- [ ] Rename `promps.py` → `prompts.py`
-- [ ] Update imports in `query.py`
-- [ ] Replace ChromaDB `Client` with `PersistentClient`
-- [ ] Remove `client.persist()` calls
-- [ ] Create `OllamaEmbeddingFunction` class
-- [ ] Create `app/extract.py` with page tracking
-- [ ] Add DOCX extraction support
-- [ ] Update chunking to capture section headings
-- [ ] Update chunking to track page numbers
-- [ ] Refactor `ingest.py` for provider support
-- [ ] Refactor `query.py` with embedding function
-- [ ] Implement CLI in `main.py`
-- [ ] Test end-to-end with CME docs
-- [ ] Update `pyproject.toml` (remove langchain)
+- [x] Rename `promps.py` → `prompts.py`
+- [x] Update imports in `query.py`
+- [x] Replace ChromaDB `Client` with `PersistentClient`
+- [x] Remove `client.persist()` calls
+- [x] Create `OllamaEmbeddingFunction` class
+- [x] Create `app/extract.py` with page tracking
+- [x] Add DOCX extraction support
+- [x] Update chunking to capture section headings
+- [x] Update chunking to track page numbers
+- [x] Refactor `ingest.py` for provider support
+- [x] Refactor `query.py` with embedding function
+- [x] Implement CLI in `main.py`
+- [x] Test end-to-end with CME docs
+- [x] Update `pyproject.toml` (remove langchain)
+- [x] Add subdirectory support (Fees/, Agreements/)
+- [x] Add comprehensive test coverage (75 tests)
 
-### Phase 2 (Robustness)
+### Phase 2 (Robustness) - ✅ COMPLETE
 
-- [ ] Remove all LangChain usage
-- [ ] Add structlog logging
-- [ ] Improve error handling
-- [ ] Enhance prompts with stricter guardrails
-- [ ] Add extraction quality checks
-- [ ] Document common issues
+- [x] Remove all LangChain usage
+- [x] Add structlog logging
+- [x] Improve error handling
+- [x] Enhance prompts with stricter guardrails
+- [x] Add extraction quality checks
+- [x] Document common issues
 
-### Phase 3 (Multi-Provider)
+### Phase 3 (Enhancements) - Sprint 3
+
+- [ ] **Hybrid Search**
+
+  - [ ] Add rank-bm25 dependency
+  - [ ] Create app/search.py module
+  - [ ] Implement BM25 indexing
+  - [ ] Implement RRF algorithm
+  - [ ] Update query pipeline
+  - [ ] Add tests and benchmarks
+
+- [ ] **Definitions Auto-Linking**
+
+  - [ ] Create app/definitions.py module
+  - [ ] Build definitions index
+  - [ ] Implement term extraction
+  - [ ] Integrate with query pipeline
+  - [ ] Update prompts and output format
+
+- [ ] **Query Logging**
+
+  - [ ] Create app/logging_util.py module
+  - [ ] Implement JSONL writer
+  - [ ] Add privacy controls
+  - [ ] Create CLI logs viewer
+  - [ ] Test log integrity
+
+### Phase 4 (REST API) - Sprint 4
+
+- [ ] **FastAPI Setup**
+
+  - [ ] Add fastapi and uvicorn dependencies
+  - [ ] Create api/ directory structure
+  - [ ] Configure CORS and middleware
+
+- [ ] **Core API Endpoints**
+
+  - [ ] Query endpoint (POST /api/v1/query)
+  - [ ] Document listing (GET /api/v1/documents)
+  - [ ] Stats endpoint (GET /api/v1/stats)
+  - [ ] Ingestion trigger (POST /api/v1/ingest/{provider})
+  - [ ] Logs endpoint (GET /api/v1/logs)
+  - [ ] Health check (GET /health)
+
+- [ ] **Security & Testing**
+
+  - [ ] API Key authentication
+  - [ ] Rate limiting
+  - [ ] OpenAPI documentation
+  - [ ] Integration tests
+
+### Phase 5 (Deployment) - Sprint 5
+
+- [ ] **Docker**
+
+  - [ ] Create Dockerfile
+  - [ ] Create docker-compose.yml
+  - [ ] Test local container
+  - [ ] Optimize image size
+
+- [ ] **AWS Infrastructure**
+
+  - [ ] VPC and security groups
+  - [ ] ECS Fargate cluster
+  - [ ] Application Load Balancer
+  - [ ] EFS persistent storage
+  - [ ] Secrets Manager setup
+
+- [ ] **CI/CD**
+
+  - [ ] GitHub Actions workflow
+  - [ ] ECR image push
+  - [ ] ECS deployment
+  - [ ] Health checks and rollback
+
+- [ ] **Monitoring**
+
+  - [ ] CloudWatch dashboard
+  - [ ] Alerting rules
+  - [ ] Log aggregation
+  - [ ] Runbook creation
+
+### Future (Multi-Provider)
 
 - [ ] Collect OPRA documents
 - [ ] Ingest OPRA documents
 - [ ] Test cross-provider queries
+- [ ] Add OpenAI API support
 - [ ] Update documentation
 
 ______________________________________________________________________
@@ -620,8 +1101,8 @@ ______________________________________________________________________
 
 Phase 1 is complete when:
 
-1. `python main.py ingest --provider cme` runs without errors
-1. `python main.py query "question"` returns grounded answers
+1. `rag ingest --provider cme` runs without errors
+1. `rag query "question"` returns grounded answers
 1. Citations include document name and section
 1. Refusal works for out-of-scope questions
 1. All 35 CME documents are indexed
