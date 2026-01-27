@@ -368,22 +368,22 @@ ______________________________________________________________________
 
 ```bash
 # Ingest documents for a provider
-python main.py ingest --provider cme
+rag ingest --provider cme
 
 # Ingest all providers
-python main.py ingest --all
+rag ingest --all
 
 # Query with default settings
-python main.py query "What are the redistribution requirements?"
+rag query "What are the redistribution requirements?"
 
 # Query specific provider
-python main.py query --provider cme "What fees apply to derived data?"
+rag query --provider cme "What fees apply to derived data?"
 
 # Query multiple providers
-python main.py query --provider cme --provider opra "Definition of subscriber"
+rag query --provider cme --provider opra "Definition of subscriber"
 
 # List indexed documents
-python main.py list --provider cme
+rag list --provider cme
 ```
 
 ### Exit Codes

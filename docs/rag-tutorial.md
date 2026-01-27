@@ -307,7 +307,7 @@ ______________________________________________________________________
 
 ## Part 6: The Code Flow
 
-### Ingestion (`python main.py ingest --provider cme`)
+### Ingestion (`rag ingest --provider cme`)
 
 ```python
 # 1. Find all PDFs
@@ -335,7 +335,7 @@ collection.add(
 )
 ```
 
-### Query (`python main.py query "What is the A1 fee?"`)
+### Query (`rag query "What is the A1 fee?"`)
 
 ```python
 # 1. Embed the question (calls Ollama)
@@ -467,7 +467,7 @@ licencing-rag/
 │   ├── prompts.py         ← system prompts for Claude
 │   └── llm.py             ← Claude API wrapper (to be added)
 │
-└── main.py                ← CLI entry point
+└── app/cli.py             ← CLI entry point
 ```
 
 ______________________________________________________________________
@@ -475,7 +475,7 @@ ______________________________________________________________________
 ## Next Steps
 
 1. **Set up Claude API** - Get an API key from console.anthropic.com
-1. **Test a query** - `python main.py query "What are the CME fees?"`
+1. **Test a query** - `rag query "What are the CME fees?"`
 1. **Add more providers** - Put OPRA docs in `data/raw/opra/`
 
 ______________________________________________________________________

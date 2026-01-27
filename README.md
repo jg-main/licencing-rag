@@ -202,10 +202,6 @@ pip install -e .
 ollama pull nomic-embed-text
 ```
 
-> **⚠️ CLI Note:** The `rag` command shown throughout this README is the planned interface from specs.v0.3.md.\
-> **Current implementation:** Use `python main.py` instead of `rag` until Sprint 1 CLI entry point is completed.\
-> Example: `python main.py query "Your question"` instead of `rag query "Your question"`
-
 ### Choose Your LLM Provider
 
 #### Option A: Claude API (Recommended) - Fast, High Quality
