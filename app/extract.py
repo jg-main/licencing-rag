@@ -226,14 +226,15 @@ def validate_extraction(extracted: ExtractedDocument) -> list[str]:
     if extracted.page_count == 0:
         warnings.append(f"Document '{extracted.source_file}' has no pages")
 
-    # Check for potential OCR issues (mostly non-text characters)
+    # Check for potential extraction issues (mostly non-alphabetic characters)
+    # This can indicate: scanned PDF needing OCR, or font encoding issues
     text = extracted.full_text
     if text:
         alpha_ratio = sum(1 for c in text if c.isalpha()) / max(len(text), 1)
         if alpha_ratio < 0.3:
             warnings.append(
-                f"Document '{extracted.source_file}' may need OCR "
-                f"(only {alpha_ratio:.0%} alphabetic)"
+                f"Document '{extracted.source_file}' has extraction issues "
+                f"(only {alpha_ratio:.0%} alphabetic) - may need OCR or has font encoding problems"
             )
 
     for warning in warnings:
