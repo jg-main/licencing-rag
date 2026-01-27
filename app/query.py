@@ -13,11 +13,15 @@ from app.config import CHROMA_DIR
 from app.config import DEFAULT_PROVIDERS
 from app.config import PROVIDERS
 from app.config import TOP_K
+from app.definitions import format_definitions_for_context
+from app.definitions import format_definitions_for_output
+from app.definitions import get_definitions_retriever
 from app.embed import OllamaEmbeddingFunction
 from app.llm import LLMConnectionError
 from app.llm import get_llm
 from app.logging import get_logger
 from app.prompts import QA_PROMPT
+from app.prompts import QA_PROMPT_NO_DEFINITIONS
 from app.prompts import SYSTEM_PROMPT
 from app.prompts import get_refusal_message
 from app.search import BM25Index
@@ -66,6 +70,7 @@ def query(
     providers: list[str] | None = None,
     top_k: int = TOP_K,
     search_mode: str = "hybrid",
+    include_definitions: bool = True,
 ) -> dict:
     """Query the knowledge base.
 
@@ -74,11 +79,13 @@ def query(
         providers: List of providers to query. Defaults to all configured.
         top_k: Number of chunks to retrieve per provider.
         search_mode: Search mode - "vector", "keyword", or "hybrid" (default).
+        include_definitions: If True, auto-link definitions for terms in context.
 
     Returns:
-        Dictionary with answer, context, citations, and metadata including:
+        Dictionary with answer, context, citations, definitions, and metadata including:
         - search_mode: The requested search mode
         - effective_search_mode: The actual mode used (may differ if fallback occurred)
+        - definitions: List of auto-linked definitions (if include_definitions=True)
 
     Raises:
         RuntimeError: If no collections are available.
@@ -185,6 +192,7 @@ def query(
             "answer": get_refusal_message(providers),
             "context": "",
             "citations": [],
+            "definitions": [],
             "chunks_retrieved": 0,
             "providers": providers,
             "search_mode": search_mode,
@@ -196,13 +204,45 @@ def query(
     # Format context
     context = format_context(all_documents, all_metadatas)
 
+    # Auto-link definitions if enabled
+    definitions_dict: dict = {}
+    definitions_context = ""
+    if include_definitions:
+        try:
+            retriever = get_definitions_retriever(tuple(providers))
+            # Find definitions for terms in the question and context
+            combined_text = question + " " + context
+            definitions_dict = retriever.find_definitions_in_text(
+                combined_text,
+                max_definitions=10,
+            )
+            if definitions_dict:
+                definitions_context = format_definitions_for_context(definitions_dict)
+                log.debug(
+                    "definitions_found",
+                    terms=list(definitions_dict.keys()),
+                    count=len(definitions_dict),
+                )
+        except Exception as e:
+            log.warning("definitions_retrieval_failed", error=str(e))
+
     # Build prompt with provider context
     provider_label = ", ".join(p.upper() for p in providers)
-    prompt = QA_PROMPT.format(
-        context=context,
-        question=question,
-        provider=provider_label,
-    )
+
+    # Use appropriate prompt based on whether definitions were found
+    if definitions_context:
+        prompt = QA_PROMPT.format(
+            context=context,
+            definitions_section=definitions_context,
+            question=question,
+            provider=provider_label,
+        )
+    else:
+        prompt = QA_PROMPT_NO_DEFINITIONS.format(
+            context=context,
+            question=question,
+            provider=provider_label,
+        )
 
     # Call LLM
     log.debug("calling_llm")
@@ -245,10 +285,16 @@ def query(
                 }
             )
 
+    # Format definitions for output
+    definitions_output = (
+        format_definitions_for_output(definitions_dict) if definitions_dict else []
+    )
+
     return {
         "answer": answer,
         "context": context,
         "citations": citations,
+        "definitions": definitions_output,
         "chunks_retrieved": len(all_documents),
         "providers": providers,
         "search_mode": search_mode,
@@ -304,6 +350,35 @@ def print_response(result: dict) -> None:
             )
 
         console.print(table)
+
+    # Print definitions table if any were auto-linked
+    definitions = result.get("definitions", [])
+    if definitions:
+        console.print()
+        def_table = Table(
+            title="Auto-Linked Definitions",
+            show_header=True,
+            header_style="bold",
+        )
+        def_table.add_column("Term", style="cyan", width=20)
+        def_table.add_column("Definition", style="white")
+        def_table.add_column("Source", style="dim")
+
+        for defn in definitions:
+            # Truncate long definitions for display
+            definition_text = defn.get("definition", "")
+            if len(definition_text) > 100:
+                definition_text = definition_text[:97] + "..."
+
+            source = f"{defn.get('document_path', defn.get('document', ''))}"
+
+            def_table.add_row(
+                defn.get("term", ""),
+                definition_text,
+                source,
+            )
+
+        console.print(def_table)
 
 
 def main(question: str) -> None:
