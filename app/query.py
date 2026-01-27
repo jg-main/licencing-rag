@@ -5,9 +5,6 @@ import sys
 from typing import Any
 
 import chromadb
-from rich.console import Console
-from rich.markdown import Markdown
-from rich.table import Table
 
 from app.config import CHROMA_DIR
 from app.config import DEFAULT_PROVIDERS
@@ -29,7 +26,6 @@ from app.search import HybridSearcher
 from app.search import SearchMode
 
 log = get_logger(__name__)
-console = Console()
 
 
 def format_context(
@@ -303,80 +299,16 @@ def query(
 def print_response(result: dict) -> None:
     """Print a formatted response using Rich console output.
 
+    This function delegates to the output module's print_result function.
+    Kept for backward compatibility with existing code.
+
     Args:
         result: Query result dictionary.
     """
-    providers = result.get("providers", [])
-    provider_label = ", ".join(p.upper() for p in providers) if providers else ""
+    from app.output import OutputFormat
+    from app.output import print_result
 
-    # Header with provider info
-    title = f"RESPONSE (Sources: {provider_label})" if provider_label else "RESPONSE"
-    console.print()
-    console.rule(f"[bold blue]{title}[/bold blue]")
-
-    # Render the LLM response as Markdown for proper formatting
-    answer_md = Markdown(result["answer"])
-    console.print(answer_md)
-
-    # Retrieved chunks summary
-    console.print()
-    console.rule("[dim]Source Information[/dim]")
-    console.print(f"[dim]Retrieved {result['chunks_retrieved']} chunks[/dim]")
-
-    # Print citation table with provider and page ranges
-    if result["citations"]:
-        table = Table(title="Source Documents", show_header=True, header_style="bold")
-        table.add_column("Provider", style="cyan", width=10)
-        table.add_column("Document", style="green")
-        table.add_column("Section", style="yellow")
-        table.add_column("Pages", style="magenta", justify="right")
-
-        for cit in result["citations"]:
-            provider = cit.get("provider", "").upper()
-            page_start = cit.get("page_start", "?")
-            page_end = cit.get("page_end", page_start)
-            if page_start != page_end and page_end != "?":
-                page_str = f"{page_start}–{page_end}"
-            else:
-                page_str = str(page_start)
-
-            table.add_row(
-                provider,
-                cit["document"],
-                cit["section"],
-                page_str,
-            )
-
-        console.print(table)
-
-    # Print definitions table if any were auto-linked
-    definitions = result.get("definitions", [])
-    if definitions:
-        console.print()
-        def_table = Table(
-            title="Auto-Linked Definitions",
-            show_header=True,
-            header_style="bold",
-        )
-        def_table.add_column("Term", style="cyan", width=20)
-        def_table.add_column("Definition", style="white")
-        def_table.add_column("Source", style="dim")
-
-        for defn in definitions:
-            # Truncate long definitions for display
-            definition_text = defn.get("definition", "")
-            if len(definition_text) > 100:
-                definition_text = definition_text[:97] + "..."
-
-            source = f"{defn.get('document_path', defn.get('document', ''))}"
-
-            def_table.add_row(
-                defn.get("term", ""),
-                definition_text,
-                source,
-            )
-
-        console.print(def_table)
+    print_result(result, OutputFormat.CONSOLE)
 
 
 def main(question: str) -> None:
