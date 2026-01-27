@@ -20,6 +20,9 @@ git clone <repo-url>
 cd licencing-rag
 uv sync
 
+# Install CLI entry point (enables 'rag' command)
+pip install -e .
+
 # Pull embedding model (required)
 ollama pull nomic-embed-text
 ```
@@ -34,7 +37,7 @@ ollama pull llama3.2:3b   # For limited RAM (<8GB)
 ollama pull llama3.1:8b   # For 8GB+ RAM
 
 # Run queries (default provider)
-uv run python main.py query "What are the CME fees?"
+rag query "What are the CME fees?"
 ```
 
 #### Option B: Claude API - Fast, ~$0.003/query
@@ -45,21 +48,46 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 export LLM_PROVIDER="anthropic"
 
 # Run queries
-uv run python main.py query "What are the CME fees?"
+rag query "What are the CME fees?"
 ```
 
 ### Basic Usage
 
 ```bash
-# Ingest documents
-uv run python main.py ingest --provider cme
+# Ingest documents (supports subdirectories)
+rag ingest --provider cme
 
 # Query the knowledge base
-uv run python main.py query "What is a subscriber?"
+rag query "What is a subscriber?"
+
+# Query with JSON output
+rag query --format json "What are the fees?" > result.json
 
 # List indexed documents
-uv run python main.py list --provider cme
+rag list --provider cme
+
+# View query logs
+rag logs --tail 10
+
+# Start REST API server (coming in Sprint 4)
+rag serve --port 8000 --host 0.0.0.0
 ```
+
+### Document Organization
+
+Documents can be organized in subdirectories for better management:
+
+```
+data/raw/cme/
+├── Fees/
+│   ├── january-2025-market-data-fee-list.pdf
+│   └── schedule-2-rates.pdf
+└── Agreements/
+    ├── information-license-agreement.pdf
+    └── subscriber-terms.pdf
+```
+
+The system will recursively discover and process all documents while maintaining deterministic ordering.
 
 ## Configuration
 
@@ -71,6 +99,24 @@ Environment variables:
 | `ANTHROPIC_API_KEY` | -        | Required for Claude API               |
 
 Edit `app/config.py` for model selection and chunking parameters.
+
+## Features
+
+### Current (v0.3)
+- ✅ **Multi-provider support** - Organize documents by data provider (CME, OPRA, etc.)
+- ✅ **Subdirectory organization** - Nested folder structure for document management
+- ✅ **Dual LLM support** - Claude API (fast) or Ollama (local, private)
+- ✅ **Page-level citations** - Every answer includes exact document references
+- ✅ **Grounded responses** - Explicit refusal when answer not in documents
+- ✅ **Comprehensive testing** - 75 tests covering core functionality
+
+### Coming Soon
+- 🚧 **Hybrid search** (Sprint 3) - BM25 keyword + vector semantic search with RRF
+- 🚧 **Definitions auto-linking** (Sprint 3) - Automatic definition retrieval for quoted terms
+- 🚧 **Query logging** (Sprint 3) - JSONL audit logs for compliance
+- 🚧 **Output formats** (Sprint 3) - Rich console formatting + JSON output
+- 🚧 **REST API** (Sprint 4) - FastAPI with OpenAPI documentation
+- 🚧 **AWS deployment** (Sprint 5) - Docker + ECS/Fargate with CI/CD
 
 ## Troubleshooting
 
@@ -113,7 +159,7 @@ export LLM_PROVIDER="anthropic"
 Documents haven't been ingested yet.
 
 ```bash
-uv run python main.py ingest --provider cme
+rag ingest --provider cme
 ```
 
 #### "Rate limit exceeded" (Claude API)
@@ -126,7 +172,7 @@ Some PDFs may be scanned images without text. Check the extraction:
 
 ```bash
 # Enable debug logging to see extraction details
-uv run python main.py --debug ingest --provider cme
+rag --debug ingest --provider cme
 ```
 
 ### Debug Mode
@@ -134,7 +180,7 @@ uv run python main.py --debug ingest --provider cme
 Enable verbose logging with `--debug`:
 
 ```bash
-uv run python main.py --debug query "What are the fees?"
+rag --debug query "What are the fees?"
 ```
 
 ### Getting Help
@@ -146,4 +192,5 @@ uv run python main.py --debug query "What are the fees?"
 
 - [RAG Tutorial](docs/rag-tutorial.md) - Beginner's guide to RAG
 - [Implementation Plan](docs/implementation-plan.md) - Development roadmap
-- [Specs v0.2](docs/specs.v0.2.md) - Technical specifications
+- [Specs v0.3](docs/specs.v0.3.md) - Technical specifications
+- [Subdirectory Implementation](SUBDIRECTORY_IMPLEMENTATION.md) - Subdirectory support details
