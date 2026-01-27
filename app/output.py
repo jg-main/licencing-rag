@@ -345,7 +345,11 @@ def _extract_clauses(context: str) -> list[dict[str, Any]]:
     return clauses
 
 
-def print_result(result: dict[str, Any], output_format: OutputFormat) -> None:
+def print_result(
+    result: dict[str, Any],
+    output_format: OutputFormat,
+    show_definitions: bool = False,
+) -> None:
     """Print query result in the specified format.
 
     Convenience function that formats and prints the result directly.
@@ -353,6 +357,7 @@ def print_result(result: dict[str, Any], output_format: OutputFormat) -> None:
     Args:
         result: Query result dictionary from query().
         output_format: Output format to use.
+        show_definitions: Whether to display auto-linked definitions.
     """
     if output_format == OutputFormat.JSON:
         print(format_json(result))
@@ -431,7 +436,7 @@ def print_result(result: dict[str, Any], output_format: OutputFormat) -> None:
             console.print(citations_table)
 
         # Definitions table
-        if qr.definitions:
+        if show_definitions and qr.definitions:
             console.print()
             def_table = Table(
                 title="Auto-Linked Definitions",

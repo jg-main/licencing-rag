@@ -81,7 +81,7 @@ def cmd_query(args: argparse.Namespace) -> int:
             OutputFormat.JSON if args.format == "json" else OutputFormat.CONSOLE
         )
 
-        print_result(result, output_format)
+        print_result(result, output_format, show_definitions=args.show_definitions)
         return 0
     except RuntimeError as e:
         print(f"Error: {e}")
@@ -207,6 +207,11 @@ Examples:
         choices=["console", "json"],
         default="console",
         help="Output format: console (Rich styled, default) or json (structured)",
+    )
+    query_parser.add_argument(
+        "--show-definitions",
+        action="store_true",
+        help="Show auto-linked definitions table (hidden by default)",
     )
 
     # List command
