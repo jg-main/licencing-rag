@@ -101,24 +101,24 @@ ______________________________________________________________________
 
 #### 3.3 Output Formats
 
-- [ ] Create `app/output.py` module
-- [ ] Implement console output formatter using Rich library
-- [ ] Add panels, colors, and markdown styling for CLI
-- [ ] Implement JSON output formatter
-- [ ] Add structured JSON schema (answer, clauses, definitions, citations)
-- [ ] Add `--format` flag to query command (console/json)
-- [ ] Test both output formats
-- [ ] Update documentation with format examples
+- [x] Create `app/output.py` module
+- [x] Implement console output formatter using Rich library
+- [x] Add panels, colors, and markdown styling for CLI
+- [x] Implement JSON output formatter
+- [x] Add structured JSON schema (answer, clauses, definitions, citations)
+- [x] Add `--format` flag to query command (console/json)
+- [x] Test both output formats
+- [x] Update documentation with format examples
 
 #### 3.4 Integration & Testing
 
-- [ ] Update all tests for hybrid search
-- [ ] Add integration tests for definitions auto-linking
+- [x] Update all tests for hybrid search
+- [x] Add integration tests for definitions auto-linking
 - [ ] Verify query logging doesn't impact performance
-- [ ] Test output formatters (console and JSON)
-- [ ] Document new features in README
-- [ ] Update this document (implementation-plan.md) with the current state of the project
-- [ ] Update CLI help text with new options
+- [x] Test output formatters (console and JSON)
+- [x] Document new features in README
+- [x] Update this document (implementation-plan.md) with the current state of the project
+- [x] Update CLI help text with new options
 
 ### Sprint 4: REST API
 
@@ -986,26 +986,34 @@ ______________________________________________________________________
 - [x] Add extraction quality checks
 - [x] Document common issues
 
-### Phase 3 (Enhancements) - Sprint 3
+### Phase 3 (Enhancements) - Sprint 3 - ✅ MOSTLY COMPLETE
 
-- [ ] **Hybrid Search**
+- [x] **Hybrid Search**
 
-  - [ ] Add rank-bm25 dependency
-  - [ ] Create app/search.py module
-  - [ ] Implement BM25 indexing
-  - [ ] Implement RRF algorithm
-  - [ ] Update query pipeline
-  - [ ] Add tests and benchmarks
+  - [x] Add rank-bm25 dependency
+  - [x] Create app/search.py module
+  - [x] Implement BM25 indexing
+  - [x] Implement RRF algorithm
+  - [x] Update query pipeline
+  - [x] Add tests and benchmarks
 
-- [ ] **Definitions Auto-Linking**
+- [x] **Definitions Auto-Linking**
 
-  - [ ] Create app/definitions.py module
-  - [ ] Build definitions index
-  - [ ] Implement term extraction
-  - [ ] Integrate with query pipeline
-  - [ ] Update prompts and output format
+  - [x] Create app/definitions.py module
+  - [x] Build definitions index
+  - [x] Implement term extraction
+  - [x] Integrate with query pipeline
+  - [x] Update prompts and output format
 
-- [ ] **Query Logging**
+- [x] **Output Formats**
+
+  - [x] Create app/output.py module
+  - [x] Implement console formatter (Rich)
+  - [x] Implement JSON formatter
+  - [x] Add --format flag to CLI
+  - [x] Add tests for formatters
+
+- [ ] **Query Logging** (moved to Future)
 
   - [ ] Create app/logging_util.py module
   - [ ] Implement JSONL writer

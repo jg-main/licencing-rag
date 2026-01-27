@@ -1,7 +1,7 @@
 # License Intelligence System - Local RAG
 
 **Version:** 0.3\
-**Status:** Sprint 1-2 Complete, Sprint 3-5 In Development
+**Status:** Sprint 1-3 Mostly Complete, Sprint 4-5 In Development
 
 A local, private legal Q&A system that answers questions **exclusively** based on curated license agreements and exhibits from multiple market data providers. No training. No cloud (optional). No hallucinations (by design).
 
@@ -33,7 +33,7 @@ This is **not** a general chatbot and **not** a trained LLM. It is a **retrieval
 - ✅ Uses Claude API for answer generation (with Ollama fallback)
 - ✅ Uses local embeddings via Ollama (nomic-embed-text)
 - ✅ Supports hybrid search (vector + keyword with BM25 and RRF)
-- ⏳ Auto-links defined terms to definitions - **NOT IMPLEMENTED YET**
+- ✅ Auto-links defined terms to definitions
 - ⏳ Logs all queries for audit - **NOT IMPLEMENTED YET**
 - ⏳ Provides REST API for programmatic access - **NOT IMPLEMENTED YET**
 - ⏳ Deployable to AWS ECS/Fargate - **NOT IMPLEMENTED YET**
@@ -88,7 +88,7 @@ ______________________________________________________________________
 - ⏳ `rag logs --tail N` - View query logs - **NOT IMPLEMENTED YET**
 - ⏳ `rag serve --port 8000` - Start REST API server - **NOT IMPLEMENTED YET**
 
-### ✅ Sprint 3: Enhanced Search & Logging (PARTIALLY IMPLEMENTED)
+### ✅ Sprint 3: Enhanced Search & Output (MOSTLY IMPLEMENTED)
 
 #### Hybrid Search (IMPLEMENTED)
 
@@ -99,12 +99,12 @@ ______________________________________________________________________
 
 📖 **[Read the Hybrid Search Guide](docs/hybrid-search.md)** — Beginner-friendly explanation of how hybrid search works, when to use it, and how it improves retrieval quality.
 
-#### Definitions Auto-Linking
+#### Definitions Auto-Linking (IMPLEMENTED)
 
-- ⏳ **Quoted Term Extraction** - Detect defined terms in answers (e.g., "Subscriber")
-- ⏳ **Definitions Index** - Build index of definition chunks (is_definitions=true)
-- ⏳ **Automatic Retrieval** - Auto-fetch and include relevant definitions
-- ⏳ **Definition Caching** - Reduce redundant retrievals
+- ✅ **Quoted Term Extraction** - Detect defined terms in answers (e.g., "Subscriber")
+- ✅ **Definitions Index** - Build index of definition chunks (is_definitions=true)
+- ✅ **Automatic Retrieval** - Auto-fetch and include relevant definitions
+- ✅ **Definition Caching** - LRU cache to reduce redundant retrievals
 
 #### Query Logging
 
@@ -113,11 +113,11 @@ ______________________________________________________________________
 - ⏳ **Log Rotation** - Monthly rotation
 - ⏳ **Query Analysis** - CLI command to view and analyze logs
 
-#### Output Formats
+#### Output Formats (IMPLEMENTED)
 
-- ⏳ **Rich Console Output** - Formatted CLI output with panels, colors, markdown
-- ⏳ **JSON Output** - Structured JSON for programmatic access
-- ⏳ **Format Selection** - `--format` flag (console/json)
+- ✅ **Rich Console Output** - Formatted CLI output with panels, colors, markdown
+- ✅ **JSON Output** - Structured JSON for programmatic access
+- ✅ **Format Selection** - `--format` flag (console/json)
 
 ### ⏳ Sprint 4: REST API (NOT IMPLEMENTED YET)
 
@@ -280,11 +280,63 @@ rag query --provider cme "What are the fees?"
 # Query multiple providers
 rag query --provider cme --provider ice "What is a subscriber?"
 
-# JSON output (flag accepted, outputs same as console)
+# JSON output with structured schema
 rag query --format json "What are the fees?" > result.json
 
-# Console output with Rich formatting (default)
+# Console output with Rich formatting (default, styled panels and tables)
 rag query "What are the fees?"
+rag query --format console "What are the fees?"
+```
+
+**JSON Output Schema:**
+
+When using `--format json`, the output follows this structure:
+
+```json
+{
+  "answer": "The subscriber fee is $100 per month...",
+  "supporting_clauses": [
+    {
+      "text": "Clause text from the document...",
+      "source": {
+        "provider": "CME",
+        "document": "Fees/Schedule-A.pdf",
+        "section": "Section 3.1 Pricing",
+        "page_start": 5,
+        "page_end": 5
+      }
+    }
+  ],
+  "definitions": [
+    {
+      "term": "Subscriber",
+      "definition": "\"Subscriber\" means any individual authorized...",
+      "source": {
+        "provider": "cme",
+        "document": "Agreements/Main-Agreement.pdf",
+        "section": "Definitions",
+        "page_start": 2,
+        "page_end": 2
+      }
+    }
+  ],
+  "citations": [
+    {
+      "provider": "cme",
+      "document": "Fees/Schedule-A.pdf",
+      "section": "Section 3.1 Pricing",
+      "page_start": 5,
+      "page_end": 5
+    }
+  ],
+  "metadata": {
+    "providers": ["cme"],
+    "chunks_retrieved": 5,
+    "search_mode": "hybrid",
+    "effective_search_mode": "hybrid",
+    "timestamp": "2026-01-27T10:30:00+00:00"
+  }
+}
 ```
 
 **What it does:**
@@ -292,7 +344,7 @@ rag query "What are the fees?"
 - Embeds question using Ollama
 - Retrieves top-K relevant chunks from ChromaDB
 - ✅ Performs hybrid search (vector + BM25 with RRF)
-- ⏳ (Sprint 3) Auto-links definitions - NOT IMPLEMENTED YET
+- ✅ Auto-links definitions (when enabled)
 - Generates answer via LLM (Claude or Ollama)
 - ⏳ (Sprint 3) Logs query to `logs/queries.jsonl` - NOT IMPLEMENTED YET
 - Returns answer with citations
@@ -577,12 +629,12 @@ ______________________________________________________________________
 | LLM (Fallback)   | Llama 3.1/3.2 (Ollama)    | Local answer generation           | ✅ Active   |
 | Embeddings       | nomic-embed-text (Ollama) | 768-dim vectors                   | ✅ Active   |
 | Vector DB        | ChromaDB 1.4+             | Vector storage & search           | ✅ Active   |
-| Keyword Search   | rank-bm25 0.2+            | BM25 keyword search               | ⏳ Sprint 3 |
+| Keyword Search   | rank-bm25 0.2+            | BM25 keyword search               | ✅ Active   |
 | PDF Extraction   | PyMuPDF 1.26+             | PDF text extraction               | ✅ Active   |
 | DOCX Extraction  | python-docx 1.2+          | DOCX text extraction              | ✅ Active   |
 | REST API         | FastAPI 0.115+            | HTTP API framework                | ⏳ Sprint 4 |
 | ASGI Server      | Uvicorn 0.32+             | Production web server             | ⏳ Sprint 4 |
-| CLI Formatting   | Rich 14.0+                | Terminal output formatting        | ⏳ Sprint 3 |
+| CLI Formatting   | Rich 14.0+                | Terminal output formatting        | ✅ Active   |
 | Logging          | structlog 25.0+           | Structured logging                | ✅ Active   |
 | Testing          | pytest 8.0+               | Unit and integration tests        | ✅ Active   |
 | Containerization | Docker 27.0+              | Application containerization      | ⏳ Sprint 5 |
@@ -900,13 +952,13 @@ ______________________________________________________________________
 
 ### Sprint Progress
 
-| Sprint | Status      | Features                                     |
-| ------ | ----------- | -------------------------------------------- |
-| 1      | ✅ Complete | MVP: Extraction, chunking, ingestion, query  |
-| 2      | ✅ Complete | Robustness: Error handling, logging, testing |
-| 3      | ⏳ Planned  | Hybrid search, definitions, logging, formats |
-| 4      | ⏳ Planned  | REST API (FastAPI), authentication, docs     |
-| 5      | ⏳ Planned  | Docker, AWS ECS/Fargate, CI/CD, monitoring   |
+| Sprint | Status             | Features                                     |
+| ------ | ------------------ | -------------------------------------------- |
+| 1      | ✅ Complete        | MVP: Extraction, chunking, ingestion, query  |
+| 2      | ✅ Complete        | Robustness: Error handling, logging, testing |
+| 3      | ✅ Mostly Complete | Hybrid search, definitions, output formats   |
+| 4      | ⏳ Planned         | REST API (FastAPI), authentication, docs     |
+| 5      | ⏳ Planned         | Docker, AWS ECS/Fargate, CI/CD, monitoring   |
 
 ______________________________________________________________________
 
