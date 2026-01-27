@@ -3,7 +3,7 @@
 
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import chromadb
@@ -16,12 +16,14 @@ from app.ingest import chunks_to_chroma_format, get_collection_name
 from app.query import format_context, query
 
 
-def _sanitize_metadata(metadatas: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _sanitize_metadata(
+    metadatas: list[dict[str, Any]],
+) -> list[dict[str, str | int | float | bool]]:
     """Remove None values from metadata dicts (ChromaDB doesn't accept None)."""
     return [
         {k: v for k, v in meta.items() if v is not None}
         for meta in metadatas
-    ]
+    ]  # type: ignore[return-value]
 
 
 class TestIngestQuerySmokeTest:
@@ -79,7 +81,7 @@ Fee amounts are subject to change. Contact CME for current pricing."""
         collection = client.get_or_create_collection(name=collection_name)
         collection.add(
             documents=documents,
-            metadatas=_sanitize_metadata(metadatas),
+            metadatas=_sanitize_metadata(metadatas),  # type: ignore[arg-type]
             ids=ids,
         )
 
@@ -95,9 +97,12 @@ Fee amounts are subject to change. Contact CME for current pricing."""
         assert len(results["documents"][0]) > 0, "Should retrieve at least one chunk"
 
         # 6. Format context for LLM
+        docs = results["documents"]
+        metas = results["metadatas"]
+        assert docs is not None and metas is not None
         context = format_context(
-            results["documents"][0],
-            results["metadatas"][0],  # type: ignore[arg-type]
+            docs[0],
+            cast(list[dict[str, Any]], metas[0]),
         )
         assert "[CME]" in context, "Context should include provider prefix"
         assert "sample-agreement.docx" in context, "Context should include doc name"
@@ -116,7 +121,7 @@ Fee amounts are subject to change. Contact CME for current pricing."""
         collection = client.get_or_create_collection(name=get_collection_name("cme"))
         collection.add(
             documents=documents,
-            metadatas=_sanitize_metadata(metadatas),
+            metadatas=_sanitize_metadata(metadatas),  # type: ignore[arg-type]
             ids=ids,
         )
 
@@ -127,9 +132,12 @@ Fee amounts are subject to change. Contact CME for current pricing."""
         )
 
         # Format context
+        docs = results["documents"]
+        metas = results["metadatas"]
+        assert docs is not None and metas is not None
         context = format_context(
-            results["documents"][0],
-            results["metadatas"][0],  # type: ignore[arg-type]
+            docs[0],
+            cast(list[dict[str, Any]], metas[0]),
         )
 
         # Verify citation components present
@@ -185,3 +193,166 @@ Fee amounts are subject to change. Contact CME for current pricing."""
 
             # Verify LLM was called
             mock_provider.generate.assert_called_once()
+
+
+class TestHybridSearchE2E:
+    """End-to-end tests for hybrid search with BM25 persistence and RRF."""
+
+    @pytest.fixture
+    def temp_bm25_dir(self, tmp_path: Path) -> Path:
+        """Create temporary BM25 index directory."""
+        bm25_dir = tmp_path / "bm25"
+        bm25_dir.mkdir(parents=True, exist_ok=True)
+        return bm25_dir
+
+    @pytest.fixture
+    def sample_documents(self) -> list[tuple[str, str]]:
+        """Sample documents for BM25 indexing."""
+        return [
+            ("chunk_fee_1", "The fee schedule outlines real-time data fees at $100 per month"),
+            ("chunk_fee_2", "Delayed data has reduced fees of $50 per month for subscribers"),
+            ("chunk_redistribution", "Redistribution requires prior written approval from CME Group"),
+            ("chunk_subscriber", "A Subscriber is defined as any person receiving market data"),
+            ("chunk_general", "CME Group provides market data through various distribution channels"),
+        ]
+
+    def test_bm25_save_load_roundtrip(
+        self, temp_bm25_dir: Path, sample_documents: list[tuple[str, str]]
+    ) -> None:
+        """Verify BM25 index can be saved, loaded, and queried correctly."""
+        import app.search as search_module
+        from app.search import BM25Index
+
+        original_dir = search_module.BM25_INDEX_DIR
+        search_module.BM25_INDEX_DIR = temp_bm25_dir
+
+        try:
+            # Build and save index
+            index = BM25Index("test_provider")
+            chunk_ids = [doc[0] for doc in sample_documents]
+            documents = [doc[1] for doc in sample_documents]
+            index.add_documents(chunk_ids, documents)
+            index.build()
+            index.save()
+
+            # Verify file exists
+            index_path = temp_bm25_dir / "test_provider_index.pkl"
+            assert index_path.exists()
+
+            # Load and verify
+            loaded = BM25Index.load("test_provider")
+            assert loaded is not None
+            assert len(loaded.chunk_ids) == len(sample_documents)
+
+            # Query should find fee-related documents
+            results = loaded.query("fee schedule real-time data", top_k=3)
+            assert len(results) >= 1
+            # First result should be the fee schedule chunk
+            assert results[0][0] == "chunk_fee_1"
+
+        finally:
+            search_module.BM25_INDEX_DIR = original_dir
+
+    def test_hybrid_search_with_loaded_bm25(
+        self, temp_bm25_dir: Path, tmp_path: Path, sample_documents: list[tuple[str, str]]
+    ) -> None:
+        """Test hybrid search combining vector results with loaded BM25 index."""
+        import app.search as search_module
+        from app.search import BM25Index, HybridSearcher, SearchMode
+
+        original_dir = search_module.BM25_INDEX_DIR
+        search_module.BM25_INDEX_DIR = temp_bm25_dir
+
+        try:
+            # Build and save BM25 index
+            index = BM25Index("test_provider")
+            chunk_ids = [doc[0] for doc in sample_documents]
+            documents = [doc[1] for doc in sample_documents]
+            index.add_documents(chunk_ids, documents)
+            index.build()
+            index.save()
+
+            # Load BM25 index (simulates fresh session)
+            loaded_bm25 = BM25Index.load("test_provider")
+            assert loaded_bm25 is not None
+
+            # Create mock ChromaDB collection with vector search results
+            # Vector search returns different ranking than BM25
+            mock_collection = MagicMock()
+            mock_collection.query.return_value = {
+                "ids": [["chunk_general", "chunk_subscriber", "chunk_fee_2"]],
+                "documents": [[
+                    sample_documents[4][1],  # general (vector thinks this is relevant)
+                    sample_documents[3][1],  # subscriber
+                    sample_documents[1][1],  # fee_2
+                ]],
+                "metadatas": [[
+                    {"chunk_id": "chunk_general", "provider": "test"},
+                    {"chunk_id": "chunk_subscriber", "provider": "test"},
+                    {"chunk_id": "chunk_fee_2", "provider": "test"},
+                ]],
+                "distances": [[0.1, 0.2, 0.3]],
+            }
+            mock_collection.get.return_value = {
+                "ids": ["chunk_fee_1"],
+                "documents": [sample_documents[0][1]],
+                "metadatas": [{"chunk_id": "chunk_fee_1", "provider": "test"}],
+            }
+
+            # Run hybrid search
+            searcher = HybridSearcher("test_provider", mock_collection, loaded_bm25)
+            results = searcher.search("fee schedule real-time", mode=SearchMode.HYBRID, top_k=3)
+
+            # Verify results
+            assert len(results) >= 1
+
+            # RRF should boost chunk_fee_1 because BM25 ranks it first for "fee schedule"
+            # even though vector search didn't return it in top 3
+            result_ids = [r.chunk_id for r in results]
+
+            # chunk_fee_1 should appear because BM25 ranked it #1 and it was fetched
+            # via collection.get() in the hybrid search
+            assert "chunk_fee_1" in result_ids
+
+            # Verify source is "hybrid"
+            assert all(r.source == "hybrid" for r in results)
+
+        finally:
+            search_module.BM25_INDEX_DIR = original_dir
+
+    def test_hybrid_fallback_when_bm25_missing(
+        self, temp_bm25_dir: Path, sample_documents: list[tuple[str, str]]
+    ) -> None:
+        """Hybrid search falls back to vector-only when BM25 index is missing."""
+        import app.search as search_module
+        from app.search import HybridSearcher, SearchMode
+
+        original_dir = search_module.BM25_INDEX_DIR
+        search_module.BM25_INDEX_DIR = temp_bm25_dir
+
+        try:
+            # NO BM25 index saved - directory is empty
+
+            # Create mock ChromaDB collection
+            mock_collection = MagicMock()
+            mock_collection.query.return_value = {
+                "ids": [["chunk_1", "chunk_2"]],
+                "documents": [[sample_documents[0][1], sample_documents[1][1]]],
+                "metadatas": [[
+                    {"chunk_id": "chunk_1", "provider": "test"},
+                    {"chunk_id": "chunk_2", "provider": "test"},
+                ]],
+                "distances": [[0.1, 0.2]],
+            }
+
+            # Run hybrid search with no BM25 index
+            searcher = HybridSearcher("test_provider", mock_collection, bm25_index=None)
+            results = searcher.search("fee schedule", mode=SearchMode.HYBRID, top_k=2)
+
+            # Should fall back to vector results
+            assert len(results) == 2
+            # Source should be "vector" since we fell back
+            assert all(r.source == "vector" for r in results)
+
+        finally:
+            search_module.BM25_INDEX_DIR = original_dir

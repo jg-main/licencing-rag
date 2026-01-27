@@ -1,6 +1,8 @@
 # tests/test_query.py
 """Tests for query pipeline."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from app.prompts import QA_PROMPT, SYSTEM_PROMPT, get_refusal_message
@@ -50,3 +52,119 @@ class TestRefusalMessage:
         """Empty provider list doesn't crash."""
         msg = get_refusal_message([])
         assert isinstance(msg, str)
+
+
+class TestProviderNormalization:
+    """Tests for provider list normalization."""
+
+    def test_empty_providers_normalized_to_default(self) -> None:
+        """Empty providers list is normalized to DEFAULT_PROVIDERS."""
+        from pathlib import Path
+        from app.query import query
+        from app.config import DEFAULT_PROVIDERS
+
+        with patch("app.query.chromadb.PersistentClient") as mock_client, \
+             patch("app.query.get_llm") as mock_llm:
+            
+            # Mock collection
+            mock_collection = MagicMock()
+            mock_collection.query.return_value = {
+                "ids": [["chunk_1"]],
+                "documents": [["Test document"]],
+                "metadatas": [[{"chunk_id": "chunk_1", "provider": "cme", "document_path": "test.pdf"}]],
+                "distances": [[0.1]],
+            }
+            mock_client.return_value.get_collection.return_value = mock_collection
+            
+            # Mock LLM
+            mock_llm_instance = MagicMock()
+            mock_llm_instance.generate.return_value = "Test answer"
+            mock_llm.return_value = mock_llm_instance
+            
+            with patch("app.query.CHROMA_DIR", Path("/tmp/test_chroma")):
+                with patch.object(Path, "exists", return_value=True):
+                    # Query with empty list should use DEFAULT_PROVIDERS
+                    result = query("test question", providers=[])
+            
+            # Should have used default providers (cme)
+            assert result["providers"] == DEFAULT_PROVIDERS
+            
+            # Should have proper provider label in context
+            mock_llm_instance.generate.assert_called_once()
+            call_args = mock_llm_instance.generate.call_args
+            prompt = call_args.kwargs["prompt"]
+            # Should mention CME (from DEFAULT_PROVIDERS)
+            assert "CME" in prompt
+
+
+class TestEffectiveSearchMode:
+    """Tests for effective_search_mode tracking."""
+
+    def test_keyword_fallback_to_vector_reported(self) -> None:
+        """When keyword mode falls back to vector, effective_search_mode reflects this."""
+        from pathlib import Path
+        from app.query import query
+        
+        # Mock ChromaDB and BM25 to simulate keyword fallback scenario
+        with patch("app.query.chromadb.PersistentClient") as mock_client, \
+             patch("app.query.BM25Index.load") as mock_bm25_load, \
+             patch("app.query.get_llm") as mock_llm:
+            
+            # Setup: BM25 index is missing (returns None)
+            mock_bm25_load.return_value = None
+            
+            # Mock collection with vector results
+            mock_collection = MagicMock()
+            mock_collection.query.return_value = {
+                "ids": [["chunk_1"]],
+                "documents": [["Test document about fees"]],
+                "metadatas": [[{"chunk_id": "chunk_1", "provider": "cme", "document_path": "test.pdf"}]],
+                "distances": [[0.1]],
+            }
+            mock_client.return_value.get_collection.return_value = mock_collection
+            
+            # Mock LLM response
+            mock_llm_instance = MagicMock()
+            mock_llm_instance.generate.return_value = "Test answer"
+            mock_llm.return_value = mock_llm_instance
+            
+            # Mock CHROMA_DIR exists
+            with patch("app.query.CHROMA_DIR", Path("/tmp/test_chroma")):
+                with patch.object(Path, "exists", return_value=True):
+                    result = query("test question", providers=["cme"], search_mode="keyword")
+            
+            # Verify response includes both requested and effective mode
+            assert result["search_mode"] == "keyword"
+            assert result["effective_search_mode"] == "vector"
+
+    def test_vector_mode_no_fallback(self) -> None:
+        """When vector mode is used without fallback, modes match."""
+        from pathlib import Path
+        from app.query import query
+        
+        with patch("app.query.chromadb.PersistentClient") as mock_client, \
+             patch("app.query.get_llm") as mock_llm:
+            
+            # Mock collection with vector results
+            mock_collection = MagicMock()
+            mock_collection.query.return_value = {
+                "ids": [["chunk_1"]],
+                "documents": [["Test document"]],
+                "metadatas": [[{"chunk_id": "chunk_1", "provider": "cme", "document_path": "test.pdf"}]],
+                "distances": [[0.1]],
+            }
+            mock_client.return_value.get_collection.return_value = mock_collection
+            
+            # Mock LLM
+            mock_llm_instance = MagicMock()
+            mock_llm_instance.generate.return_value = "Test answer"
+            mock_llm.return_value = mock_llm_instance
+            
+            with patch("app.query.CHROMA_DIR", Path("/tmp/test_chroma")):
+                with patch.object(Path, "exists", return_value=True):
+                    result = query("test question", providers=["cme"], search_mode="vector")
+            
+            # Both should be vector
+            assert result["search_mode"] == "vector"
+            assert result["effective_search_mode"] == "vector"
+

@@ -64,9 +64,15 @@ def cmd_query(args: argparse.Namespace) -> int:
     from app.query import query
 
     providers = args.provider if args.provider else None
+    search_mode = getattr(args, "search_mode", "hybrid")
 
     try:
-        result = query(args.question, providers=providers, top_k=args.top_k)
+        result = query(
+            args.question,
+            providers=providers,
+            top_k=args.top_k,
+            search_mode=search_mode,
+        )
 
         # Format selection (Sprint 3 - not fully implemented yet)
         # For now, --format flag is accepted but both output the same way
@@ -140,6 +146,8 @@ Examples:
   rag ingest --provider cme
   rag query "What are the redistribution requirements?"
   rag query --provider cme "What fees apply to derived data?"
+  rag query --search-mode keyword "subscriber definition"
+  rag query --search-mode vector "What are the licensing terms?"
   rag query --format json "What are the fees?" > result.json
   rag list --provider cme
         """,
@@ -189,6 +197,13 @@ Examples:
         type=int,
         default=5,
         help="Number of chunks to retrieve (default: 5)",
+    )
+    query_parser.add_argument(
+        "--search-mode",
+        type=str,
+        choices=["vector", "keyword", "hybrid"],
+        default="hybrid",
+        help="Search mode: vector (semantic), keyword (BM25), or hybrid (default)",
     )
     query_parser.add_argument(
         "--format",
