@@ -356,3 +356,237 @@ class TestHybridSearchE2E:
 
         finally:
             search_module.BM25_INDEX_DIR = original_dir
+
+
+class TestQueryWithDefinitions:
+    """Integration tests for query pipeline with definitions auto-linking."""
+
+    @pytest.fixture
+    def temp_definitions_dir(self, tmp_path: Path) -> Path:
+        """Create a temporary definitions index directory."""
+        return tmp_path / "definitions"
+
+    def test_query_includes_definitions_when_enabled(
+        self,
+        tmp_path: Path,
+        temp_definitions_dir: Path,
+    ) -> None:
+        """Query with include_definitions=True returns definitions in result."""
+        from unittest.mock import patch
+
+        from app.definitions import (
+            DefinitionEntry,
+            DefinitionsIndex,
+            save_definitions_index,
+        )
+
+        # Create and save a definitions index
+        temp_definitions_dir.mkdir(parents=True, exist_ok=True)
+        index = DefinitionsIndex(provider="test_provider")
+        entry = DefinitionEntry(
+            term="Subscriber",
+            normalized_term="subscriber",
+            chunk_id="test_doc_1",
+            document_name="agreement.pdf",
+            document_path="agreements/agreement.pdf",
+            section_heading="Definitions",
+            page_start=5,
+            page_end=5,
+            definition_text="Any person or entity receiving Information from a Vendor.",
+            provider="test_provider",
+        )
+        index.add_entry(entry)
+
+        with patch("app.definitions.DEFINITIONS_INDEX_DIR", temp_definitions_dir):
+            save_definitions_index(index)
+
+        # Create a mock ChromaDB collection
+        mock_collection = MagicMock()
+        mock_collection.query.return_value = {
+            "ids": [["chunk_1"]],
+            "documents": [["The Subscriber must pay monthly fees as specified."]],
+            "metadatas": [[{
+                "chunk_id": "chunk_1",
+                "provider": "test_provider",
+                "document_name": "fees.pdf",
+                "document_path": "fees.pdf",
+                "section_heading": "Fees",
+                "page_start": 10,
+                "page_end": 10,
+            }]],
+            "distances": [[0.1]],
+        }
+
+        # Mock client
+        mock_client = MagicMock()
+        mock_client.get_collection.return_value = mock_collection
+
+        # Mock the LLM response
+        mock_llm_response = """## Answer
+The Subscriber must pay monthly fees as specified in the agreement.
+
+## Citations
+- [TEST_PROVIDER] fees.pdf, Pages 10"""
+
+        # Mock PROVIDERS to include test_provider
+        test_providers = {
+            "test_provider": {"collection": "test_provider_docs"},
+        }
+
+        # Patch all necessary components
+        with (
+            patch("app.definitions.DEFINITIONS_INDEX_DIR", temp_definitions_dir),
+            patch("chromadb.PersistentClient") as mock_chroma_client,
+            patch("app.query.OllamaEmbeddingFunction"),
+            patch("app.search.BM25Index.load") as mock_load_bm25,
+            patch("app.query.get_llm") as mock_get_llm,
+            patch("app.query.get_definitions_retriever") as mock_get_retriever,
+            patch("app.query.CHROMA_DIR", tmp_path),
+            patch("app.query.PROVIDERS", test_providers),
+        ):
+            # Setup mocks
+            (tmp_path / "chroma.sqlite3").touch()  # Fake ChromaDB file
+            mock_chroma_client.return_value = mock_client
+            mock_load_bm25.return_value = None  # No BM25 for simplicity
+
+            # Mock LLM
+            mock_llm = MagicMock()
+            mock_llm.generate.return_value = mock_llm_response
+            mock_get_llm.return_value = mock_llm
+
+            # Create a mock retriever that returns our definition
+            from app.definitions import DefinitionsRetriever
+            with patch("app.definitions.DEFINITIONS_INDEX_DIR", temp_definitions_dir):
+                real_retriever = DefinitionsRetriever(["test_provider"])
+            mock_get_retriever.return_value = real_retriever
+
+            # Run query with definitions enabled
+            result = query(
+                question="What are the Subscriber fees?",
+                providers=["test_provider"],
+                include_definitions=True,
+            )
+
+            # Verify definitions are in the result
+            assert "definitions" in result
+            definitions = result["definitions"]
+            assert isinstance(definitions, list)
+            assert len(definitions) >= 1
+
+            # Check definition content
+            subscriber_def = next(
+                (d for d in definitions if d["term"] == "Subscriber"),
+                None,
+            )
+            assert subscriber_def is not None
+            assert "person or entity" in subscriber_def["definition"]
+            assert subscriber_def["provider"] == "test_provider"
+
+    def test_query_no_definitions_when_disabled(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Query with include_definitions=False returns empty definitions."""
+        # Create a mock ChromaDB collection
+        mock_collection = MagicMock()
+        mock_collection.query.return_value = {
+            "ids": [["chunk_1"]],
+            "documents": [["The Subscriber must pay monthly fees."]],
+            "metadatas": [[{
+                "chunk_id": "chunk_1",
+                "provider": "test_provider",
+                "document_name": "fees.pdf",
+                "document_path": "fees.pdf",
+                "section_heading": "Fees",
+                "page_start": 10,
+                "page_end": 10,
+            }]],
+            "distances": [[0.1]],
+        }
+
+        mock_client = MagicMock()
+        mock_client.get_collection.return_value = mock_collection
+
+        mock_llm_response = """## Answer
+Monthly fees apply.
+
+## Citations
+- [TEST_PROVIDER] fees.pdf, Pages 10"""
+
+        # Mock PROVIDERS to include test_provider
+        test_providers = {
+            "test_provider": {"collection": "test_provider_docs"},
+        }
+
+        with (
+            patch("chromadb.PersistentClient") as mock_chroma_client,
+            patch("app.query.OllamaEmbeddingFunction"),
+            patch("app.search.BM25Index.load") as mock_load_bm25,
+            patch("app.query.get_llm") as mock_get_llm,
+            patch("app.query.CHROMA_DIR", tmp_path),
+            patch("app.query.PROVIDERS", test_providers),
+        ):
+            (tmp_path / "chroma.sqlite3").touch()
+            mock_chroma_client.return_value = mock_client
+            mock_load_bm25.return_value = None
+
+            # Mock LLM
+            mock_llm = MagicMock()
+            mock_llm.generate.return_value = mock_llm_response
+            mock_get_llm.return_value = mock_llm
+
+            # Run query with definitions disabled
+            result = query(
+                question="What are the fees?",
+                providers=["test_provider"],
+                include_definitions=False,
+            )
+
+            # Verify definitions are empty
+            assert "definitions" in result
+            assert result["definitions"] == []
+
+    def test_provider_with_underscores_in_definitions(
+        self,
+        temp_definitions_dir: Path,
+    ) -> None:
+        """Providers with underscores (e.g., cta_utp) are handled correctly."""
+        from unittest.mock import patch
+
+        from app.definitions import (
+            DefinitionEntry,
+            DefinitionsIndex,
+            format_definitions_for_output,
+            save_definitions_index,
+        )
+
+        # Create index for provider with underscore in name
+        temp_definitions_dir.mkdir(parents=True, exist_ok=True)
+        index = DefinitionsIndex(provider="cta_utp")
+        entry = DefinitionEntry(
+            term="Vendor",
+            normalized_term="vendor",
+            chunk_id="cta_utp_doc_1",  # chunk_id has underscores
+            document_name="cta_utp_agreement.pdf",
+            document_path="cta_utp/agreement.pdf",
+            section_heading="Definitions",
+            page_start=3,
+            page_end=3,
+            definition_text="A company that redistributes market data.",
+            provider="cta_utp",  # Provider stored directly
+        )
+        index.add_entry(entry)
+
+        with patch("app.definitions.DEFINITIONS_INDEX_DIR", temp_definitions_dir):
+            save_definitions_index(index)
+            from app.definitions import load_definitions_index
+            loaded = load_definitions_index("cta_utp")
+
+        assert loaded is not None
+        definitions = loaded.get_definitions("Vendor")
+        assert len(definitions) == 1
+        assert definitions[0].provider == "cta_utp"
+
+        # Verify format_definitions_for_output uses provider directly
+        result = format_definitions_for_output({"vendor": definitions})
+        assert result[0]["provider"] == "cta_utp"  # Not "cta" from chunk_id split
