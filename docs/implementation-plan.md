@@ -12,7 +12,7 @@ ______________________________________________________________________
 
 #### 1.1 Critical Bug Fixes
 
-- [x] Rename `promps.py` → `prompts.py`
+- [x] Rename `prompts.py` → `prompts.py`
 - [x] Update import in `query.py`
 - [x] Replace ChromaDB `Client` → `PersistentClient`
 - [x] Remove deprecated `client.persist()` calls
@@ -77,15 +77,16 @@ ______________________________________________________________________
 
 #### 3.1 Hybrid Search Implementation
 
-- [ ] Add `rank-bm25` dependency to pyproject.toml
-- [ ] Create `app/search.py` module
-- [ ] Implement BM25 index building during ingestion
-- [ ] Save BM25 index to `index/bm25/{provider}_index.pkl`
-- [ ] Implement Reciprocal Rank Fusion (RRF) algorithm
-- [ ] Update `query.py` to use hybrid search
-- [ ] Add search mode parameter (vector/keyword/hybrid)
+- [x] Add `rank-bm25` dependency to pyproject.toml
+- [x] Create `app/search.py` module
+- [x] Implement BM25 index building during ingestion
+- [x] Save BM25 index to `index/bm25/{provider}_index.pkl`
+- [x] Implement Reciprocal Rank Fusion (RRF) algorithm
+- [x] Update `query.py` to use hybrid search
+- [x] Add search mode parameter (vector/keyword/hybrid)
 - [ ] Benchmark hybrid vs vector-only retrieval (target: >15% improvement)
-- [ ] Add tests for hybrid ranking
+- [x] Add tests for hybrid ranking
+- [x] Create Hybrid Search Document in docs/ and add link in README
 
 #### 3.2 Definitions Auto-Linking
 
@@ -285,7 +286,7 @@ ______________________________________________________________________
 1. ChromaDB uses deprecated `Client()` — must use `PersistentClient()`
 1. Query doesn't embed the question — missing embedding function
 1. Path mismatch — code looks at `data/raw/` but docs are in `data/raw/cme/`
-1. Filename typo — `promps.py` should be `prompts.py`
+1. Filename typo — `prompts.py` should be `prompts.py`
 
 ______________________________________________________________________
 
@@ -298,7 +299,7 @@ ______________________________________________________________________
 #### Task 1.1.1: Rename prompts file
 
 ```bash
-mv app/promps.py app/prompts.py
+mv app/prompts.py app/prompts.py
 ```
 
 Update import in `query.py`.
@@ -973,7 +974,7 @@ ______________________________________________________________________
 
 ### Phase 1 (MVP) - ✅ COMPLETE
 
-- [x] Rename `promps.py` → `prompts.py`
+- [x] Rename `prompts.py` → `prompts.py`
 - [x] Update imports in `query.py`
 - [x] Replace ChromaDB `Client` with `PersistentClient`
 - [x] Remove `client.persist()` calls

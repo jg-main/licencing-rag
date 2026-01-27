@@ -16,7 +16,7 @@ A local, private legal Q&A system that answers questions **exclusively** based o
 - [Configuration](#configuration)
 - [Architecture](#architecture)
 - [Development](#development)
-- [Deployment](#deployment-not-implemented-yet)
+- [Deployment](#deployment-not-implemented-yet---sprint-5)
 - [Troubleshooting](#troubleshooting)
 - [Documentation](#documentation)
 
@@ -32,7 +32,7 @@ This is **not** a general chatbot and **not** a trained LLM. It is a **retrieval
 - ✅ Supports multiple data providers
 - ✅ Uses Claude API for answer generation (with Ollama fallback)
 - ✅ Uses local embeddings via Ollama (nomic-embed-text)
-- ⏳ Supports hybrid search (vector + keyword) - **NOT IMPLEMENTED YET**
+- ✅ Supports hybrid search (vector + keyword with BM25 and RRF)
 - ⏳ Auto-links defined terms to definitions - **NOT IMPLEMENTED YET**
 - ⏳ Logs all queries for audit - **NOT IMPLEMENTED YET**
 - ⏳ Provides REST API for programmatic access - **NOT IMPLEMENTED YET**
@@ -86,14 +86,16 @@ ______________________________________________________________________
 - ⏳ `rag logs --tail N` - View query logs - **NOT IMPLEMENTED YET**
 - ⏳ `rag serve --port 8000` - Start REST API server - **NOT IMPLEMENTED YET**
 
-### ⏳ Sprint 3: Enhanced Search & Logging (NOT IMPLEMENTED YET)
+### ✅ Sprint 3: Enhanced Search & Logging (PARTIALLY IMPLEMENTED)
 
-#### Hybrid Search
+#### Hybrid Search (IMPLEMENTED)
 
-- ⏳ **BM25 Keyword Search** - Complement vector search with keyword matching
-- ⏳ **Reciprocal Rank Fusion (RRF)** - Combine vector + keyword results for better retrieval
-- ⏳ **Search Mode Selection** - Choose vector-only, keyword-only, or hybrid
+- ✅ **BM25 Keyword Search** - Complement vector search with keyword matching
+- ✅ **Reciprocal Rank Fusion (RRF)** - Combine vector + keyword results for better retrieval
+- ✅ **Search Mode Selection** - Choose vector-only, keyword-only, or hybrid
 - ⏳ **Performance Benchmarking** - Target: >15% improvement over vector-only
+
+📖 **[Read the Hybrid Search Guide](docs/hybrid-search.md)** — Beginner-friendly explanation of how hybrid search works, when to use it, and how it improves retrieval quality.
 
 #### Definitions Auto-Linking
 
@@ -191,7 +193,7 @@ cd licencing-rag
 # Install dependencies with uv
 uv sync
 
-# Install CLI entry point (enables 'rag' command) - NOT IMPLEMENTED YET
+# Install CLI entry point (enables 'rag' command)
 pip install -e .
 
 # Pull embedding model (REQUIRED - used even with Claude API)
@@ -225,7 +227,7 @@ ollama pull llama3.2:3b   # For limited RAM (<8GB)
 ollama pull llama3.1:8b   # For 8GB+ RAM (better quality)
 
 # Run queries (default provider)
-export LLM_PROVIDER="ollama"  # optional, this is the default
+export LLM_PROVIDER="ollama"  # optional, default is anthropic
 rag query "What are the CME fees?"
 ```
 
@@ -274,27 +276,27 @@ rag ingest --provider opra
 # Basic query
 rag query "What are the redistribution requirements?"
 
-# Query specific provider (NOT IMPLEMENTED YET)
+# Query specific provider
 rag query --provider cme "What are the fees?"
 
-# Query all providers (NOT IMPLEMENTED YET)
-rag query --provider all "What is a subscriber?"
+# Query multiple providers
+rag query --provider cme --provider ice "What is a subscriber?"
 
-# JSON output (NOT IMPLEMENTED YET)
+# JSON output (flag accepted, outputs same as console)
 rag query --format json "What are the fees?" > result.json
 
-# Console output with Rich formatting (NOT IMPLEMENTED YET)
-rag query --format console "What are the fees?"
+# Console output with Rich formatting (default)
+rag query "What are the fees?"
 ```
 
 **What it does:**
 
 - Embeds question using Ollama
 - Retrieves top-K relevant chunks from ChromaDB
-- ⏳ (Sprint 3) Performs hybrid search (vector + BM25)
-- ⏳ (Sprint 3) Auto-links definitions
+- ✅ Performs hybrid search (vector + BM25 with RRF)
+- ⏳ (Sprint 3) Auto-links definitions - NOT IMPLEMENTED YET
 - Generates answer via LLM (Claude or Ollama)
-- ⏳ (Sprint 3) Logs query to `logs/queries.jsonl`
+- ⏳ (Sprint 3) Logs query to `logs/queries.jsonl` - NOT IMPLEMENTED YET
 - Returns answer with citations
 
 #### Document Management
@@ -303,8 +305,8 @@ rag query --format console "What are the fees?"
 # List all documents for a provider
 rag list --provider cme
 
-# Show document details (NOT IMPLEMENTED YET)
-rag list --provider cme --detailed
+# List all documents for all providers
+rag list
 
 # Show statistics (NOT IMPLEMENTED YET)
 rag stats
@@ -444,7 +446,7 @@ data/
 index/
 ├── chroma/                 # ChromaDB vector database
 │   └── cme_docs/           # Collection per provider
-└── bm25/                   # BM25 keyword index (NOT IMPLEMENTED YET)
+└── bm25/                   # BM25 keyword index (IMPLEMENTED)
     └── cme_index.pkl
 
 logs/
@@ -490,7 +492,7 @@ ______________________________________________________________________
 
 | Variable            | Default        | Description                                         | Required        |
 | ------------------- | -------------- | --------------------------------------------------- | --------------- |
-| `LLM_PROVIDER`      | `ollama`       | LLM provider: `ollama` or `anthropic`               | No              |
+| `LLM_PROVIDER`      | `anthropic`    | LLM provider: `ollama` or `anthropic`               | No              |
 | `ANTHROPIC_API_KEY` | -              | Claude API key                                      | If using Claude |
 | `RATE_LIMIT_RPM`    | `60`           | API rate limit (requests/min) - NOT IMPLEMENTED YET | No              |
 | `CHROMA_DIR`        | `index/chroma` | ChromaDB storage directory                          | No              |
@@ -501,9 +503,9 @@ Edit `app/config.py` for advanced settings:
 
 ```python
 # LLM Configuration
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")
 LLM_MODEL = "llama3.2:3b"  # Ollama model
-ANTHROPIC_MODEL = "claude-sonnet-4-20250514"  # Claude model
+ANTHROPIC_MODEL = "claude-sonnet-4-20250514"  # Claude Sonnet 4 model
 
 # Embedding Configuration
 EMBEDDING_MODEL = "nomic-embed-text"
@@ -515,12 +517,12 @@ CHUNK_OVERLAP = 100  # words
 MIN_CHUNK_SIZE = 100  # words
 MAX_CHUNK_CHARS = 6000  # characters
 
-# Retrieval Parameters (NOT IMPLEMENTED YET - Sprint 3)
+# Retrieval Parameters
 TOP_K_VECTOR = 10  # Vector search results
 TOP_K_BM25 = 10    # BM25 search results
 FINAL_TOP_N = 5    # Final chunks after hybrid ranking
 
-# Search Configuration (NOT IMPLEMENTED YET - Sprint 3)
+# Search Configuration (IMPLEMENTED - Sprint 3)
 DEFAULT_SEARCH_MODE = "hybrid"  # vector, keyword, hybrid
 
 # Logging (NOT IMPLEMENTED YET - Sprint 3)
