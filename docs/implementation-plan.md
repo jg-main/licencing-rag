@@ -42,10 +42,10 @@ ______________________________________________________________________
 - [x] Add `ingest` command
 - [x] Add `query` command
 - [x] Add `list` command
-- [ ] Create `app/cli.py` with main() entry point
-- [ ] Add `[project.scripts]` to pyproject.toml for `rag` command
-- [ ] Add `--format` flag for output (console/json)
-- [ ] Update commands to use `rag` instead of `python main.py`
+- [x] Create `app/cli.py` with main() entry point
+- [x] Add `[project.scripts]` to pyproject.toml for `rag` command
+- [x] Add `--format` flag for output (console/json)
+- [x] Update commands to use `rag` instead of `python main.py`
 
 #### 1.6 Verification
 

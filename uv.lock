@@ -760,7 +760,7 @@ wheels = [
 [[package]]
 name = "licencing-rag"
 version = "0.2.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "chromadb" },
