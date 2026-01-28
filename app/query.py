@@ -8,6 +8,7 @@ import chromadb
 from chromadb.errors import NotFoundError
 
 from app.config import CHROMA_DIR
+from app.config import CONTEXT_BUDGET_ENABLED
 from app.config import DEFAULT_PROVIDERS
 from app.config import EMBEDDING_DIMENSIONS
 from app.config import EMBEDDING_MODEL
@@ -74,6 +75,7 @@ def query(
     search_mode: str = "hybrid",
     include_definitions: bool = True,
     enable_reranking: bool = RERANKING_ENABLED,
+    enable_budget: bool = CONTEXT_BUDGET_ENABLED,
     debug: bool = False,
 ) -> dict:
     """Query the knowledge base.
@@ -85,6 +87,7 @@ def query(
         search_mode: Search mode - "vector", "keyword", or "hybrid" (default).
         include_definitions: If True, auto-link definitions for terms in context.
         enable_reranking: If True, use LLM to rerank chunks (Phase 4).
+        enable_budget: If True, enforce token budget on context (Phase 5).
         debug: If True, include normalization details in response.
 
     Returns:
@@ -286,6 +289,9 @@ def query(
 
     # Phase 4: LLM Reranking (optional)
     rerank_info: dict[str, Any] = {}
+    kept_chunks: list[Any] = []  # Initialize to avoid unbound variable
+    dropped_chunks: list[Any] = []  # Initialize to avoid unbound variable
+
     if enable_reranking:
         log.info("reranking_started", chunk_count=len(all_search_results))
         kept_chunks, dropped_chunks = rerank_chunks(
@@ -314,8 +320,9 @@ def query(
             all_documents = [r["text"] for r in fallback_results]
             all_metadatas = [r["metadata"] for r in fallback_results]
 
-            # Set _retrieval_source for fallback chunks
+            # Set original retrieval scores for budget prioritization in fallback case
             for i, fallback_result in enumerate(fallback_results):
+                all_metadatas[i]["_relevance_score"] = fallback_result["score"]
                 all_metadatas[i]["_retrieval_source"] = fallback_result["source"]
 
             # Track fallback in debug info (only if debug mode is on)
@@ -346,8 +353,9 @@ def query(
             all_documents = [chunk.text for chunk in kept_chunks]
             all_metadatas = [chunk.metadata for chunk in kept_chunks]
 
-            # Add retrieval source to metadata for debug tracking
+            # Set relevance scores for budget prioritization
             for i, chunk in enumerate(kept_chunks):
+                all_metadatas[i]["_relevance_score"] = chunk.relevance_score
                 all_metadatas[i]["_retrieval_source"] = chunk.source
 
             # Track reranking info for debug mode (only if not fallback)
@@ -400,6 +408,10 @@ def query(
         all_documents = [r["text"] for r in all_search_results]
         all_metadatas = [r["metadata"] for r in all_search_results]
 
+        # Store original retrieval scores for budget prioritization when reranking disabled
+        for i, search_result in enumerate(all_search_results):
+            all_metadatas[i]["_relevance_score"] = search_result["score"]
+
         # Track retrieval source for debug info
         if debug:
             for i, search_result in enumerate(all_search_results):
@@ -407,16 +419,76 @@ def query(
 
         rerank_info = {"enabled": False}
 
-    # Format context
+    # Phase 5: Full-Prompt Budget Enforcement (apply after reranking)
+    budget_info: dict[str, Any] = {}
+    if enable_budget:
+        from app.budget import enforce_full_prompt_budget
+        from app.config import MAX_CONTEXT_TOKENS
+
+        # Prepare chunks with metadata including relevance scores
+        chunks_with_metadata = list(zip(all_documents, all_metadatas))
+
+        # Build provider label
+        provider_label = ", ".join(p.upper() for p in providers)
+
+        # First pass: enforce budget WITHOUT definitions to get final chunks
+        # This prevents definitions from terms in dropped chunks
+        kept_chunks_after_budget, budget_info = enforce_full_prompt_budget(
+            chunks=chunks_with_metadata,
+            system_prompt=SYSTEM_PROMPT,
+            question=question,
+            definitions_context="",  # No definitions yet
+            provider_label=provider_label,
+            max_tokens=MAX_CONTEXT_TOKENS,
+        )
+
+        # Update documents and metadata with budget-enforced chunks
+        if len(kept_chunks_after_budget) < len(all_documents):
+            all_documents = [chunk[0] for chunk in kept_chunks_after_budget]
+            all_metadatas = [chunk[1] for chunk in kept_chunks_after_budget]
+            log.info(
+                "full_prompt_budget_applied",
+                original_chunks=budget_info["original_count"],
+                kept_chunks=budget_info["kept_count"],
+                dropped_chunks=budget_info["dropped_count"],
+                total_prompt_tokens=budget_info["total_tokens"],
+                max_tokens=budget_info["max_tokens"],
+            )
+
+        # Check if budget is exceeded even without chunks
+        if not budget_info["under_budget"] and budget_info["kept_count"] == 0:
+            log.error(
+                "prompt_exceeds_budget_without_chunks",
+                total_tokens=budget_info["total_tokens"],
+                max_tokens=budget_info["max_tokens"],
+                message="System prompt + question alone exceed budget",
+            )
+            # Return refusal - cannot answer if base prompt is too large
+            return {
+                "answer": get_refusal_message(providers),
+                "context": "",
+                "citations": [],
+                "definitions": [],
+                "chunks_retrieved": 0,
+                "providers": providers,
+                "search_mode": search_mode,
+                "effective_search_mode": effective_search_mode,
+                "error": "prompt_too_large",
+            }
+    else:
+        budget_info = {"enabled": False}
+
+    # Format final context (after budget enforcement)
     context = format_context(all_documents, all_metadatas)
 
-    # Auto-link definitions if enabled
+    # Auto-link definitions AFTER budget enforcement (only for final context)
+    # This ensures we only retrieve definitions for terms in chunks we're actually using
     definitions_dict: dict = {}
     definitions_context = ""
     if include_definitions:
         try:
             retriever = get_definitions_retriever(tuple(providers))
-            # Find definitions for terms in the question and context
+            # Find definitions for terms in question + final context only
             combined_text = question + " " + context
             definitions_dict = retriever.find_definitions_in_text(
                 combined_text,
@@ -429,10 +501,194 @@ def query(
                     terms=list(definitions_dict.keys()),
                     count=len(definitions_dict),
                 )
+
+                # Second pass: re-enforce budget WITH definitions
+                # Accuracy-first: prefer keeping chunks over definitions
+                if enable_budget:
+                    chunks_with_metadata = list(zip(all_documents, all_metadatas))
+                    provider_label = ", ".join(p.upper() for p in providers)
+
+                    # Calculate chunks before second pass for accurate drop reporting
+                    chunks_before_second_pass = len(all_documents)
+
+                    kept_chunks_final, budget_info_final = enforce_full_prompt_budget(
+                        chunks=chunks_with_metadata,
+                        system_prompt=SYSTEM_PROMPT,
+                        question=question,
+                        definitions_context=definitions_context,
+                        provider_label=provider_label,
+                        max_tokens=MAX_CONTEXT_TOKENS,
+                    )
+
+                    # Always update budget_info to reflect actual final token count
+                    budget_info = budget_info_final
+
+                    # If definitions pushed us over budget, choose: drop definitions or chunks?
+                    # Accuracy > cost: prefer chunks over definitions
+                    if len(kept_chunks_final) < chunks_before_second_pass:
+                        chunks_dropped = chunks_before_second_pass - len(
+                            kept_chunks_final
+                        )
+
+                        log.warning(
+                            "definitions_pushed_over_budget",
+                            chunks_dropped=chunks_dropped,
+                            total_tokens_with_definitions=budget_info_final[
+                                "total_tokens"
+                            ],
+                        )
+
+                        # Try dropping definitions instead of chunks (accuracy-first)
+                        kept_without_definitions, budget_without_defs = (
+                            enforce_full_prompt_budget(
+                                chunks=chunks_with_metadata,  # Original chunks before second pass
+                                system_prompt=SYSTEM_PROMPT,
+                                question=question,
+                                definitions_context="",  # No definitions
+                                provider_label=provider_label,
+                                max_tokens=MAX_CONTEXT_TOKENS,
+                            )
+                        )
+
+                        # If we can keep all chunks by dropping definitions, do that
+                        if len(kept_without_definitions) == chunks_before_second_pass:
+                            log.info(
+                                "dropped_definitions_to_preserve_chunks",
+                                definitions_dropped=len(definitions_dict),
+                                chunks_preserved=chunks_before_second_pass,
+                                total_tokens=budget_without_defs["total_tokens"],
+                            )
+                            # Drop definitions, keep all chunks
+                            definitions_dict = {}
+                            definitions_context = ""
+                            budget_info = budget_without_defs
+                        else:
+                            # Dropping definitions wasn't enough - must drop chunks
+                            all_documents = [chunk[0] for chunk in kept_chunks_final]
+                            all_metadatas = [chunk[1] for chunk in kept_chunks_final]
+                            context = format_context(all_documents, all_metadatas)
+
+                            # Re-compute definitions from FINAL context only
+                            # This prevents stale definitions for dropped chunks
+                            original_definitions_count = len(definitions_dict)
+                            try:
+                                retriever = get_definitions_retriever(tuple(providers))
+                                combined_text = question + " " + context
+                                final_definitions_dict = (
+                                    retriever.find_definitions_in_text(
+                                        combined_text,
+                                        max_definitions=10,
+                                    )
+                                )
+                                if final_definitions_dict:
+                                    definitions_dict = final_definitions_dict
+                                    definitions_context = (
+                                        format_definitions_for_context(
+                                            final_definitions_dict
+                                        )
+                                    )
+                                    log.debug(
+                                        "definitions_recomputed_after_drops",
+                                        original_terms=original_definitions_count,
+                                        final_terms=len(final_definitions_dict),
+                                    )
+                                else:
+                                    # No definitions in final context
+                                    definitions_dict = {}
+                                    definitions_context = ""
+                            except Exception as e:
+                                log.warning(
+                                    "definitions_recompute_failed", error=str(e)
+                                )
+                                definitions_dict = {}
+                                definitions_context = ""
+
+                            # Update budget_info to reflect actual final tokens after recomputing definitions
+                            # This ensures debug/audit accuracy
+                            _, budget_info_after_recompute = enforce_full_prompt_budget(
+                                chunks=[
+                                    (doc, meta)
+                                    for doc, meta in zip(all_documents, all_metadatas)
+                                ],
+                                system_prompt=SYSTEM_PROMPT,
+                                question=question,
+                                definitions_context=definitions_context,
+                                provider_label=provider_label,
+                                max_tokens=MAX_CONTEXT_TOKENS,
+                            )
+                            budget_info = budget_info_after_recompute
+
+                            # Accuracy-first: attempt to restore dropped chunks if definitions shrunk
+                            # Recomputed definitions are likely smaller, so we may have budget headroom
+                            if chunks_dropped > 0:
+                                chunks_to_try_restore = chunks_with_metadata[
+                                    len(all_documents) : chunks_before_second_pass
+                                ]
+
+                                for chunk_text, chunk_meta in chunks_to_try_restore:
+                                    # Try adding this chunk back
+                                    test_chunks = [
+                                        (doc, meta)
+                                        for doc, meta in zip(
+                                            all_documents, all_metadatas
+                                        )
+                                    ]
+                                    test_chunks.append((chunk_text, chunk_meta))
+
+                                    kept_test, budget_test = enforce_full_prompt_budget(
+                                        chunks=test_chunks,
+                                        system_prompt=SYSTEM_PROMPT,
+                                        question=question,
+                                        definitions_context=definitions_context,
+                                        provider_label=provider_label,
+                                        max_tokens=MAX_CONTEXT_TOKENS,
+                                    )
+
+                                    # If all chunks fit (including this restored one), keep it
+                                    if len(kept_test) == len(test_chunks):
+                                        all_documents.append(chunk_text)
+                                        all_metadatas.append(chunk_meta)
+                                        budget_info = budget_test
+                                        chunks_dropped -= 1
+                                        log.debug(
+                                            "chunk_restored_after_definitions_shrink",
+                                            chunk_relevance=chunk_meta.get(
+                                                "_relevance_score", 0.0
+                                            ),
+                                            total_tokens=budget_test["total_tokens"],
+                                        )
+                                    else:
+                                        # Can't fit this chunk, stop trying
+                                        break
+
+                                # Update context with any restored chunks
+                                if chunks_dropped < chunks_before_second_pass - len(
+                                    kept_chunks_final
+                                ):
+                                    context = format_context(
+                                        all_documents, all_metadatas
+                                    )
+                                    log.info(
+                                        "chunks_restored_after_definitions_shrink",
+                                        chunks_restored=(
+                                            chunks_before_second_pass
+                                            - len(kept_chunks_final)
+                                            - chunks_dropped
+                                        ),
+                                        final_chunk_count=len(all_documents),
+                                        total_tokens=budget_info["total_tokens"],
+                                    )
+
+                            log.info(
+                                "dropped_chunks_despite_definitions",
+                                chunks_dropped=chunks_dropped,
+                                definitions_kept=len(definitions_dict),
+                                total_tokens=budget_info["total_tokens"],
+                            )
         except Exception as e:
             log.warning("definitions_retrieval_failed", error=str(e))
 
-    # Build prompt with provider context
+    # Build final prompt (provider label already set during budget enforcement)
     provider_label = ", ".join(p.upper() for p in providers)
 
     # Use appropriate prompt based on whether definitions were found
@@ -519,6 +775,9 @@ def query(
         # Add reranking info if available
         if rerank_info:
             debug_dict["reranking"] = rerank_info
+        # Add budget info if available
+        if budget_info:
+            debug_dict["budget"] = budget_info
         response["debug"] = debug_dict
 
     return response
