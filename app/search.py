@@ -58,8 +58,8 @@ class SearchResult:
     chunk_id: str
     text: str
     metadata: dict[str, Any]
-    score: float
-    source: str  # "vector", "keyword", or "hybrid"
+    score: float = 0.0
+    source: str = "vector"  # "vector", "keyword", or "hybrid"
 
 
 def tokenize(text: str) -> list[str]:
@@ -518,7 +518,8 @@ class HybridSearcher:
             List of SearchResult objects.
         """
         # Retrieve more candidates for re-ranking
-        candidate_count = top_k * retrieval_multiplier
+        # Phase 3 requirement: candidate pool max 12 chunks
+        candidate_count = min(top_k * retrieval_multiplier, 12)
 
         # Get vector results
         vector_results = self._vector_search(question, candidate_count)
