@@ -1,11 +1,11 @@
 # CME License Intelligence System - Technical Product Brief
 
-**Project Name:** License Intelligence System (OpenAI RAG)  
-**Version:** 0.4  
-**Last Updated:** 2026-01-28  
+**Project Name:** License Intelligence System (OpenAI RAG)\
+**Version:** 0.4\
+**Last Updated:** 2026-01-28\
 **Branch:** openai
 
----
+______________________________________________________________________
 
 ## Changelog from v0.3
 
@@ -21,7 +21,7 @@
 - **Removed**: Local embedding model support
 - **Updated**: Refusal is now enforced in code, not just prompts
 
----
+______________________________________________________________________
 
 ## 1. Objective
 
@@ -38,26 +38,26 @@ This is **not** a general chatbot. It is a **retrieval-grounded legal analysis t
 
 ### Core Principle
 
-> **Retrieval quality > LLM cleverness**  
+> **Retrieval quality > LLM cleverness**\
 > The LLM is not a knowledge source—it is only the renderer.
 
----
+______________________________________________________________________
 
 ## 2. Model Stack (Single Provider: OpenAI)
 
 ### Embeddings
 
-| Purpose | Provider | Model | Dimensions |
-|---------|----------|-------|------------|
-| Document chunks | OpenAI | `text-embedding-3-large` | 3072 |
-| Query embedding | OpenAI | `text-embedding-3-large` | 3072 |
+| Purpose         | Provider | Model                    | Dimensions |
+| --------------- | -------- | ------------------------ | ---------- |
+| Document chunks | OpenAI   | `text-embedding-3-large` | 3072       |
+| Query embedding | OpenAI   | `text-embedding-3-large` | 3072       |
 
 ### LLM Reasoning
 
-| Purpose | Provider | Model | Notes |
-|---------|----------|-------|-------|
-| Answer generation | OpenAI | `gpt-4.1` | Clause-grounded responses |
-| Reranking | OpenAI | `gpt-4.1` | Relevance scoring (0-3) |
+| Purpose           | Provider | Model     | Notes                     |
+| ----------------- | -------- | --------- | ------------------------- |
+| Answer generation | OpenAI   | `gpt-4.1` | Clause-grounded responses |
+| Reranking         | OpenAI   | `gpt-4.1` | Relevance scoring (0-3)   |
 
 > ⚠️ **Any change to these models is a breaking change and requires explicit review.**
 
@@ -69,18 +69,18 @@ export OPENAI_API_KEY="sk-..."
 
 No fallback providers. OpenAI is the single source for all model operations.
 
----
+______________________________________________________________________
 
 ## 3. Non-Negotiable Design Principles
 
 1. **Retrieval quality > LLM cleverness** — Focus on getting the right chunks
-2. **The LLM is not a knowledge source** — Never rely on model knowledge
-3. **Refusal is enforced in code, not only via prompt** — Deterministic gating
-4. **Context trimming is mandatory** — Quality + cost control
-5. **All answers must be traceable to documents** — Full citation chain
-6. **Single provider only (OpenAI)** — No provider abstraction complexity
+1. **The LLM is not a knowledge source** — Never rely on model knowledge
+1. **Refusal is enforced in code, not only via prompt** — Deterministic gating
+1. **Context trimming is mandatory** — Quality + cost control
+1. **All answers must be traceable to documents** — Full citation chain
+1. **Single provider only (OpenAI)** — No provider abstraction complexity
 
----
+______________________________________________________________________
 
 ## 4. Non-Goals (Explicitly Out of Scope)
 
@@ -93,7 +93,7 @@ No fallback providers. OpenAI is the single source for all model operations.
 - OCR for image-based PDFs
 - Automated clause negotiation or contract generation
 
----
+______________________________________________________________________
 
 ## 5. High-Level Architecture
 
@@ -163,39 +163,40 @@ No fallback providers. OpenAI is the single source for all model operations.
 └─────────────────────────────────────────────────────────────────┘
 ```
 
----
+______________________________________________________________________
 
 ## 6. Technology Stack
 
 ### Runtime
 
 - Python 3.13+
-- Local execution / Docker / AWS ECS (Fargate)
+- Local execution / Docker
+- AWS EC2 (simple) with optional Auto Scaling
 
 ### Models (OpenAI Only)
 
-| Purpose | Model | Notes |
-|---------|-------|-------|
-| Embeddings | `text-embedding-3-large` | 3072 dimensions |
-| LLM | `gpt-4.1` | Answer generation + reranking |
+| Purpose    | Model                    | Notes                         |
+| ---------- | ------------------------ | ----------------------------- |
+| Embeddings | `text-embedding-3-large` | 3072 dimensions               |
+| LLM        | `gpt-4.1`                | Answer generation + reranking |
 
 ### Libraries
 
-| Library | Purpose | Version |
-|---------|---------|---------|
-| `openai` | OpenAI API client | 1.0+ |
-| `chromadb` | Vector database | 1.4+ |
-| `rank-bm25` | BM25 keyword search | 0.2+ |
-| `tiktoken` | Token counting | 0.9+ |
-| `pymupdf` | PDF extraction | 1.26+ |
-| `python-docx` | DOCX extraction | 1.2+ |
-| `fastapi` | REST API | 0.115+ |
-| `uvicorn` | ASGI server | 0.32+ |
-| `rich` | Console output | 14.0+ |
-| `structlog` | Structured logging | 25.0+ |
-| `pytest` | Testing | 8.0+ |
+| Library       | Purpose             | Version |
+| ------------- | ------------------- | ------- |
+| `openai`      | OpenAI API client   | 1.0+    |
+| `chromadb`    | Vector database     | 1.4+    |
+| `rank-bm25`   | BM25 keyword search | 0.2+    |
+| `tiktoken`    | Token counting      | 0.9+    |
+| `pymupdf`     | PDF extraction      | 1.26+   |
+| `python-docx` | DOCX extraction     | 1.2+    |
+| `fastapi`     | REST API            | 0.115+  |
+| `uvicorn`     | ASGI server         | 0.32+   |
+| `rich`        | Console output      | 14.0+   |
+| `structlog`   | Structured logging  | 25.0+   |
+| `pytest`      | Testing             | 8.0+    |
 
----
+______________________________________________________________________
 
 ## 7. Directory Structure
 
@@ -239,7 +240,7 @@ licencing-rag/
 └── README.md
 ```
 
----
+______________________________________________________________________
 
 ## 8. Query Normalization (Phase 2)
 
@@ -294,19 +295,20 @@ def normalize_query(query: str) -> str:
 
 ### Example
 
-| Original | Normalized |
-|----------|------------|
-| "What is the fee schedule for CME data?" | "fee schedule cme data" |
+| Original                                       | Normalized                    |
+| ---------------------------------------------- | ----------------------------- |
+| "What is the fee schedule for CME data?"       | "fee schedule cme data"       |
 | "Can you explain redistribution requirements?" | "redistribution requirements" |
-| "How does CME charge for real-time data?" | "cme charge real-time data" |
+| "How does CME charge for real-time data?"      | "cme charge real-time data"   |
 
 ### Usage
 
 The normalized query is used for:
+
 - Vector embedding (OpenAI)
 - BM25 keyword search
 
----
+______________________________________________________________________
 
 ## 9. Hybrid Retrieval (Phase 3)
 
@@ -315,20 +317,20 @@ The normalized query is used for:
 For each query:
 
 1. **Vector search** — `text-embedding-3-large`, k=10
-2. **Keyword/BM25 search** — section_heading + chunk text, k=10
-3. **Merge** — Deduplicate by chunk_id
-4. **Candidate pool** — Maximum 12 chunks
+1. **Keyword/BM25 search** — section_heading + chunk text, k=10
+1. **Merge** — Deduplicate by chunk_id
+1. **Candidate pool** — Maximum 12 chunks
 
 ### Retrieval Parameters
 
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| Vector k | 10 | Initial vector retrieval |
-| BM25 k | 10 | Initial keyword retrieval |
-| Candidate max | 12 | Before reranking |
-| Final top | 3-5 | After reranking |
+| Parameter     | Value | Notes                     |
+| ------------- | ----- | ------------------------- |
+| Vector k      | 10    | Initial vector retrieval  |
+| BM25 k        | 10    | Initial keyword retrieval |
+| Candidate max | 12    | Before reranking          |
+| Final top     | 3-5   | After reranking           |
 
----
+______________________________________________________________________
 
 ## 10. Reranking (Phase 4)
 
@@ -389,7 +391,7 @@ async def rerank_chunks(
 - Keep only top 3-5 chunks
 - Discard all others
 
----
+______________________________________________________________________
 
 ## 11. Confidence Gating (Phase 6)
 
@@ -399,10 +401,10 @@ Refuse when evidence is weak or missing.
 
 ### Rules (Enforced in Code)
 
-| Condition | Action |
-|-----------|--------|
-| No chunk score ≥ 2 | REFUSE |
-| Top score < 2 | REFUSE |
+| Condition            | Action |
+| -------------------- | ------ |
+| No chunk score ≥ 2   | REFUSE |
+| Top score < 2        | REFUSE |
 | All chunks score 0-1 | REFUSE |
 
 ### Implementation
@@ -433,7 +435,7 @@ def should_refuse(scored_chunks: list[tuple[dict, int]]) -> bool:
 REFUSAL_MESSAGE = "This is not addressed in the provided CME documents."
 ```
 
----
+______________________________________________________________________
 
 ## 12. Context Budget Enforcement (Phase 5)
 
@@ -443,8 +445,8 @@ Reduce cost and hallucination risk.
 
 ### Targets
 
-| Metric | Before | After |
-|--------|--------|-------|
+| Metric        | Before       | After       |
+| ------------- | ------------ | ----------- |
 | Avg LLM input | ~100k tokens | ≤60k tokens |
 
 ### Rules
@@ -483,7 +485,7 @@ def enforce_context_budget(
     return selected
 ```
 
----
+______________________________________________________________________
 
 ## 13. LLM Prompt Discipline (Phase 7)
 
@@ -517,7 +519,7 @@ Context:
 Question: {question}
 ```
 
----
+______________________________________________________________________
 
 ## 14. Debug & Audit Mode (Phase 8)
 
@@ -550,7 +552,7 @@ rag query "fee schedule" --debug
 }
 ```
 
----
+______________________________________________________________________
 
 ## 15. Evaluation Set (Phase 9)
 
@@ -587,13 +589,13 @@ rag query "fee schedule" --debug
 
 ### Evaluation Metrics
 
-| Metric | Description | Target |
-|--------|-------------|--------|
-| Chunk Recall | Expected chunks retrieved | ≥90% |
-| Refusal Accuracy | Correct refusals | 100% |
-| False Refusal Rate | Incorrect refusals | <5% |
+| Metric             | Description               | Target |
+| ------------------ | ------------------------- | ------ |
+| Chunk Recall       | Expected chunks retrieved | ≥90%   |
+| Refusal Accuracy   | Correct refusals          | 100%   |
+| False Refusal Rate | Incorrect refusals        | \<5%   |
 
----
+______________________________________________________________________
 
 ## 16. Output Format
 
@@ -628,37 +630,37 @@ rag query "fee schedule" --debug
 }
 ```
 
----
+______________________________________________________________________
 
 ## 17. Cost Estimation
 
 ### Per Query
 
-| Operation | Tokens | Cost |
-|-----------|--------|------|
-| Embedding (query) | ~50 | $0.00001 |
-| Reranking (12 chunks) | ~24,000 | $0.024 |
-| Answer generation | ~5,000 | $0.005 |
-| **Total** | | **~$0.03/query** |
+| Operation             | Tokens  | Cost             |
+| --------------------- | ------- | ---------------- |
+| Embedding (query)     | ~50     | $0.00001         |
+| Reranking (12 chunks) | ~24,000 | $0.024           |
+| Answer generation     | ~5,000  | $0.005           |
+| **Total**             |         | **~$0.03/query** |
 
 ### Monthly (100 queries/day)
 
-| Usage | Queries | Cost |
-|-------|---------|------|
-| Light | 3,000 | ~$90 |
-| Medium | 6,000 | ~$180 |
-| Heavy | 10,000 | ~$300 |
+| Usage  | Queries | Cost  |
+| ------ | ------- | ----- |
+| Light  | 3,000   | ~$90  |
+| Medium | 6,000   | ~$180 |
+| Heavy  | 10,000  | ~$300 |
 
----
+______________________________________________________________________
 
 ## 18. Migration from v0.3
 
 ### Breaking Changes
 
 1. **Re-embed all documents** — Ollama embeddings incompatible with OpenAI
-2. **Delete existing ChromaDB index** — Different dimensions (768 → 3072)
-3. **Remove Ollama/Claude config** — Single provider only
-4. **Update environment variables** — `OPENAI_API_KEY` required
+1. **Delete existing ChromaDB index** — Different dimensions (768 → 3072)
+1. **Remove Ollama/Claude config** — Single provider only
+1. **Update environment variables** — `OPENAI_API_KEY` required
 
 ### Migration Steps
 
@@ -676,7 +678,7 @@ rag ingest --provider cme --force
 rag query "fee schedule" --debug
 ```
 
----
+______________________________________________________________________
 
 ## 19. Expected Outcomes
 

@@ -1,12 +1,12 @@
 # Implementation Plan - License Intelligence System (OpenAI Branch)
 
-**Version:** 2.0  
-**Created:** 2026-01-26  
-**Updated:** 2026-01-28  
-**Target:** specs.v0.4.md  
+**Version:** 2.0\
+**Created:** 2026-01-26\
+**Updated:** 2026-01-28\
+**Target:** specs.v0.4.md\
 **Branch:** openai
 
----
+______________________________________________________________________
 
 ## Overview
 
@@ -24,7 +24,7 @@ This branch implements a new approach using **OpenAI as the single provider** fo
 - **Debug Mode**: Full transparency into retrieval pipeline
 - **Evaluation Set**: Validate clause retrieval accuracy
 
----
+______________________________________________________________________
 
 ## Progress Checklist
 
@@ -259,7 +259,7 @@ This branch implements a new approach using **OpenAI as the single provider** fo
 - [ ] Add tests for gating
 - [ ] Run full test suite
 
----
+______________________________________________________________________
 
 ## Legacy Sections (Completed in v1.x - Reference Only)
 
@@ -363,7 +363,7 @@ The following sections document work completed in the master branch. They are ke
 
 </details>
 
----
+______________________________________________________________________
 
 ## Future Phases (Post-OpenAI Migration)
 
@@ -378,36 +378,37 @@ The following items from v0.3 are deferred until the OpenAI migration is complet
 ### AWS Deployment (Sprint 5)
 
 - Docker containerization
-- ECS/Fargate deployment
-- CI/CD pipeline
+- EC2 deployment (simple single instance)
+- Optional: Auto Scaling group for high availability
+- CI/CD pipeline (GitHub Actions → EC2)
 
 ### Additional Data Providers
 
 - OPRA, CTA/UTP document ingestion
 - Cross-provider queries
 
----
+______________________________________________________________________
 
 ## Cost Estimation (OpenAI)
 
 ### Per Query
 
-| Operation | Tokens | Cost |
-|-----------|--------|------|
-| Embedding (query) | ~50 | $0.00001 |
-| Reranking (12 chunks) | ~24,000 | $0.024 |
-| Answer generation | ~5,000 | $0.005 |
-| **Total** | | **~$0.03/query** |
+| Operation             | Tokens  | Cost             |
+| --------------------- | ------- | ---------------- |
+| Embedding (query)     | ~50     | $0.00001         |
+| Reranking (12 chunks) | ~24,000 | $0.024           |
+| Answer generation     | ~5,000  | $0.005           |
+| **Total**             |         | **~$0.03/query** |
 
 ### Monthly Estimates
 
-| Usage | Queries/day | Monthly Cost |
-|-------|-------------|--------------|
-| Light | 100 | ~$90 |
-| Medium | 200 | ~$180 |
-| Heavy | 350 | ~$315 |
+| Usage  | Queries/day | Monthly Cost |
+| ------ | ----------- | ------------ |
+| Light  | 100         | ~$90         |
+| Medium | 200         | ~$180        |
+| Heavy  | 350         | ~$315        |
 
----
+______________________________________________________________________
 
 ## Migration Checklist
 
