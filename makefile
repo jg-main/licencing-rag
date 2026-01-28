@@ -132,9 +132,14 @@ pre-commit: sync ## 🔍 Run pre-commit hooks manually
 
 .PHONY: setup
 setup: sync install-hooks ## 🚀 Complete development environment setup
+	@echo "$(BLUE)ℹ️  Verifying project installation...$(END)"
+	@uv pip list | grep -q licencing-rag && echo "$(GREEN)✅ Project installed in editable mode$(END)" || { \
+		echo "$(YELLOW)⚠️  Installing project in editable mode...$(END)"; \
+		uv pip install -e .; \
+	}
 	@echo "$(GREEN)✅ Development environment setup complete!$(END)"
 	@echo "$(BLUE)💡 Use 'uv run <command>' to run commands in the environment$(END)"
-	@echo "$(BLUE)💡 Example: uv run qtrader run experiments/buy_hold/buy_hold.yaml$(END)"
+	@echo "$(BLUE)💡 Example: uv run rag query 'what is a subscriber?'$(END)"
 
 .PHONY: clean
 clean: ## 🧹 Clean workspace (remove cache, temp files)
