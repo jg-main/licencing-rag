@@ -96,23 +96,23 @@ ______________________________________________________________________
 - [x] Test: Normalized query retrieves same top chunks as keyword query
 - [x] Verify fee schedules, exhibits, tables are retrievable
 
-### Phase 3: Hybrid Retrieval (Mandatory)
+### Phase 3: Hybrid Retrieval (Mandatory) ✅
 
 > Note: Hybrid search already exists from v1.x, but needs verification with new embeddings.
 
 #### 3.1 Verification with OpenAI Embeddings
 
-- [ ] Test vector search with `text-embedding-3-large`
-- [ ] Verify BM25 still works correctly
-- [ ] Test RRF merge produces reasonable rankings
-- [ ] Verify candidate pool max 12 chunks
+- [x] Test vector search with `text-embedding-3-large`
+- [x] Verify BM25 still works correctly
+- [x] Test RRF merge produces reasonable rankings
+- [x] Verify candidate pool max 12 chunks
 
 #### 3.2 Configuration Updates
 
-- [ ] Set vector k=10
-- [ ] Set BM25 k=10
-- [ ] Ensure deduplication by chunk_id
-- [ ] Log retrieval sources in debug mode
+- [x] Set vector k=10
+- [x] Set BM25 k=10
+- [x] Ensure deduplication by chunk_id
+- [x] Log retrieval sources in debug mode
 
 ### Phase 4: LLM Reranking
 
