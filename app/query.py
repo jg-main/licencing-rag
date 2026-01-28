@@ -237,6 +237,9 @@ def query(
         for result in search_results:
             all_documents.append(result.text)
             all_metadatas.append(result.metadata)
+            # Track source for debug info
+            if debug:
+                result.metadata["_retrieval_source"] = result.source
 
     # Determine effective search mode
     # If fallback occurred or mixed modes, report the actual mode(s) used
@@ -251,7 +254,7 @@ def query(
 
     if not all_documents:
         log.info("no_chunks_retrieved", question=question[:100])
-        return {
+        response = {
             "answer": get_refusal_message(providers),
             "context": "",
             "citations": [],
@@ -261,6 +264,13 @@ def query(
             "search_mode": search_mode,
             "effective_search_mode": effective_search_mode,
         }
+        if debug:
+            response["debug_info"] = {
+                "normalized_query": normalized_question,
+                "original_query": question,
+                "retrieval_sources": {},
+            }
+        return response
 
     log.debug("chunks_retrieved", count=len(all_documents))
 

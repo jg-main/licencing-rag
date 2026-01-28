@@ -69,6 +69,7 @@ class QueryResult:
     providers: list[str]
     search_mode: str
     effective_search_mode: str
+    debug_info: dict[str, Any] | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "QueryResult":
@@ -89,6 +90,7 @@ class QueryResult:
             providers=data.get("providers", []),
             search_mode=data.get("search_mode", ""),
             effective_search_mode=data.get("effective_search_mode", ""),
+            debug_info=data.get("debug_info"),
         )
 
 
@@ -136,6 +138,25 @@ def format_console(result: dict[str, Any]) -> str:
             f"\n[warning]Note: Search mode fell back from "
             f"'{qr.search_mode}' to '{qr.effective_search_mode}'[/warning]"
         )
+
+    # Debug info if available
+    if qr.debug_info:
+        console.print()
+        console.rule("[dim]Debug Information[/dim]")
+        console.print(
+            f"[dim]Original query: {qr.debug_info.get('original_query', 'N/A')}[/dim]"
+        )
+        console.print(
+            f"[dim]Normalized query: {qr.debug_info.get('normalized_query', 'N/A')}[/dim]"
+        )
+        retrieval_sources = qr.debug_info.get("retrieval_sources", {})
+        if retrieval_sources:
+            console.print(
+                f"[dim]Retrieval sources: "
+                f"vector={retrieval_sources.get('vector', 0)}, "
+                f"keyword={retrieval_sources.get('keyword', 0)}, "
+                f"hybrid={retrieval_sources.get('hybrid', 0)}[/dim]"
+            )
 
     # Source Information section
     console.print()
