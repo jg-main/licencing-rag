@@ -17,58 +17,81 @@ from app.logging import get_logger
 
 log = get_logger(__name__)
 
-# Leading phrases to strip (case-insensitive)
-LEADING_PHRASES = [
-    r"^what\s+(is|are|was|were)\s+",
-    r"^can\s+you\s+(tell\s+me|explain|describe)\s+",
-    r"^could\s+you\s+(tell\s+me|explain|describe)\s+",
-    r"^please\s+(tell\s+me|explain|describe)\s+",
-    r"^i\s+(want|need)\s+to\s+know\s+",
-    r"^tell\s+me\s+(about\s+)?",
-    r"^explain\s+(to\s+me\s+)?",
-    r"^describe\s+",
-    r"^show\s+me\s+",
-    r"^where\s+(can\s+i\s+find|is)\s+",
-    r"^how\s+(do|does|can)\s+",
+# Leading phrases to strip (exact match from spec v0.4)
+# Must match spec exactly for acceptance criteria
+STRIP_PREFIXES = [
+    "what is",
+    "what are",
+    "what's",
+    "can you",
+    "could you",
+    "would you",
+    "please explain",
+    "please tell me",
+    "how does",
+    "how do",
+    "how is",
+    "tell me about",
+    "explain",
 ]
 
-# Filler words to remove (but preserve in context of meaningful phrases)
+# Filler words to remove (from spec v0.4 + prepositions inferred from examples)
+# Must match spec exactly for acceptance criteria
 FILLER_WORDS = {
+    # Articles
+    "the",
     "a",
     "an",
-    "the",
+    # Auxiliary verbs
     "is",
     "are",
     "was",
     "were",
-    "am",
     "be",
     "been",
     "being",
+    "have",
+    "has",
+    "had",
+    # Modal verbs
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "must",
+    "shall",
+    # Demonstratives
+    "this",
+    "that",
+    "these",
+    "those",
+    # Pronouns
+    "i",
+    "me",
+    "my",
+    "we",
+    "our",
+    "you",
+    "your",
+    # Common prepositions (inferred from spec examples)
+    "for",
     "of",
     "in",
     "on",
     "at",
     "to",
-    "for",
-    "with",
-    "by",
     "from",
+    "with",
     "about",
-    "as",
-    "into",
-    "through",
-    "during",
-    "before",
-    "after",
-    "above",
-    "below",
-    "between",
-    "under",
-    "again",
-    "further",
-    "then",
-    "once",
+    "by",
+    # Action verbs that are conversational filler (inferred from spec examples)
+    "explain",
+    "tell",
 }
 
 # Domain-specific terms to preserve (never remove these words)
@@ -131,12 +154,11 @@ PRESERVE_TERMS = {
 def normalize_query(query: str) -> str:
     """Normalize a query for improved retrieval.
 
-    Performs the following transformations:
-    1. Strip leading conversational phrases
-    2. Convert to lowercase
-    3. Remove filler words while preserving domain terms
-    4. Preserve multi-word phrases and hyphens
-    5. Clean up whitespace
+    Follows spec v0.4 algorithm:
+    1. Lowercase
+    2. Strip leading phrases (exact prefix match)
+    3. Remove filler words
+    4. Preserve nouns and legal terms (implicitly via PRESERVE_TERMS)
 
     Args:
         query: Raw user query string.
@@ -147,31 +169,31 @@ def normalize_query(query: str) -> str:
     Examples:
         >>> normalize_query("What is the fee schedule?")
         'fee schedule'
-        >>> normalize_query("Can you tell me about real-time data fees?")
-        'real-time data fees'
-        >>> normalize_query("Where can I find the CME exhibit?")
-        'cme exhibit'
+        >>> normalize_query("Can you explain redistribution requirements?")
+        'redistribution requirements'
+        >>> normalize_query("How does CME charge for real-time data?")
+        'cme charge real-time data'
     """
     if not query or not query.strip():
         return ""
 
     original = query
-    normalized = query.strip()
+    # Normalize whitespace: lowercase, strip, and collapse multiple spaces
+    text = " ".join(query.lower().split())
 
-    # 1. Strip leading conversational phrases
-    for pattern in LEADING_PHRASES:
-        normalized = re.sub(pattern, "", normalized, flags=re.IGNORECASE)
+    # 1. Strip prefix phrases (exact match)
+    for prefix in STRIP_PREFIXES:
+        if text.startswith(prefix):
+            text = text[len(prefix) :].strip()
+            break  # Only strip first matching prefix
 
-    # 2. Convert to lowercase for processing
-    normalized = normalized.lower()
-
-    # 3. Preserve hyphenated terms (e.g., "real-time", "non-professional")
+    # 2. Preserve hyphenated terms (e.g., "real-time", "non-professional")
     # Replace hyphens with placeholder to prevent splitting
     hyphen_placeholder = "___HYPHEN___"
-    normalized = normalized.replace("-", hyphen_placeholder)
+    text = text.replace("-", hyphen_placeholder)
 
-    # 4. Tokenize and filter
-    words = normalized.split()
+    # 3. Tokenize and filter
+    words = text.split()
     filtered_words = []
 
     for word in words:
@@ -194,7 +216,7 @@ def normalize_query(query: str) -> str:
         elif word_clean.isdigit():
             filtered_words.append(word_clean)
 
-    # 5. Join and clean up whitespace
+    # 4. Join and clean up whitespace
     normalized = " ".join(filtered_words).strip()
 
     # Log normalization if significant change
@@ -203,7 +225,7 @@ def normalize_query(query: str) -> str:
             "query_normalized",
             original=original,
             normalized=normalized,
-            removed_words=len(words) - len(filtered_words),
+            words_removed=len(words) - len(filtered_words),
         )
 
     return normalized

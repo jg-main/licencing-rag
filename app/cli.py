@@ -215,6 +215,11 @@ Examples:
         action="store_true",
         help="Show auto-linked definitions table (hidden by default)",
     )
+    query_parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Show debug information (e.g., query normalization details)",
+    )
 
     # List command
     list_parser = subparsers.add_parser(

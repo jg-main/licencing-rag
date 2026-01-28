@@ -120,6 +120,7 @@ def query(
 
     # Normalize query for improved retrieval
     normalized_question = normalize_query(question)
+    normalization_failed = False
 
     # Fall back to original if normalization produces empty string
     if not normalized_question:
@@ -129,6 +130,7 @@ def query(
             message="Normalization produced empty query, using original",
         )
         normalized_question = question
+        normalization_failed = True
 
     log.info(
         "query_started",
@@ -369,6 +371,7 @@ def query(
             "normalized_query": normalized_question,
             "normalization_applied": question.lower().strip()
             != normalized_question.lower().strip(),
+            "normalization_failed": normalization_failed,
         }
 
     return response

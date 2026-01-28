@@ -206,6 +206,38 @@ def format_console(result: dict[str, Any]) -> str:
 
         console.print(def_table)
 
+    # Debug information (if present)
+    debug_info = result.get("debug")
+    if debug_info:
+        console.print()
+        console.rule("[dim]Debug Information[/dim]")
+
+        debug_items = [
+            ("Original Query", debug_info["original_query"]),
+            ("Normalized Query", debug_info["normalized_query"]),
+            (
+                "Normalization Applied",
+                "Yes" if debug_info["normalization_applied"] else "No",
+            ),
+        ]
+
+        if debug_info.get("normalization_failed"):
+            debug_items.append(
+                (
+                    "⚠ Normalization Status",
+                    "[yellow]Failed - using original query[/yellow]",
+                )
+            )
+
+        debug_table = Table(show_header=False, border_style="dim", box=None)
+        debug_table.add_column("Key", style="dim", width=25)
+        debug_table.add_column("Value")
+
+        for key, value in debug_items:
+            debug_table.add_row(key, str(value))
+
+        console.print(debug_table)
+
     console.print()
 
     return string_buffer.getvalue()
@@ -274,6 +306,16 @@ def format_json(result: dict[str, Any], pretty: bool = True) -> str:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
     }
+
+    # Include debug information if present
+    debug_info = result.get("debug")
+    if debug_info:
+        output["debug"] = {
+            "original_query": debug_info["original_query"],
+            "normalized_query": debug_info["normalized_query"],
+            "normalization_applied": debug_info["normalization_applied"],
+            "normalization_failed": debug_info.get("normalization_failed", False),
+        }
 
     if pretty:
         return json.dumps(output, indent=2, ensure_ascii=False)
@@ -463,5 +505,37 @@ def print_result(
                 )
 
             console.print(def_table)
+
+        # Debug information (if present)
+        debug_info = result.get("debug")
+        if debug_info:
+            console.print()
+            console.rule("[dim]Debug Information[/dim]")
+
+            debug_items = [
+                ("Original Query", debug_info["original_query"]),
+                ("Normalized Query", debug_info["normalized_query"]),
+                (
+                    "Normalization Applied",
+                    "Yes" if debug_info["normalization_applied"] else "No",
+                ),
+            ]
+
+            if debug_info.get("normalization_failed"):
+                debug_items.append(
+                    (
+                        "⚠ Normalization Status",
+                        "[yellow]Failed - using original query[/yellow]",
+                    )
+                )
+
+            debug_table = Table(show_header=False, border_style="dim", box=None)
+            debug_table.add_column("Key", style="dim", width=25)
+            debug_table.add_column("Value")
+
+            for key, value in debug_items:
+                debug_table.add_row(key, str(value))
+
+            console.print(debug_table)
 
         console.print()
