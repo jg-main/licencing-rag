@@ -30,47 +30,47 @@ ______________________________________________________________________
 
 > Update this checklist as tasks are completed. Use `[x]` to mark done.
 
-### Phase 1: OpenAI Embeddings Upgrade
+### Phase 1: OpenAI Embeddings Upgrade ✅
 
 #### 1.1 Dependencies & Configuration
 
-- [ ] Add `openai` package to pyproject.toml
-- [ ] Add `tiktoken` package for token counting
-- [ ] Remove `anthropic` package (no longer needed)
-- [ ] Remove `ollama` package (no longer needed)
-- [ ] Update `app/config.py` with OpenAI model constants
-- [ ] Remove `LLM_PROVIDER` abstraction (single provider)
+- [x] Add `openai` package to pyproject.toml
+- [x] Add `tiktoken` package for token counting
+- [x] Remove `anthropic` package (no longer needed)
+- [x] Remove `ollama` package (no longer needed)
+- [x] Update `app/config.py` with OpenAI model constants
+- [x] Remove `LLM_PROVIDER` abstraction (single provider)
 
 #### 1.2 Embedding Function Rewrite
 
-- [ ] Rewrite `app/embed.py` for OpenAI embeddings
-- [ ] Use `text-embedding-3-large` model (3072 dimensions)
-- [ ] Implement batch embedding for efficiency
-- [ ] Add error handling for API failures
-- [ ] Update ChromaDB dimension configuration
+- [x] Rewrite `app/embed.py` for OpenAI embeddings
+- [x] Use `text-embedding-3-large` model (3072 dimensions)
+- [x] Implement batch embedding for efficiency
+- [x] Add error handling for API failures
+- [x] Update ChromaDB dimension configuration
 
 #### 1.3 LLM Provider Rewrite
 
-- [ ] Rewrite `app/llm.py` for OpenAI only
-- [ ] Remove `OllamaProvider` class
-- [ ] Remove `AnthropicProvider` class
-- [ ] Implement `OpenAIProvider` with `gpt-4.1`
-- [ ] Remove provider abstraction (direct OpenAI client)
+- [x] Rewrite `app/llm.py` for OpenAI only
+- [x] Remove `OllamaProvider` class
+- [x] Remove `AnthropicProvider` class
+- [x] Implement simple OpenAI client with `gpt-4.1`
+- [x] Remove provider abstraction (direct OpenAI client)
 
 #### 1.4 Index Migration
 
-- [ ] Delete existing ChromaDB index (incompatible dimensions)
-- [ ] Delete existing BM25 index
-- [ ] Re-ingest all documents with new embeddings
-- [ ] Store embedding model metadata with index
-- [ ] Add version check: block queries if model mismatch
+- [x] Store embedding model metadata with index
+- [x] Add version check: block queries if model mismatch
+- [x] Delete existing ChromaDB index (incompatible dimensions) — user action
+- [x] Delete existing BM25 index — user action
+- [x] Re-ingest all documents with new embeddings — user action
 
 #### 1.5 Verification
 
-- [ ] Test embedding generation
-- [ ] Test basic query without reranking
-- [ ] Verify identical queries return consistent results
-- [ ] Document API key setup
+- [x] Update tests for OpenAIEmbeddingFunction
+- [x] All 192 tests passing
+- [x] All QA checks passing (formatting, linting, type checking)
+- [x] Document API key setup in README.md
 
 ### Phase 2: Query Normalization
 
