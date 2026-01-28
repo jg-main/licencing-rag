@@ -272,24 +272,24 @@ FILLER_WORDS = {
 
 def normalize_query(query: str) -> str:
     """Normalize query for better retrieval.
-    
+
     1. Lowercase
     2. Strip leading phrases
     3. Remove filler words
     4. Preserve nouns and legal terms
     """
     text = query.lower().strip()
-    
+
     # Strip prefix phrases
     for prefix in STRIP_PREFIXES:
         if text.startswith(prefix):
             text = text[len(prefix):].strip()
             break
-    
+
     # Remove filler words
     words = text.split()
     filtered = [w for w in words if w not in FILLER_WORDS]
-    
+
     return " ".join(filtered)
 ```
 
@@ -379,7 +379,7 @@ async def rerank_chunks(
         )
         score = int(response.choices[0].message.content.strip())
         scored.append((chunk, score))
-    
+
     # Sort by score descending, keep top 3-5
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[:5]
@@ -419,17 +419,17 @@ def should_refuse(scored_chunks: list[tuple[dict, int]]) -> bool:
     """Determine if query should be refused based on retrieval confidence."""
     if not scored_chunks:
         return True
-    
+
     top_score = scored_chunks[0][1]
-    
+
     # Refuse if top score below threshold
     if top_score < CONFIDENCE_THRESHOLD:
         return True
-    
+
     # Refuse if no chunk meets relevance threshold
     if not any(score >= RELEVANCE_THRESHOLD for _, score in scored_chunks):
         return True
-    
+
     return False
 
 REFUSAL_MESSAGE = "This is not addressed in the provided CME documents."
@@ -451,38 +451,62 @@ Reduce cost and hallucination risk.
 
 ### Rules
 
-- Hard cap on number of chunks (3-5)
-- Prefer shorter clauses with higher relevance scores
-- Drop long, low-score chunks first
-- Use `tiktoken` for accurate token counting
+- **Accuracy-first prioritization**: Relevance score takes precedence over chunk length
+- **Smart budget enforcement**: Drop lowest-score chunks first when over budget
+- **Tie-breaking by length**: Prefer shorter chunks when relevance scores are equal
+- **Token counting**: Use `tiktoken` for accurate token counting (cl100k_base encoding)
+- **Reserved tokens**: Account for system prompt (~500), QA template (~200), answer buffer (~2048)
+- **Available context**: ~57k tokens for actual chunks (60k - overheads)
 
 ### Implementation
 
 ```python
-# app/query.py
+# app/budget.py
 
 import tiktoken
 
-MAX_CONTEXT_TOKENS = 60000
-ENCODING = tiktoken.encoding_for_model("gpt-4.1")
+# Configuration
+MAX_CONTEXT_TOKENS = 60000  # Total budget
+SYSTEM_PROMPT_TOKENS = 500  # System prompt overhead
+QA_PROMPT_OVERHEAD = 200    # QA template overhead
+ANSWER_BUFFER_TOKENS = 2048 # Reserve for answer
+AVAILABLE_CONTEXT_TOKENS = 57300  # For actual chunks
 
 def enforce_context_budget(
-    chunks: list[tuple[dict, int]],
-    max_tokens: int = MAX_CONTEXT_TOKENS,
-) -> list[dict]:
-    """Trim context to fit within token budget."""
-    selected = []
+    chunks: list[tuple[str, dict[str, Any]]],
+    max_tokens: int = AVAILABLE_CONTEXT_TOKENS,
+) -> tuple[list[tuple[str, dict]], dict]:
+    """Enforce token budget on context chunks.
+
+    Prioritization:
+    1. Relevance score (descending) - keep most relevant
+    2. Token count (ascending) - prefer shorter when scores tied
+
+    Returns:
+        (kept_chunks, budget_info) with metrics
+    """
+    # Sort by priority: -score (high first), +tokens (short first)
+    sorted_chunks = sorted(chunks, key=lambda x: (-x.score, x.tokens))
+
+    # Accumulate until budget exceeded
+    kept_chunks = []
     total_tokens = 0
-    
-    for chunk, score in chunks:
-        chunk_tokens = len(ENCODING.encode(chunk["text"]))
-        if total_tokens + chunk_tokens <= max_tokens:
-            selected.append(chunk)
-            total_tokens += chunk_tokens
-        else:
-            break  # Already sorted by score, stop here
-    
-    return selected
+
+    for chunk, metadata in sorted_chunks:
+        formatted = format_chunk_for_context(chunk, metadata)
+        tokens = count_tokens(formatted)
+
+        if total_tokens + tokens <= max_tokens:
+            kept_chunks.append((chunk, metadata))
+            total_tokens += tokens
+        # else: drop chunk (over budget)
+
+    return kept_chunks, {
+        "kept_count": len(kept_chunks),
+        "dropped_count": len(chunks) - len(kept_chunks),
+        "total_tokens": total_tokens,
+        "under_budget": total_tokens <= max_tokens
+    }
 ```
 
 ______________________________________________________________________
@@ -492,7 +516,7 @@ ______________________________________________________________________
 ### System Prompt
 
 ```
-You are a legal document analyst. You answer questions using ONLY the 
+You are a legal document analyst. You answer questions using ONLY the
 provided context from CME licensing documents.
 
 STRICT RULES:

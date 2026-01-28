@@ -140,21 +140,30 @@ ______________________________________________________________________
 - [x] **Single-token scoring (50% cost reduction)** - explanations optional, disabled by default
 - [x] **Config flag for debug mode** - RERANKING_INCLUDE_EXPLANATIONS for troubleshooting
 
-### Phase 5: Context Budget Enforcement
+### Phase 5: Context Budget Enforcement ✅
 
 #### 5.1 Implementation
 
-- [ ] Add `tiktoken` for accurate token counting
-- [ ] Implement `enforce_context_budget()` function
-- [ ] Target: ≤60k tokens for LLM input
-- [ ] Prefer shorter, higher-score chunks
-- [ ] Drop long, low-score chunks first
+- [x] Add `tiktoken` for accurate token counting
+- [x] Implement `enforce_context_budget()` function
+- [x] Target: ≤60k tokens for LLM input
+- [x] Prefer shorter, higher-score chunks
+- [x] Drop long, low-score chunks first
 
 #### 5.2 Integration
 
-- [ ] Apply budget after reranking
-- [ ] Log final context token count
-- [ ] Add budget exceeded warning
+- [x] Apply budget after reranking
+- [x] Log final context token count
+- [x] Add budget exceeded warning
+- [x] Add `--no-budget` CLI flag
+- [x] Add comprehensive test suite (18 tests)
+
+#### 5.3 Production Optimizations
+
+- [x] **Accuracy-first prioritization**: Relevance score > chunk length
+- [x] **Smart dropping**: Drop lowest-score chunks first when over budget
+- [x] **Tie-breaking**: Prefer shorter chunks when scores are equal
+- [x] **Debug visibility**: Full budget metrics in debug mode
 
 ### Phase 6: Retrieval Confidence Gating
 
