@@ -2,12 +2,13 @@
 """Tests for document ingestion."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 from app.chunking import Chunk
-from app.ingest import chunks_to_chroma_format, get_collection_name, prune_deleted_documents
+from app.ingest import chunks_to_chroma_format
+from app.ingest import get_collection_name
+from app.ingest import prune_deleted_documents
 
 
 class TestChunksToChromaFormat:
@@ -165,7 +166,9 @@ class TestPruneDeletedDocuments:
         # file2.pdf has been deleted
         current_doc_paths = {"file1.pdf", "subdir/file3.pdf"}
 
-        deleted_count = prune_deleted_documents("cme", mock_collection, current_doc_paths)
+        deleted_count = prune_deleted_documents(
+            "cme", mock_collection, current_doc_paths
+        )
 
         # Should delete 1 chunk from file2.pdf
         assert deleted_count == 1
@@ -184,7 +187,9 @@ class TestPruneDeletedDocuments:
 
         current_doc_paths = {"file1.pdf", "file2.pdf"}
 
-        deleted_count = prune_deleted_documents("cme", mock_collection, current_doc_paths)
+        deleted_count = prune_deleted_documents(
+            "cme", mock_collection, current_doc_paths
+        )
 
         assert deleted_count == 0
         mock_collection.delete.assert_not_called()
@@ -196,7 +201,9 @@ class TestPruneDeletedDocuments:
 
         current_doc_paths = {"file1.pdf"}
 
-        deleted_count = prune_deleted_documents("cme", mock_collection, current_doc_paths)
+        deleted_count = prune_deleted_documents(
+            "cme", mock_collection, current_doc_paths
+        )
 
         assert deleted_count == 0
         mock_collection.delete.assert_not_called()
@@ -215,7 +222,9 @@ class TestPruneDeletedDocuments:
         # Only file2.pdf exists (file1.pdf deleted)
         current_doc_paths = {"file2.pdf"}
 
-        deleted_count = prune_deleted_documents("cme", mock_collection, current_doc_paths)
+        deleted_count = prune_deleted_documents(
+            "cme", mock_collection, current_doc_paths
+        )
 
         # Should delete chunk from file1.pdf
         assert deleted_count == 1
@@ -227,15 +236,17 @@ class TestStaleChunkCleanup:
 
     def test_extraction_failure_removes_stale_chunks(self) -> None:
         """When extraction fails, existing chunks are deleted before the failure."""
-        from pathlib import Path
-        from unittest.mock import MagicMock, patch
-        from app.ingest import ingest_provider
-        from app.extract import ExtractionError
+        from unittest.mock import MagicMock
 
-        with patch("app.ingest.chromadb.PersistentClient") as mock_client, \
-             patch("app.ingest.extract_document") as mock_extract, \
-             patch("app.ingest.BM25Index") as mock_bm25_class:
-            
+        from app.extract import ExtractionError
+        from app.ingest import ingest_provider
+
+        with (
+            patch("app.ingest.chromadb.PersistentClient") as mock_client,
+            patch("app.ingest.OpenAIEmbeddingFunction"),
+            patch("app.ingest.extract_document") as mock_extract,
+            patch("app.ingest.BM25Index") as mock_bm25_class,
+        ):
             # Setup mock collection
             mock_collection = MagicMock()
             mock_collection.get.return_value = {
@@ -245,51 +256,59 @@ class TestStaleChunkCleanup:
                     {"document_path": "test.pdf", "chunk_id": "old_chunk_2"},
                 ],
             }
-            mock_client.return_value.get_or_create_collection.return_value = mock_collection
-            
+            mock_client.return_value.get_or_create_collection.return_value = (
+                mock_collection
+            )
+
             # Mock extraction to fail
             mock_extract.side_effect = ExtractionError("Corrupted PDF")
-            
+
             # Mock BM25 index
             mock_bm25_instance = MagicMock()
             mock_bm25_class.return_value = mock_bm25_instance
-            
+
             # Create temp directory with a test file
             with patch("app.ingest.get_provider_raw_dir") as mock_raw_dir:
                 temp_dir = Path("/tmp/test_provider")
                 mock_raw_dir.return_value = temp_dir
-                
+
                 # Mock the file existence check
-                with patch.object(Path, "exists", return_value=True), \
-                     patch.object(Path, "rglob") as mock_rglob:
-                    
+                with (
+                    patch.object(Path, "exists", return_value=True),
+                    patch.object(Path, "rglob") as mock_rglob,
+                ):
                     # Mock finding one PDF file
                     test_file = temp_dir / "test.pdf"
                     mock_rglob.return_value = [test_file]
-                    
+
                     # Mock file check
-                    with patch.object(Path, "is_file", return_value=True), \
-                         patch.object(Path, "suffix", new_callable=lambda: property(lambda self: ".pdf")), \
-                         patch.object(Path, "relative_to", return_value=Path("test.pdf")):
-                        
+                    with (
+                        patch.object(Path, "is_file", return_value=True),
+                        patch.object(
+                            Path,
+                            "suffix",
+                            new_callable=lambda: property(lambda self: ".pdf"),
+                        ),
+                        patch.object(
+                            Path, "relative_to", return_value=Path("test.pdf")
+                        ),
+                    ):
                         # Run ingestion
                         result = ingest_provider("cme", force=False)
-            
+
             # Verify old chunks were deleted BEFORE extraction failed
             mock_collection.delete.assert_called_once_with(
                 ids=["old_chunk_1", "old_chunk_2"]
             )
-            
+
             # Verify extraction was attempted
             mock_extract.assert_called_once()
-            
+
             # Verify no new chunks were added (extraction failed)
             mock_collection.add.assert_not_called()
-            
+
             # Verify error was reported
             errors = result["errors"]
             assert isinstance(errors, list)
             assert len(errors) == 1
             assert "Extraction failed" in errors[0]
-
-

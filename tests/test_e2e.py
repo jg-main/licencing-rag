@@ -1,29 +1,29 @@
 # tests/test_e2e.py
 """End-to-end integration tests for ingest → query pipeline."""
 
-import shutil
 from pathlib import Path
-from typing import Any, cast
-from unittest.mock import MagicMock, patch
+from typing import Any
+from typing import cast
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import chromadb
 import pytest
 
-from app.chunking import Chunk, chunk_document
-from app.config import CHROMA_DIR
+from app.chunking import Chunk
+from app.chunking import chunk_document
 from app.extract import extract_document
-from app.ingest import chunks_to_chroma_format, get_collection_name
-from app.query import format_context, query
+from app.ingest import chunks_to_chroma_format
+from app.ingest import get_collection_name
+from app.query import format_context
+from app.query import query
 
 
 def _sanitize_metadata(
     metadatas: list[dict[str, Any]],
 ) -> list[dict[str, str | int | float | bool]]:
     """Remove None values from metadata dicts (ChromaDB doesn't accept None)."""
-    return [
-        {k: v for k, v in meta.items() if v is not None}
-        for meta in metadatas
-    ]  # type: ignore[return-value]
+    return [{k: v for k, v in meta.items() if v is not None} for meta in metadatas]  # type: ignore[return-value]
 
 
 class TestIngestQuerySmokeTest:
@@ -146,7 +146,9 @@ Fee amounts are subject to change. Contact CME for current pricing."""
         import re
 
         page_match = re.search(r"Page\s+\d+", context)
-        assert page_match is not None, f"Citation should include page number. Context: {context}"
+        assert page_match is not None, (
+            f"Citation should include page number. Context: {context}"
+        )
 
     def test_full_query_with_mocked_llm(
         self, sample_docx: Path, temp_chroma_dir: Path, mock_llm_response: str
@@ -166,6 +168,8 @@ Fee amounts are subject to change. Contact CME for current pricing."""
             "ids": [ids[:2]],
             "distances": [[0.1, 0.2]],
         }
+        # Add metadata for embedding model check
+        mock_collection.metadata = {"embedding_model": "text-embedding-3-large"}
 
         mock_client = MagicMock()
         mock_client.get_collection.return_value = mock_collection
@@ -177,7 +181,7 @@ Fee amounts are subject to change. Contact CME for current pricing."""
         with (
             patch("app.query.CHROMA_DIR", temp_chroma_dir),
             patch("app.query.chromadb.PersistentClient", return_value=mock_client),
-            patch("app.query.OllamaEmbeddingFunction"),
+            patch("app.query.OpenAIEmbeddingFunction"),
             patch("app.query.get_llm", return_value=mock_provider),
         ):
             # Ensure CHROMA_DIR exists for the check
@@ -209,11 +213,26 @@ class TestHybridSearchE2E:
     def sample_documents(self) -> list[tuple[str, str]]:
         """Sample documents for BM25 indexing."""
         return [
-            ("chunk_fee_1", "The fee schedule outlines real-time data fees at $100 per month"),
-            ("chunk_fee_2", "Delayed data has reduced fees of $50 per month for subscribers"),
-            ("chunk_redistribution", "Redistribution requires prior written approval from CME Group"),
-            ("chunk_subscriber", "A Subscriber is defined as any person receiving market data"),
-            ("chunk_general", "CME Group provides market data through various distribution channels"),
+            (
+                "chunk_fee_1",
+                "The fee schedule outlines real-time data fees at $100 per month",
+            ),
+            (
+                "chunk_fee_2",
+                "Delayed data has reduced fees of $50 per month for subscribers",
+            ),
+            (
+                "chunk_redistribution",
+                "Redistribution requires prior written approval from CME Group",
+            ),
+            (
+                "chunk_subscriber",
+                "A Subscriber is defined as any person receiving market data",
+            ),
+            (
+                "chunk_general",
+                "CME Group provides market data through various distribution channels",
+            ),
         ]
 
     def test_bm25_save_load_roundtrip(
@@ -254,11 +273,16 @@ class TestHybridSearchE2E:
             search_module.BM25_INDEX_DIR = original_dir
 
     def test_hybrid_search_with_loaded_bm25(
-        self, temp_bm25_dir: Path, tmp_path: Path, sample_documents: list[tuple[str, str]]
+        self,
+        temp_bm25_dir: Path,
+        tmp_path: Path,
+        sample_documents: list[tuple[str, str]],
     ) -> None:
         """Test hybrid search combining vector results with loaded BM25 index."""
         import app.search as search_module
-        from app.search import BM25Index, HybridSearcher, SearchMode
+        from app.search import BM25Index
+        from app.search import HybridSearcher
+        from app.search import SearchMode
 
         original_dir = search_module.BM25_INDEX_DIR
         search_module.BM25_INDEX_DIR = temp_bm25_dir
@@ -281,16 +305,22 @@ class TestHybridSearchE2E:
             mock_collection = MagicMock()
             mock_collection.query.return_value = {
                 "ids": [["chunk_general", "chunk_subscriber", "chunk_fee_2"]],
-                "documents": [[
-                    sample_documents[4][1],  # general (vector thinks this is relevant)
-                    sample_documents[3][1],  # subscriber
-                    sample_documents[1][1],  # fee_2
-                ]],
-                "metadatas": [[
-                    {"chunk_id": "chunk_general", "provider": "test"},
-                    {"chunk_id": "chunk_subscriber", "provider": "test"},
-                    {"chunk_id": "chunk_fee_2", "provider": "test"},
-                ]],
+                "documents": [
+                    [
+                        sample_documents[4][
+                            1
+                        ],  # general (vector thinks this is relevant)
+                        sample_documents[3][1],  # subscriber
+                        sample_documents[1][1],  # fee_2
+                    ]
+                ],
+                "metadatas": [
+                    [
+                        {"chunk_id": "chunk_general", "provider": "test"},
+                        {"chunk_id": "chunk_subscriber", "provider": "test"},
+                        {"chunk_id": "chunk_fee_2", "provider": "test"},
+                    ]
+                ],
                 "distances": [[0.1, 0.2, 0.3]],
             }
             mock_collection.get.return_value = {
@@ -301,7 +331,9 @@ class TestHybridSearchE2E:
 
             # Run hybrid search
             searcher = HybridSearcher("test_provider", mock_collection, loaded_bm25)
-            results = searcher.search("fee schedule real-time", mode=SearchMode.HYBRID, top_k=3)
+            results = searcher.search(
+                "fee schedule real-time", mode=SearchMode.HYBRID, top_k=3
+            )
 
             # Verify results
             assert len(results) >= 1
@@ -325,7 +357,8 @@ class TestHybridSearchE2E:
     ) -> None:
         """Hybrid search falls back to vector-only when BM25 index is missing."""
         import app.search as search_module
-        from app.search import HybridSearcher, SearchMode
+        from app.search import HybridSearcher
+        from app.search import SearchMode
 
         original_dir = search_module.BM25_INDEX_DIR
         search_module.BM25_INDEX_DIR = temp_bm25_dir
@@ -338,10 +371,12 @@ class TestHybridSearchE2E:
             mock_collection.query.return_value = {
                 "ids": [["chunk_1", "chunk_2"]],
                 "documents": [[sample_documents[0][1], sample_documents[1][1]]],
-                "metadatas": [[
-                    {"chunk_id": "chunk_1", "provider": "test"},
-                    {"chunk_id": "chunk_2", "provider": "test"},
-                ]],
+                "metadatas": [
+                    [
+                        {"chunk_id": "chunk_1", "provider": "test"},
+                        {"chunk_id": "chunk_2", "provider": "test"},
+                    ]
+                ],
                 "distances": [[0.1, 0.2]],
             }
 
@@ -374,11 +409,9 @@ class TestQueryWithDefinitions:
         """Query with include_definitions=True returns definitions in result."""
         from unittest.mock import patch
 
-        from app.definitions import (
-            DefinitionEntry,
-            DefinitionsIndex,
-            save_definitions_index,
-        )
+        from app.definitions import DefinitionEntry
+        from app.definitions import DefinitionsIndex
+        from app.definitions import save_definitions_index
 
         # Create and save a definitions index
         temp_definitions_dir.mkdir(parents=True, exist_ok=True)
@@ -405,17 +438,23 @@ class TestQueryWithDefinitions:
         mock_collection.query.return_value = {
             "ids": [["chunk_1"]],
             "documents": [["The Subscriber must pay monthly fees as specified."]],
-            "metadatas": [[{
-                "chunk_id": "chunk_1",
-                "provider": "test_provider",
-                "document_name": "fees.pdf",
-                "document_path": "fees.pdf",
-                "section_heading": "Fees",
-                "page_start": 10,
-                "page_end": 10,
-            }]],
+            "metadatas": [
+                [
+                    {
+                        "chunk_id": "chunk_1",
+                        "provider": "test_provider",
+                        "document_name": "fees.pdf",
+                        "document_path": "fees.pdf",
+                        "section_heading": "Fees",
+                        "page_start": 10,
+                        "page_end": 10,
+                    }
+                ]
+            ],
             "distances": [[0.1]],
         }
+        # Add metadata for embedding model check
+        mock_collection.metadata = {"embedding_model": "text-embedding-3-large"}
 
         # Mock client
         mock_client = MagicMock()
@@ -437,7 +476,7 @@ The Subscriber must pay monthly fees as specified in the agreement.
         with (
             patch("app.definitions.DEFINITIONS_INDEX_DIR", temp_definitions_dir),
             patch("chromadb.PersistentClient") as mock_chroma_client,
-            patch("app.query.OllamaEmbeddingFunction"),
+            patch("app.query.OpenAIEmbeddingFunction"),
             patch("app.search.BM25Index.load") as mock_load_bm25,
             patch("app.query.get_llm") as mock_get_llm,
             patch("app.query.get_definitions_retriever") as mock_get_retriever,
@@ -456,6 +495,7 @@ The Subscriber must pay monthly fees as specified in the agreement.
 
             # Create a mock retriever that returns our definition
             from app.definitions import DefinitionsRetriever
+
             with patch("app.definitions.DEFINITIONS_INDEX_DIR", temp_definitions_dir):
                 real_retriever = DefinitionsRetriever(["test_provider"])
             mock_get_retriever.return_value = real_retriever
@@ -492,17 +532,23 @@ The Subscriber must pay monthly fees as specified in the agreement.
         mock_collection.query.return_value = {
             "ids": [["chunk_1"]],
             "documents": [["The Subscriber must pay monthly fees."]],
-            "metadatas": [[{
-                "chunk_id": "chunk_1",
-                "provider": "test_provider",
-                "document_name": "fees.pdf",
-                "document_path": "fees.pdf",
-                "section_heading": "Fees",
-                "page_start": 10,
-                "page_end": 10,
-            }]],
+            "metadatas": [
+                [
+                    {
+                        "chunk_id": "chunk_1",
+                        "provider": "test_provider",
+                        "document_name": "fees.pdf",
+                        "document_path": "fees.pdf",
+                        "section_heading": "Fees",
+                        "page_start": 10,
+                        "page_end": 10,
+                    }
+                ]
+            ],
             "distances": [[0.1]],
         }
+        # Add metadata for embedding model check
+        mock_collection.metadata = {"embedding_model": "text-embedding-3-large"}
 
         mock_client = MagicMock()
         mock_client.get_collection.return_value = mock_collection
@@ -520,7 +566,7 @@ Monthly fees apply.
 
         with (
             patch("chromadb.PersistentClient") as mock_chroma_client,
-            patch("app.query.OllamaEmbeddingFunction"),
+            patch("app.query.OpenAIEmbeddingFunction"),
             patch("app.search.BM25Index.load") as mock_load_bm25,
             patch("app.query.get_llm") as mock_get_llm,
             patch("app.query.CHROMA_DIR", tmp_path),
@@ -553,12 +599,10 @@ Monthly fees apply.
         """Providers with underscores (e.g., cta_utp) are handled correctly."""
         from unittest.mock import patch
 
-        from app.definitions import (
-            DefinitionEntry,
-            DefinitionsIndex,
-            format_definitions_for_output,
-            save_definitions_index,
-        )
+        from app.definitions import DefinitionEntry
+        from app.definitions import DefinitionsIndex
+        from app.definitions import format_definitions_for_output
+        from app.definitions import save_definitions_index
 
         # Create index for provider with underscore in name
         temp_definitions_dir.mkdir(parents=True, exist_ok=True)
@@ -580,6 +624,7 @@ Monthly fees apply.
         with patch("app.definitions.DEFINITIONS_INDEX_DIR", temp_definitions_dir):
             save_definitions_index(index)
             from app.definitions import load_definitions_index
+
             loaded = load_definitions_index("cta_utp")
 
         assert loaded is not None
