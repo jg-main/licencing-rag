@@ -41,6 +41,16 @@ RERANKING_TIMEOUT = 30  # Timeout in seconds per chunk scoring (prevents hangs)
 RERANKING_INCLUDE_EXPLANATIONS = False  # Include explanations (costs ~50% more tokens)
 RERANKING_ENABLED = True  # Enable LLM reranking by default
 
+# Context Budget parameters (Phase 5)
+MAX_CONTEXT_TOKENS = (
+    60000  # Hard limit: complete prompt (system + user) must be ≤60k tokens
+)
+CONTEXT_BUDGET_ENABLED = True  # Enable token budget enforcement
+
+# Note: We no longer use static overhead estimates. Budget enforcement measures
+# the FULL prompt (system + QA template + question + definitions + context) with
+# tiktoken to guarantee the 60k limit. This is the accuracy-first approach.
+
 # Provider configuration
 PROVIDERS: dict[str, dict[str, str]] = {
     "cme": {
