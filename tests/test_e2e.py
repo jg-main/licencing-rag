@@ -183,7 +183,29 @@ Fee amounts are subject to change. Contact CME for current pricing."""
             patch("app.query.chromadb.PersistentClient", return_value=mock_client),
             patch("app.query.OpenAIEmbeddingFunction"),
             patch("app.query.get_llm", return_value=mock_provider),
+            patch("app.query.rerank_chunks") as mock_rerank,
         ):
+            # Mock reranking to keep the chunks (score >= threshold)
+            from app.rerank import ScoredChunk
+
+            def mock_rerank_fn(chunks, question):
+                # Convert to ScoredChunk and return all as kept
+                scored = [
+                    ScoredChunk(
+                        chunk_id=chunk["chunk_id"],
+                        text=chunk["text"],
+                        metadata=chunk["metadata"],
+                        original_score=chunk["score"],
+                        relevance_score=2,  # Pass threshold
+                        explanation="Relevant",
+                        source=chunk.get("source", "vector"),
+                    )
+                    for chunk in chunks
+                ]
+                return scored, []  # All kept, none dropped
+
+            mock_rerank.side_effect = mock_rerank_fn
+
             # Ensure CHROMA_DIR exists for the check
             temp_chroma_dir.mkdir(parents=True, exist_ok=True)
 
@@ -195,7 +217,7 @@ Fee amounts are subject to change. Contact CME for current pricing."""
             assert "citations" in result
             assert "[CME]" in result["answer"]
 
-            # Verify LLM was called
+            # Verify LLM was called (since chunks passed reranking)
             mock_provider.generate.assert_called_once()
 
 

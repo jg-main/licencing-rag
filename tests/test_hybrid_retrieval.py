@@ -336,6 +336,8 @@ class TestRuntimeBehavior:
         self, tmp_chroma_collection: Any
     ) -> None:
         """Verify hybrid search actually retrieves max 12 candidates, not 20."""
+        from unittest.mock import patch
+
         # Create a large corpus to ensure we can retrieve 20+ items
         chunk_ids = [f"chunk_{i:03d}" for i in range(50)]
         documents = [
@@ -355,24 +357,24 @@ class TestRuntimeBehavior:
         bm25.build()
 
         # Track how many candidates were actually requested
-        vector_call_count = []
+        vector_call_count: list[int] = []
 
         searcher = HybridSearcher("test", tmp_chroma_collection, bm25)
 
-        # Patch the internal method to track candidate_count
+        # Store original method reference
         original_vector = searcher._vector_search
 
         def tracked_vector(question: str, top_k: int) -> list:
             vector_call_count.append(top_k)
             return original_vector(question, top_k)
 
-        searcher._vector_search = tracked_vector
-
-        # Call hybrid search with top_k=10, retrieval_multiplier=2
-        # This would calculate 20 candidates, but should be capped at 12
-        results = searcher._hybrid_search(
-            "market data fee", top_k=10, retrieval_multiplier=2
-        )
+        # Use patch.object to properly mock the method
+        with patch.object(searcher, "_vector_search", side_effect=tracked_vector):
+            # Call hybrid search with top_k=10, retrieval_multiplier=2
+            # This would calculate 20 candidates, but should be capped at 12
+            results = searcher._hybrid_search(
+                "market data fee", top_k=10, retrieval_multiplier=2
+            )
 
         # Verify candidate_count was capped at 12, not 20
         assert len(vector_call_count) == 1, "Vector search should be called once"

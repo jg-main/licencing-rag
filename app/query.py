@@ -12,6 +12,7 @@ from app.config import DEFAULT_PROVIDERS
 from app.config import EMBEDDING_DIMENSIONS
 from app.config import EMBEDDING_MODEL
 from app.config import PROVIDERS
+from app.config import RERANKING_ENABLED
 from app.config import TOP_K
 from app.definitions import format_definitions_for_context
 from app.definitions import format_definitions_for_output
@@ -25,6 +26,7 @@ from app.prompts import QA_PROMPT
 from app.prompts import QA_PROMPT_NO_DEFINITIONS
 from app.prompts import SYSTEM_PROMPT
 from app.prompts import get_refusal_message
+from app.rerank import rerank_chunks
 from app.search import BM25Index
 from app.search import HybridSearcher
 from app.search import SearchMode
@@ -71,6 +73,7 @@ def query(
     top_k: int = TOP_K,
     search_mode: str = "hybrid",
     include_definitions: bool = True,
+    enable_reranking: bool = RERANKING_ENABLED,
     debug: bool = False,
 ) -> dict:
     """Query the knowledge base.
@@ -81,6 +84,7 @@ def query(
         top_k: Number of chunks to retrieve per provider.
         search_mode: Search mode - "vector", "keyword", or "hybrid" (default).
         include_definitions: If True, auto-link definitions for terms in context.
+        enable_reranking: If True, use LLM to rerank chunks (Phase 4).
         debug: If True, include normalization details in response.
 
     Returns:
@@ -144,8 +148,7 @@ def query(
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
     embed_fn = OpenAIEmbeddingFunction()
 
-    all_documents: list[str] = []
-    all_metadatas: list[dict[str, Any]] = []
+    all_search_results: list[dict[str, Any]] = []
 
     # Track actual mode used (may differ from requested due to fallbacks)
     actual_modes_used: set[str] = set()
@@ -234,12 +237,16 @@ def query(
         # Track the actual mode used
         actual_modes_used.add(effective_mode.value)
 
+        # Store search results with all metadata for potential reranking
         for result in search_results:
-            all_documents.append(result.text)
-            all_metadatas.append(result.metadata)
-            # Track source for debug info
-            if debug:
-                result.metadata["_retrieval_source"] = result.source
+            search_result_dict = {
+                "chunk_id": result.chunk_id,
+                "text": result.text,
+                "metadata": result.metadata,
+                "score": result.score,
+                "source": result.source,
+            }
+            all_search_results.append(search_result_dict)
 
     # Determine effective search mode
     # If fallback occurred or mixed modes, report the actual mode(s) used
@@ -252,7 +259,7 @@ def query(
         # No results retrieved, use requested mode
         effective_search_mode = search_mode
 
-    if not all_documents:
+    if not all_search_results:
         log.info("no_chunks_retrieved", question=question[:100])
         response = {
             "answer": get_refusal_message(providers),
@@ -265,14 +272,140 @@ def query(
             "effective_search_mode": effective_search_mode,
         }
         if debug:
-            response["debug_info"] = {
-                "normalized_query": normalized_question,
+            response["debug"] = {
                 "original_query": question,
+                "normalized_query": normalized_question,
+                "normalization_applied": question.lower().strip()
+                != normalized_question.lower().strip(),
+                "normalization_failed": normalization_failed,
                 "retrieval_sources": {},
             }
         return response
 
-    log.debug("chunks_retrieved", count=len(all_documents))
+    log.debug("chunks_retrieved", count=len(all_search_results))
+
+    # Phase 4: LLM Reranking (optional)
+    rerank_info: dict[str, Any] = {}
+    if enable_reranking:
+        log.info("reranking_started", chunk_count=len(all_search_results))
+        kept_chunks, dropped_chunks = rerank_chunks(
+            chunks=all_search_results,
+            question=question,
+            # Uses MIN_RERANKING_SCORE and MAX_CHUNKS_AFTER_RERANKING from config
+        )
+
+        # CRITICAL: If reranking dropped all chunks, fall back to original ranking
+        # This prevents false refusals when reranker is overly strict (accuracy > cost)
+        if not kept_chunks:
+            from app.config import MAX_CHUNKS_AFTER_RERANKING
+            from app.config import RERANKING_INCLUDE_EXPLANATIONS
+
+            log.warning(
+                "reranking_dropped_all_chunks_fallback",
+                question=question,
+                total_chunks=len(all_search_results),
+                action="falling back to original ranking",
+            )
+            # Sort by original relevance score (desc) before capping to preserve quality
+            sorted_results: list[dict[str, Any]] = sorted(
+                all_search_results, key=lambda x: x["score"], reverse=True
+            )
+            fallback_results = sorted_results[:MAX_CHUNKS_AFTER_RERANKING]
+            all_documents = [r["text"] for r in fallback_results]
+            all_metadatas = [r["metadata"] for r in fallback_results]
+
+            # Set _retrieval_source for fallback chunks
+            for i, fallback_result in enumerate(fallback_results):
+                all_metadatas[i]["_retrieval_source"] = fallback_result["source"]
+
+            # Track fallback in debug info (only if debug mode is on)
+            if debug:
+                rerank_info = {
+                    "enabled": True,
+                    "fallback_triggered": True,
+                    "chunks_before_reranking": len(all_search_results),
+                    "chunks_after_reranking": len(fallback_results),
+                    "dropped_chunks": [
+                        {
+                            "chunk_id": chunk.chunk_id,
+                            "relevance_score": chunk.relevance_score,
+                            # Only include explanation if requested
+                            **(
+                                {"explanation": chunk.explanation}
+                                if RERANKING_INCLUDE_EXPLANATIONS
+                                else {}
+                            ),
+                        }
+                        for chunk in dropped_chunks
+                    ],
+                }
+            else:
+                rerank_info = {"enabled": True, "fallback_triggered": True}
+        else:
+            # Use reranked chunks for context
+            all_documents = [chunk.text for chunk in kept_chunks]
+            all_metadatas = [chunk.metadata for chunk in kept_chunks]
+
+            # Add retrieval source to metadata for debug tracking
+            for i, chunk in enumerate(kept_chunks):
+                all_metadatas[i]["_retrieval_source"] = chunk.source
+
+            # Track reranking info for debug mode (only if not fallback)
+            if debug:
+                from app.config import RERANKING_INCLUDE_EXPLANATIONS
+
+                rerank_info = {
+                    "enabled": True,
+                    "fallback_triggered": False,
+                    "chunks_before_reranking": len(all_search_results),
+                    "chunks_after_reranking": len(kept_chunks),
+                    "kept_chunks": [
+                        {
+                            "chunk_id": chunk.chunk_id,
+                            "relevance_score": chunk.relevance_score,
+                            "original_score": chunk.original_score,
+                            "source": chunk.source,
+                            # Only include explanation if explanations were requested
+                            **(
+                                {"explanation": chunk.explanation}
+                                if RERANKING_INCLUDE_EXPLANATIONS
+                                else {}
+                            ),
+                        }
+                        for chunk in kept_chunks
+                    ],
+                    "dropped_chunks": [
+                        {
+                            "chunk_id": chunk.chunk_id,
+                            "relevance_score": chunk.relevance_score,
+                            # Only include explanation if explanations were requested
+                            **(
+                                {"explanation": chunk.explanation}
+                                if RERANKING_INCLUDE_EXPLANATIONS
+                                else {}
+                            ),
+                        }
+                        for chunk in dropped_chunks
+                    ],
+                }
+
+        log.info(
+            "reranking_complete",
+            kept=len(all_documents),  # Use all_documents to reflect fallback
+            dropped=len(dropped_chunks),
+            top_scores=[c.relevance_score for c in kept_chunks] if kept_chunks else [],
+        )
+    else:
+        # No reranking - use all retrieved chunks
+        all_documents = [r["text"] for r in all_search_results]
+        all_metadatas = [r["metadata"] for r in all_search_results]
+
+        # Track retrieval source for debug info
+        if debug:
+            for i, search_result in enumerate(all_search_results):
+                all_metadatas[i]["_retrieval_source"] = search_result["source"]
+
+        rerank_info = {"enabled": False}
 
     # Format context
     context = format_context(all_documents, all_metadatas)
@@ -376,13 +509,17 @@ def query(
 
     # Add debug information if requested
     if debug:
-        response["debug"] = {
+        debug_dict = {
             "original_query": question,
             "normalized_query": normalized_question,
             "normalization_applied": question.lower().strip()
             != normalized_question.lower().strip(),
             "normalization_failed": normalization_failed,
         }
+        # Add reranking info if available
+        if rerank_info:
+            debug_dict["reranking"] = rerank_info
+        response["debug"] = debug_dict
 
     return response
 
