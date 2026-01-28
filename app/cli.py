@@ -69,6 +69,7 @@ def cmd_query(args: argparse.Namespace) -> int:
     search_mode = getattr(args, "search_mode", "hybrid")
     debug = getattr(args, "debug", False)
     enable_reranking = getattr(args, "enable_reranking", True)
+    enable_budget = getattr(args, "enable_budget", True)
 
     try:
         result = query(
@@ -77,6 +78,7 @@ def cmd_query(args: argparse.Namespace) -> int:
             top_k=args.top_k,
             search_mode=search_mode,
             enable_reranking=enable_reranking,
+            enable_budget=enable_budget,
             debug=debug,
         )
 
@@ -228,6 +230,13 @@ Examples:
         action="store_false",
         default=True,
         help="Disable LLM reranking (Phase 4 feature, enabled by default)",
+    )
+    query_parser.add_argument(
+        "--no-budget",
+        dest="enable_budget",
+        action="store_false",
+        default=True,
+        help="Disable context budget enforcement (Phase 5 feature, enabled by default)",
     )
 
     # List command
