@@ -49,7 +49,7 @@ help: ## 📚 Show this help message
 	@echo "$(CYAN)📋 Available Commands:$(END)"
 	@echo ""
 	@echo "$(BOLD)🚀 Setup & Environment:$(END)"
-	@grep -E '^(check-uv|sync|upgrade|install-hooks|setup|clean):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(END) %s\n", $$1, $$2}'
+	@grep -E '^(check-uv|sync|upgrade|install-hooks|setup|clean|clean-all):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(END) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(BOLD)🎨 Code Quality:$(END)"
 	@grep -E '^(format|format-md|lint|lint-check|type-check|quality):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(END) %s\n", $$1, $$2}'
@@ -147,6 +147,17 @@ clean: ## 🧹 Clean workspace (remove cache, temp files)
 	@rm -rf .venv/
 	@rm -rf htmlcov/ mypy-report/ .coverage.*
 	@echo "$(GREEN)✅ Workspace cleaned$(END)"
+
+.PHONY: clean-all
+clean-all: clean ## 🧹 Full clean (workspace + indexes + extracted data)
+	@echo "$(BLUE)ℹ️  Cleaning indexes and extracted data...$(END)"
+	@rm -rf index/chroma/
+	@rm -rf index/bm25/
+	@rm -rf index/definitions/
+	@rm -rf data/text/
+	@rm -rf data/chunks/
+	@rm -rf logs/*.jsonl
+	@echo "$(GREEN)✅ Full clean complete - ready for fresh ingestion$(END)"
 
 
 ################################################################################
