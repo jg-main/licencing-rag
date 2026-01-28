@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import chromadb
+from chromadb.errors import NotFoundError
 from tqdm import tqdm
 
 from app.chunking import Chunk
@@ -13,12 +14,14 @@ from app.chunking import chunk_document
 from app.chunking import save_chunks_artifacts
 from app.config import CHROMA_DIR
 from app.config import CHUNKS_DATA_DIR
+from app.config import EMBEDDING_DIMENSIONS
+from app.config import EMBEDDING_MODEL
 from app.config import PROVIDERS
 from app.config import RAW_DATA_DIR
 from app.config import TEXT_DATA_DIR
 from app.definitions import build_definitions_index
 from app.definitions import save_definitions_index
-from app.embed import OllamaEmbeddingFunction
+from app.embed import OpenAIEmbeddingFunction
 from app.extract import ExtractionError
 from app.extract import detect_document_version
 from app.extract import extract_document
@@ -236,7 +239,7 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     # Initialize ChromaDB
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    embed_fn = OllamaEmbeddingFunction()
+    embed_fn = OpenAIEmbeddingFunction()
 
     collection_name = get_collection_name(provider)
 
@@ -246,13 +249,18 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
         try:
             client.delete_collection(collection_name)
             log.info("collection_deleted", collection=collection_name)
-        except ValueError:
+        except NotFoundError:
             log.debug("collection_not_found_for_deletion", collection=collection_name)
 
+    # Store embedding model metadata with collection for version checking
     collection = client.get_or_create_collection(
         name=collection_name,
         embedding_function=embed_fn,  # type: ignore[arg-type]
-        metadata={"provider": provider},
+        metadata={
+            "provider": provider,
+            "embedding_model": EMBEDDING_MODEL,
+            "embedding_dimensions": EMBEDDING_DIMENSIONS,
+        },
     )
     log.info("collection_ready", collection=collection_name, provider=provider)
 
@@ -459,7 +467,7 @@ def list_indexed_documents(provider: str) -> list[str]:
 
     try:
         collection = client.get_collection(collection_name)
-    except ValueError:
+    except NotFoundError:
         return []
 
     # Get all metadatas

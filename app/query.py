@@ -5,15 +5,18 @@ import sys
 from typing import Any
 
 import chromadb
+from chromadb.errors import NotFoundError
 
 from app.config import CHROMA_DIR
 from app.config import DEFAULT_PROVIDERS
+from app.config import EMBEDDING_DIMENSIONS
+from app.config import EMBEDDING_MODEL
 from app.config import PROVIDERS
 from app.config import TOP_K
 from app.definitions import format_definitions_for_context
 from app.definitions import format_definitions_for_output
 from app.definitions import get_definitions_retriever
-from app.embed import OllamaEmbeddingFunction
+from app.embed import OpenAIEmbeddingFunction
 from app.llm import LLMConnectionError
 from app.llm import get_llm
 from app.logging import get_logger
@@ -121,7 +124,7 @@ def query(
     )
 
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    embed_fn = OllamaEmbeddingFunction()
+    embed_fn = OpenAIEmbeddingFunction()
 
     all_documents: list[str] = []
     all_metadatas: list[dict[str, Any]] = []
@@ -137,7 +140,52 @@ def query(
                 name=collection_name,
                 embedding_function=embed_fn,  # type: ignore[arg-type]
             )
-        except ValueError:
+            # Verify embedding model and dimensions match (prevent mixed embeddings)
+            coll_meta = collection.metadata or {}
+            stored_model = coll_meta.get("embedding_model")
+            stored_dims = coll_meta.get("embedding_dimensions")
+
+            # Block if metadata is missing (legacy index) or mismatched
+            if not stored_model:
+                log.error(
+                    "embedding_metadata_missing",
+                    collection=collection_name,
+                    message="Legacy index without embedding metadata",
+                )
+                raise RuntimeError(
+                    f"Index '{collection_name}' is missing embedding metadata. "
+                    "This may be a legacy Ollama index. "
+                    "Re-ingest with 'rag ingest --provider <name> --force'."
+                )
+
+            if stored_model != EMBEDDING_MODEL:
+                log.error(
+                    "embedding_model_mismatch",
+                    collection=collection_name,
+                    stored=stored_model,
+                    current=EMBEDDING_MODEL,
+                )
+                raise RuntimeError(
+                    f"Embedding model mismatch: index uses '{stored_model}', "
+                    f"but current config uses '{EMBEDDING_MODEL}'. "
+                    "Re-ingest with 'rag ingest --provider <name> --force'."
+                )
+
+            if stored_dims and stored_dims != EMBEDDING_DIMENSIONS:
+                log.error(
+                    "embedding_dimensions_mismatch",
+                    collection=collection_name,
+                    stored=stored_dims,
+                    current=EMBEDDING_DIMENSIONS,
+                )
+                raise RuntimeError(
+                    f"Embedding dimensions mismatch: index uses {stored_dims}, "
+                    f"but current config uses {EMBEDDING_DIMENSIONS}. "
+                    "Re-ingest with 'rag ingest --provider <name> --force'."
+                )
+        except (NotFoundError, ValueError):
+            # NotFoundError: ChromaDB >= 1.4.1
+            # ValueError: ChromaDB < 1.4.1 (legacy compatibility)
             log.warning(
                 "collection_not_found", collection=collection_name, provider=provider
             )
