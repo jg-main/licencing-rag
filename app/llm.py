@@ -7,6 +7,8 @@ Single provider architecture: OpenAI only (no Ollama, no Claude).
 
 import os
 
+import httpx
+from openai import APITimeoutError
 from openai import OpenAI
 
 from app.config import LLM_MODEL
@@ -45,6 +47,7 @@ def generate(
     model: str = LLM_MODEL,
     max_tokens: int = 2048,
     temperature: float = 0.0,
+    timeout: float | None = None,
 ) -> str:
     """Generate a response using OpenAI GPT-4.1.
 
@@ -54,14 +57,15 @@ def generate(
         model: OpenAI model to use (default: gpt-4.1).
         max_tokens: Maximum tokens in response.
         temperature: Sampling temperature (0.0 for deterministic).
+        timeout: Request timeout in seconds (None for no timeout).
 
     Returns:
         Generated response text.
 
     Raises:
-        LLMConnectionError: If API call fails.
+        LLMConnectionError: If API call fails or times out.
     """
-    log.debug("llm_generate", model=model, prompt_length=len(prompt))
+    log.debug("llm_generate", model=model, prompt_length=len(prompt), timeout=timeout)
 
     try:
         client = get_openai_client()
@@ -73,6 +77,7 @@ def generate(
             ],
             max_tokens=max_tokens,
             temperature=temperature,
+            timeout=timeout,
         )
         content = response.choices[0].message.content
         if content is None:
@@ -81,6 +86,9 @@ def generate(
     except ValueError:
         # Re-raise ValueError (missing API key)
         raise
+    except (APITimeoutError, httpx.TimeoutException) as e:
+        log.error("llm_timeout", model=model, timeout=timeout)
+        raise LLMConnectionError(f"OpenAI API timeout after {timeout}s") from e
     except Exception as e:
         log.error("llm_generation_failed", model=model, error=str(e))
         raise LLMConnectionError(f"OpenAI API error: {e}") from e

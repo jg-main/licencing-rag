@@ -68,6 +68,7 @@ def cmd_query(args: argparse.Namespace) -> int:
     providers = args.provider if args.provider else None
     search_mode = getattr(args, "search_mode", "hybrid")
     debug = getattr(args, "debug", False)
+    enable_reranking = getattr(args, "enable_reranking", True)
 
     try:
         result = query(
@@ -75,6 +76,7 @@ def cmd_query(args: argparse.Namespace) -> int:
             providers=providers,
             top_k=args.top_k,
             search_mode=search_mode,
+            enable_reranking=enable_reranking,
             debug=debug,
         )
 
@@ -219,6 +221,13 @@ Examples:
         "--debug",
         action="store_true",
         help="Show debug information (e.g., query normalization details)",
+    )
+    query_parser.add_argument(
+        "--no-reranking",
+        dest="enable_reranking",
+        action="store_false",
+        default=True,
+        help="Disable LLM reranking (Phase 4 feature, enabled by default)",
     )
 
     # List command

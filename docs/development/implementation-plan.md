@@ -114,27 +114,31 @@ ______________________________________________________________________
 - [x] Ensure deduplication by chunk_id
 - [x] Log retrieval sources in debug mode
 
-### Phase 4: LLM Reranking
+### Phase 4: LLM Reranking ✅
 
 #### 4.1 Implementation
 
-- [ ] Create `app/rerank.py` module
-- [ ] Implement scoring prompt (0-3 relevance scale)
-- [ ] Implement `rerank_chunks()` function
-- [ ] Call GPT-4.1 for each candidate chunk
-- [ ] Sort by score, keep top 3-5
+- [x] Create `app/rerank.py` module
+- [x] Implement scoring prompt (0-3 relevance scale)
+- [x] Implement `rerank_chunks()` function
+- [x] Call GPT-4.1 for each candidate chunk
+- [x] Sort by score, keep top 3-5
 
 #### 4.2 Integration
 
-- [ ] Update `query.py` to call reranking after retrieval
-- [ ] Log scores in debug mode
-- [ ] Track dropped chunks with reasons
+- [x] Update `query.py` to call reranking after retrieval
+- [x] Log scores in debug mode
+- [x] Track dropped chunks with reasons
 
-#### 4.3 Optimization
+#### 4.3 Optimization & Production Hardening
 
-- [ ] Truncate chunk text to ~2000 chars for reranking
-- [ ] Consider parallel API calls for speed
-- [ ] Add timeout handling
+- [x] Truncate chunk text to ~2000 chars for reranking
+- [x] Parallel API calls with ThreadPoolExecutor (5 workers)
+- [x] Add timeout handling (30s per chunk, prevents pipeline hangs)
+- [x] Score-based threshold (keep chunks ≥2, max 10) for adaptive filtering
+- [x] Improved prompt (semantic understanding over keyword matching)
+- [x] **Single-token scoring (50% cost reduction)** - explanations optional, disabled by default
+- [x] **Config flag for debug mode** - RERANKING_INCLUDE_EXPLANATIONS for troubleshooting
 
 ### Phase 5: Context Budget Enforcement
 

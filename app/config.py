@@ -31,6 +31,16 @@ MAX_CHUNK_CHARS = 8000  # Increased for OpenAI's larger context window
 # Retrieval parameters
 TOP_K = 10  # Default chunks to retrieve (increased for better fee table coverage)
 
+# Reranking parameters (Phase 4)
+MAX_CHUNK_LENGTH_FOR_RERANKING = 2000  # Truncate chunks to this length for scoring
+MIN_RERANKING_SCORE = (
+    2  # Keep all chunks scoring >= this (2=RELEVANT, 3=HIGHLY RELEVANT)
+)
+MAX_CHUNKS_AFTER_RERANKING = 8  # Safety cap (balance: accuracy vs cost/context)
+RERANKING_TIMEOUT = 30  # Timeout in seconds per chunk scoring (prevents hangs)
+RERANKING_INCLUDE_EXPLANATIONS = False  # Include explanations (costs ~50% more tokens)
+RERANKING_ENABLED = True  # Enable LLM reranking by default
+
 # Provider configuration
 PROVIDERS: dict[str, dict[str, str]] = {
     "cme": {
