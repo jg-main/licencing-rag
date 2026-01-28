@@ -1,9 +1,9 @@
-# License Intelligence System - Local RAG
+# License Intelligence System - OpenAI RAG
 
-**Version:** 0.3\
-**Status:** Sprint 1-3 Mostly Complete, Sprint 4-5 In Development
+**Version:** 0.4\
+**Status:** OpenAI Migration (Phase 1 Complete) **Branch:** openai
 
-A local, private legal Q&A system that answers questions **exclusively** based on curated license agreements and exhibits from multiple market data providers. No training. No cloud (optional). No hallucinations (by design).
+A high-precision, clause-level Retrieval-Augmented Generation (RAG) system that answers questions **exclusively** based on curated license agreements and exhibits from market data providers. Single provider architecture using OpenAI for both embeddings and LLM.
 
 ## Table of Contents
 
@@ -30,13 +30,15 @@ This is **not** a general chatbot and **not** a trained LLM. It is a **retrieval
 - ✅ Explicitly refuses to answer when the documents are silent
 - ✅ Always provides **citations** (provider, document name, section, page)
 - ✅ Supports multiple data providers
-- ✅ Uses Claude API for answer generation (with Ollama fallback)
-- ✅ Uses local embeddings via Ollama (nomic-embed-text)
+- ✅ Uses OpenAI for embeddings (text-embedding-3-large, 3072 dimensions)
+- ✅ Uses OpenAI GPT-4.1 for answer generation
 - ✅ Supports hybrid search (vector + keyword with BM25 and RRF)
 - ✅ Auto-links defined terms to definitions
-- ⏳ Logs all queries for audit - **NOT IMPLEMENTED YET**
-- ⏳ Provides REST API for programmatic access - **NOT IMPLEMENTED YET**
-- ⏳ Deployable to AWS ECS/Fargate - **NOT IMPLEMENTED YET**
+- ⏳ Query normalization - **PHASE 2**
+- ⏳ LLM reranking - **PHASE 4**
+- ⏳ Confidence gating - **PHASE 6**
+- ⏳ REST API for programmatic access - **DEFERRED**
+- ⏳ Deployable to AWS EC2 - **DEFERRED**
 
 ### Supported Data Providers
 
@@ -48,13 +50,12 @@ This is **not** a general chatbot and **not** a trained LLM. It is a **retrieval
 
 **📋 [Data Sources Documentation](docs/data-sources.md)** — Track provider sources, update dates, and document retrieval information.
 
-### Supported LLM Providers
+### Model Stack (OpenAI Only)
 
-| Provider | Status     | Use Case                     |
-| -------- | ---------- | ---------------------------- |
-| Claude   | ✅ Active  | Primary (fast, high-quality) |
-| Ollama   | ✅ Active  | Fallback (local, private)    |
-| OpenAI   | ⏳ Planned | Alternative                  |
+| Purpose    | Model                    | Notes                         |
+| ---------- | ------------------------ | ----------------------------- |
+| Embeddings | `text-embedding-3-large` | 3072 dimensions               |
+| LLM        | `gpt-4.1`                | Answer generation + reranking |
 
 ______________________________________________________________________
 
@@ -182,8 +183,7 @@ ______________________________________________________________________
 
 - **Python 3.13+**
 - **[uv](https://docs.astral.sh/uv/)** - Fast Python package manager
-- **[Ollama](https://ollama.com/)** - For local embeddings (required) and optional LLM fallback
-- **Anthropic API Key** - For Claude API (recommended for production)
+- **OpenAI API Key** - Required for embeddings and LLM
 
 ### Installation
 
@@ -192,55 +192,41 @@ ______________________________________________________________________
 git clone <repo-url>
 cd licencing-rag
 
+# Switch to openai branch
+git checkout openai
+
 # Install dependencies with uv
 uv sync
 
 # Install CLI entry point (enables 'rag' command)
 pip install -e .
-
-# Pull embedding model (REQUIRED - used even with Claude API)
-ollama pull nomic-embed-text
 ```
 
-### Choose Your LLM Provider
-
-#### Option A: Claude API (Recommended) - Fast, High Quality
+### Configure OpenAI API
 
 ```bash
-# Get API key from https://console.anthropic.com/
-export ANTHROPIC_API_KEY="sk-ant-..."
-export LLM_PROVIDER="anthropic"
+# Get API key from https://platform.openai.com/api-keys
+export OPENAI_API_KEY="sk-..."
 
-# Run queries (uses Claude for answers, Ollama for embeddings)
+# Verify setup
 rag query "What are the CME fees?"
 ```
 
-**Cost:** ~$0.003 per query (~$9/month for 100 queries/day)
-
-#### Option B: Ollama (Free, Local) - Requires RAM
-
-```bash
-# Pull LLM model
-ollama pull llama3.2:3b   # For limited RAM (<8GB)
-ollama pull llama3.1:8b   # For 8GB+ RAM (better quality)
-
-# Run queries (default provider)
-export LLM_PROVIDER="ollama"  # optional, default is anthropic
-rag query "What are the CME fees?"
-```
-
-**Cost:** Free, but slower and requires local compute
+**Cost:** ~$0.03 per query (~$90/month for 100 queries/day)
 
 ### Basic Workflow
 
 ```bash
-# 1. Ingest documents
+# 1. Delete old indexes (incompatible with new embeddings)
+make clean-all
+
+# 2. Ingest documents with OpenAI embeddings
 rag ingest --provider cme
 
-# 2. Query the knowledge base
+# 3. Query the knowledge base
 rag query "What is a subscriber?"
 
-# 3. List indexed documents
+# 4. List indexed documents
 rag list --provider cme
 ```
 
@@ -540,44 +526,35 @@ ______________________________________________________________________
 
 ### Environment Variables
 
-| Variable            | Default        | Description                                         | Required        |
-| ------------------- | -------------- | --------------------------------------------------- | --------------- |
-| `LLM_PROVIDER`      | `anthropic`    | LLM provider: `ollama` or `anthropic`               | No              |
-| `ANTHROPIC_API_KEY` | -              | Claude API key                                      | If using Claude |
-| `RATE_LIMIT_RPM`    | `60`           | API rate limit (requests/min) - NOT IMPLEMENTED YET | No              |
-| `CHROMA_DIR`        | `index/chroma` | ChromaDB storage directory                          | No              |
+| Variable         | Default        | Description                | Required |
+| ---------------- | -------------- | -------------------------- | -------- |
+| `OPENAI_API_KEY` | -              | OpenAI API key             | Yes      |
+| `CHROMA_DIR`     | `index/chroma` | ChromaDB storage directory | No       |
 
 ### Configuration File
 
 Edit `app/config.py` for advanced settings:
 
 ```python
-# LLM Configuration
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")
-LLM_MODEL = "llama3.2:3b"  # Ollama model
-ANTHROPIC_MODEL = "claude-sonnet-4-20250514"  # Claude Sonnet 4 model
+# OpenAI Configuration (Single Provider)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Embedding Configuration
-EMBEDDING_MODEL = "nomic-embed-text"
-EMBEDDING_DIM = 768
+# Model Configuration
+EMBEDDING_MODEL = "text-embedding-3-large"  # 3072 dimensions
+EMBEDDING_DIMENSIONS = 3072
+LLM_MODEL = "gpt-4.1"  # For answer generation
 
 # Chunking Parameters
 CHUNK_SIZE = 500  # words
 CHUNK_OVERLAP = 100  # words
 MIN_CHUNK_SIZE = 100  # words
-MAX_CHUNK_CHARS = 6000  # characters
+MAX_CHUNK_CHARS = 8000  # characters
 
 # Retrieval Parameters
-TOP_K_VECTOR = 10  # Vector search results
-TOP_K_BM25 = 10    # BM25 search results
-FINAL_TOP_N = 5    # Final chunks after hybrid ranking
+TOP_K = 10  # Chunks to retrieve
 
-# Search Configuration (IMPLEMENTED - Sprint 3)
+# Search Configuration
 DEFAULT_SEARCH_MODE = "hybrid"  # vector, keyword, hybrid
-
-# Logging (NOT IMPLEMENTED YET - Sprint 3)
-QUERY_LOGGING_ENABLED = True
-LOG_ROTATION = "monthly"
 ```
 
 ______________________________________________________________________
