@@ -1,18 +1,18 @@
 [project]
 name = "licencing-rag"
-version = "0.2.0"
-description = "Local RAG system for license agreement analysis"
+version = "0.4.0"
+description = "OpenAI RAG system for license agreement analysis"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "anthropic>=0.76.0",
     "chromadb>=1.4.1",
-    "ollama>=0.6.1",
+    "openai>=1.0.0",
     "pymupdf>=1.26.7",
     "python-docx>=1.2.0",
     "rank-bm25>=0.2.2",
     "rich>=14.0.0",
     "structlog>=25.5.0",
+    "tiktoken>=0.9.0",
     "tqdm>=4.67.1",
 ]
 
