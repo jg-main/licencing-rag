@@ -1,5 +1,9 @@
 # app/config.py
-"""Configuration constants for the License Intelligence System."""
+"""Configuration constants for the License Intelligence System.
+
+This module defines all configuration for the OpenAI-based RAG system.
+Single provider architecture: OpenAI only (no Ollama, no Claude).
+"""
 
 import os
 from pathlib import Path
@@ -10,23 +14,19 @@ TEXT_DATA_DIR = Path("data/text")
 CHUNKS_DATA_DIR = Path("data/chunks")
 CHROMA_DIR = Path("index/chroma")
 
-# LLM Provider: "ollama" or "anthropic"
-# Default is anthropic (Claude API) per spec v0.3; set LLM_PROVIDER=ollama for local-only
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")
+# OpenAI API Configuration
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Model configuration (Ollama)
-LLM_MODEL = "llama3.2:8b"  # Use 8B for limited RAM; upgrade to 70b with more memory
-EMBED_MODEL = "nomic-embed-text"
-
-# Model configuration (Anthropic)
-ANTHROPIC_MODEL = "claude-sonnet-4-5-20250929"  # Latest Sonnet, active until Sep 2026+
+# OpenAI Model Configuration (Single Provider - Breaking Change from v0.3)
+EMBEDDING_MODEL = "text-embedding-3-large"  # 3072 dimensions
+EMBEDDING_DIMENSIONS = 3072  # text-embedding-3-large output dimensions
+LLM_MODEL = "gpt-4.1"  # For answer generation and reranking
 
 # Chunking parameters (spec: 500-800 words target, 100-150 overlap, 100 min)
-# Using lower values to stay within embedding model context limits
 CHUNK_SIZE = 500  # words (spec: 500-800)
 CHUNK_OVERLAP = 100  # words (spec: 100-150)
 MIN_CHUNK_SIZE = 100  # words (spec: 100)
-MAX_CHUNK_CHARS = 6000  # hard limit to prevent embedding overflow
+MAX_CHUNK_CHARS = 8000  # Increased for OpenAI's larger context window
 
 # Retrieval parameters
 TOP_K = 10  # Default chunks to retrieve (increased for better fee table coverage)
