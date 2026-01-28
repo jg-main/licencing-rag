@@ -112,7 +112,15 @@ def is_fee_table_content(text: str) -> bool:
 
     # Check for fee-related keywords with dollar amounts
     lower_text = text.lower()
-    fee_keywords = ["fee", "price", "rate", "monthly", "annually", "per device", "per user"]
+    fee_keywords = [
+        "fee",
+        "price",
+        "rate",
+        "monthly",
+        "annually",
+        "per device",
+        "per user",
+    ]
     has_fee_keyword = any(kw in lower_text for kw in fee_keywords)
 
     return has_fee_keyword and len(dollar_matches) >= 1
