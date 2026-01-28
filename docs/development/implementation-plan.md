@@ -72,29 +72,29 @@ ______________________________________________________________________
 - [x] All QA checks passing (formatting, linting, type checking)
 - [x] Document API key setup in README.md
 
-### Phase 2: Query Normalization
+### Phase 2: Query Normalization ✅
 
 #### 2.1 Implementation
 
-- [ ] Create `app/normalize.py` module
-- [ ] Implement `normalize_query()` function
-- [ ] Strip leading phrases ("what is", "can you", etc.)
-- [ ] Remove filler words (the, a, an, is, etc.)
-- [ ] Preserve nouns and legal terms
-- [ ] Add comprehensive test cases
+- [x] Create `app/normalize.py` module
+- [x] Implement `normalize_query()` function
+- [x] Strip leading phrases ("what is", "can you", etc.)
+- [x] Remove filler words (the, a, an, is, etc.)
+- [x] Preserve nouns and legal terms
+- [x] Add comprehensive test cases
 
 #### 2.2 Integration
 
-- [ ] Update `query.py` to normalize before embedding
-- [ ] Update `query.py` to normalize before BM25
-- [ ] Log original vs normalized query
-- [ ] Add `--debug` flag to show normalization
+- [x] Update `query.py` to normalize before embedding
+- [x] Update `query.py` to normalize before BM25
+- [x] Log original vs normalized query
+- [x] Add `--debug` flag to show normalization
 
 #### 2.3 Verification
 
-- [ ] Test: "What is the fee schedule?" → "fee schedule"
-- [ ] Test: Normalized query retrieves same top chunks as keyword query
-- [ ] Verify fee schedules, exhibits, tables are retrievable
+- [x] Test: "What is the fee schedule?" → "fee schedule"
+- [x] Test: Normalized query retrieves same top chunks as keyword query
+- [x] Verify fee schedules, exhibits, tables are retrievable
 
 ### Phase 3: Hybrid Retrieval (Mandatory)
 

@@ -20,6 +20,7 @@ from app.embed import OpenAIEmbeddingFunction
 from app.llm import LLMConnectionError
 from app.llm import get_llm
 from app.logging import get_logger
+from app.normalize import normalize_query
 from app.prompts import QA_PROMPT
 from app.prompts import QA_PROMPT_NO_DEFINITIONS
 from app.prompts import SYSTEM_PROMPT
@@ -70,6 +71,7 @@ def query(
     top_k: int = TOP_K,
     search_mode: str = "hybrid",
     include_definitions: bool = True,
+    debug: bool = False,
 ) -> dict:
     """Query the knowledge base.
 
@@ -79,6 +81,7 @@ def query(
         top_k: Number of chunks to retrieve per provider.
         search_mode: Search mode - "vector", "keyword", or "hybrid" (default).
         include_definitions: If True, auto-link definitions for terms in context.
+        debug: If True, include normalization details in response.
 
     Returns:
         Dictionary with answer, context, citations, definitions, and metadata including:
@@ -115,9 +118,22 @@ def query(
         log.error("no_index_found", path=str(CHROMA_DIR))
         raise RuntimeError("No index found. Run 'rag ingest --provider <name>' first.")
 
+    # Normalize query for improved retrieval
+    normalized_question = normalize_query(question)
+
+    # Fall back to original if normalization produces empty string
+    if not normalized_question:
+        log.warning(
+            "normalization_empty",
+            original=question,
+            message="Normalization produced empty query, using original",
+        )
+        normalized_question = question
+
     log.info(
         "query_started",
         question=question[:100],
+        normalized=normalized_question[:100],
         providers=providers,
         top_k=top_k,
         search_mode=search_mode,
@@ -207,8 +223,11 @@ def query(
                 effective_mode = SearchMode.VECTOR
 
         # Use hybrid searcher for all search modes
+        # Use normalized query for better retrieval
         searcher = HybridSearcher(provider, collection, bm25_index)
-        search_results = searcher.search(question, mode=effective_mode, top_k=top_k)
+        search_results = searcher.search(
+            normalized_question, mode=effective_mode, top_k=top_k
+        )
 
         # Track the actual mode used
         actual_modes_used.add(effective_mode.value)
@@ -332,7 +351,7 @@ def query(
         format_definitions_for_output(definitions_dict) if definitions_dict else []
     )
 
-    return {
+    response = {
         "answer": answer,
         "context": context,
         "citations": citations,
@@ -342,6 +361,17 @@ def query(
         "search_mode": search_mode,
         "effective_search_mode": effective_search_mode,
     }
+
+    # Add debug information if requested
+    if debug:
+        response["debug"] = {
+            "original_query": question,
+            "normalized_query": normalized_question,
+            "normalization_applied": question.lower().strip()
+            != normalized_question.lower().strip(),
+        }
+
+    return response
 
 
 def print_response(result: dict) -> None:

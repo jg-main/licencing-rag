@@ -67,6 +67,7 @@ def cmd_query(args: argparse.Namespace) -> int:
 
     providers = args.provider if args.provider else None
     search_mode = getattr(args, "search_mode", "hybrid")
+    debug = getattr(args, "debug", False)
 
     try:
         result = query(
@@ -74,6 +75,7 @@ def cmd_query(args: argparse.Namespace) -> int:
             providers=providers,
             top_k=args.top_k,
             search_mode=search_mode,
+            debug=debug,
         )
 
         # Select output format
