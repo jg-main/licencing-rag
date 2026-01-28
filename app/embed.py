@@ -64,6 +64,26 @@ class OpenAIEmbeddingFunction(EmbeddingFunction):  # type: ignore[type-arg]
         # Use cl100k_base tokenizer (same as text-embedding-3-* models)
         self._tokenizer = tiktoken.get_encoding("cl100k_base")
 
+    @staticmethod
+    def name() -> str:
+        """Return the name of the embedding function for ChromaDB compatibility."""
+        return EMBEDDING_MODEL
+
+    def get_config(self) -> dict[str, Any]:
+        """Return the configuration for ChromaDB compatibility."""
+        return {
+            "model": self.model,
+            "dimensions": self.dimensions,
+        }
+
+    @staticmethod
+    def build_from_config(config: dict[str, Any]) -> "OpenAIEmbeddingFunction":
+        """Build an instance from configuration for ChromaDB compatibility."""
+        return OpenAIEmbeddingFunction(
+            model=config.get("model", EMBEDDING_MODEL),
+            dimensions=config.get("dimensions", EMBEDDING_DIMENSIONS),
+        )
+
     def _count_tokens(self, text: str) -> int:
         """Count tokens in a text string."""
         return len(self._tokenizer.encode(text))
