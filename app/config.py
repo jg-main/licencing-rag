@@ -13,6 +13,18 @@ RAW_DATA_DIR = Path("data/raw")
 TEXT_DATA_DIR = Path("data/text")
 CHUNKS_DATA_DIR = Path("data/chunks")
 CHROMA_DIR = Path("index/chroma")
+LOGS_DIR = Path("logs")
+
+# Debug logging configuration (Phase 8.1)
+DEBUG_LOG_ENABLED = True  # Write debug output to log files
+DEBUG_LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB per log file
+DEBUG_LOG_BACKUP_COUNT = 5  # Keep 5 rotated log files
+DEBUG_LOG_FILE = LOGS_DIR / "debug.jsonl"  # JSON Lines format for easy parsing
+
+# Query/Response Audit Logging (Phase 8.2 - always-on for compliance)
+AUDIT_LOG_FILE = LOGS_DIR / "queries.jsonl"
+AUDIT_LOG_MAX_BYTES = 50 * 1024 * 1024  # 50MB per log file
+AUDIT_LOG_BACKUP_COUNT = 10  # Keep 10 old files (500MB total)
 
 # OpenAI API Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

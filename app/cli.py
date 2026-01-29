@@ -71,6 +71,7 @@ def cmd_query(args: argparse.Namespace) -> int:
     enable_reranking = getattr(args, "enable_reranking", True)
     enable_budget = getattr(args, "enable_budget", True)
     enable_confidence_gate = getattr(args, "enable_confidence_gate", True)
+    log_to_console = getattr(args, "log_queries", False)
 
     try:
         result = query(
@@ -82,6 +83,7 @@ def cmd_query(args: argparse.Namespace) -> int:
             enable_budget=enable_budget,
             enable_confidence_gate=enable_confidence_gate,
             debug=debug,
+            log_to_console=log_to_console,
         )
 
         # Select output format
@@ -233,21 +235,26 @@ Examples:
         dest="enable_reranking",
         action="store_false",
         default=True,
-        help="Disable LLM reranking (Phase 4 feature, enabled by default)",
+        help="Disable LLM reranking (enabled by default)",
     )
     query_parser.add_argument(
         "--no-budget",
         dest="enable_budget",
         action="store_false",
         default=True,
-        help="Disable context budget enforcement (Phase 5 feature, enabled by default)",
+        help="Disable context budget enforcement (enabled by default)",
     )
     query_parser.add_argument(
         "--no-gate",
         dest="enable_confidence_gate",
         action="store_false",
         default=True,
-        help="Disable confidence gating (Phase 6 feature, enabled by default)",
+        help="Disable confidence gating (enabled by default)",
+    )
+    query_parser.add_argument(
+        "--log-queries",
+        action="store_true",
+        help="Write audit log to console (stderr) in addition to file",
     )
 
     # List command

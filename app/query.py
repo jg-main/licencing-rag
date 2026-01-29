@@ -18,6 +18,9 @@ from app.config import RELEVANCE_THRESHOLD
 from app.config import RERANKING_ENABLED
 from app.config import SOURCES
 from app.config import TOP_K
+from app.debug import build_debug_output
+from app.debug import format_retrieval_info
+from app.debug import write_debug_output
 from app.definitions import format_definitions_for_context
 from app.definitions import format_definitions_for_output
 from app.definitions import get_definitions_retriever
@@ -85,6 +88,7 @@ def query(
     enable_budget: bool = CONTEXT_BUDGET_ENABLED,
     enable_confidence_gate: bool = CONFIDENCE_GATE_ENABLED,
     debug: bool = False,
+    log_to_console: bool = False,
 ) -> dict:
     """Query the knowledge base.
 
@@ -98,6 +102,7 @@ def query(
         enable_budget: If True, enforce token budget on context (Phase 5).
         enable_confidence_gate: If True, refuse on low confidence (Phase 6).
         debug: If True, include normalization details in response.
+        log_to_console: If True, write audit log to console (stderr).
 
     Returns:
         Dictionary with answer, context, citations, definitions, and metadata including:
@@ -109,6 +114,10 @@ def query(
         RuntimeError: If no collections are available.
         ValueError: If invalid source or search mode.
     """
+    import time
+
+    start_time = time.time()  # Track query latency for audit logging
+
     if sources is None or len(sources) == 0:
         sources = DEFAULT_SOURCES
 
@@ -254,7 +263,8 @@ def query(
                 "text": result.text,
                 "metadata": result.metadata,
                 "score": result.score,
-                "source": result.source,
+                "source": source,  # Provider source (cme, opra, etc.)
+                "method": result.source,  # Search method (vector, keyword, hybrid)
             }
             all_search_results.append(search_result_dict)
 
@@ -282,14 +292,48 @@ def query(
             "effective_search_mode": effective_search_mode,
         }
         if debug:
-            response["debug"] = {
-                "original_query": question,
-                "normalized_query": normalized_question,
-                "normalization_applied": question.lower().strip()
-                != normalized_question.lower().strip(),
-                "normalization_failed": normalization_failed,
-                "retrieval_sources": {},
-            }
+            # Use format_retrieval_info for rich debug output with scores/ranks
+            retrieval_info = format_retrieval_info(all_search_results, sources)
+
+            debug_dict = build_debug_output(
+                original_query=question,
+                normalized_query=normalized_question,
+                normalization_applied=(
+                    question.lower().strip() != normalized_question.lower().strip()
+                ),
+                normalization_failed=normalization_failed,
+                sources=sources,
+                search_mode=search_mode,
+                effective_search_mode=effective_search_mode,
+                retrieval_info=retrieval_info,
+                final_chunks_count=0,
+                final_context_tokens=0,
+                definitions_count=0,
+                llm_called=False,
+            )
+            response["debug"] = debug_dict
+
+            # Always write debug output (stderr always, file if DEBUG_LOG_ENABLED=True)
+            write_debug_output(debug_dict, write_to_stderr=True)
+
+        # Audit logging (always-on for compliance)
+        from app.audit import calculate_latency_ms
+        from app.audit import log_query_response
+
+        log_query_response(
+            query=question,
+            answer=str(response["answer"]),
+            sources=sources,
+            chunks_retrieved=0,
+            chunks_used=0,
+            tokens_input=0,
+            tokens_output=0,
+            latency_ms=calculate_latency_ms(start_time),
+            refused=True,
+            refusal_reason="no_chunks_retrieved",
+            write_to_console=log_to_console,
+        )
+
         return response
 
     log.debug("chunks_retrieved", count=len(all_search_results))
@@ -447,7 +491,7 @@ def query(
 
         # Build chunk objects for gating (need relevance scores)
         gate_chunks = []
-        for i, (doc, meta) in enumerate(zip(all_documents, all_metadatas)):
+        for _i, (_doc, meta) in enumerate(zip(all_documents, all_metadatas)):
             # Create a simple object with relevance_score
             class ChunkForGating:
                 def __init__(self, score: float):
@@ -506,16 +550,50 @@ def query(
             }
 
             if debug:
-                debug_dict: dict[str, Any] = {}
-                if normalization_failed:
-                    debug_dict["normalization_failed"] = True
-                    debug_dict["original_query"] = question
-                debug_dict["normalized_query"] = normalized_question
-                if rerank_info:
-                    debug_dict["reranking"] = rerank_info
-                if gate_info:
-                    debug_dict["confidence_gate"] = gate_info
+                retrieval_info = format_retrieval_info(all_search_results, sources)
+
+                # Build comprehensive debug for confidence gate refusal
+                debug_dict = build_debug_output(
+                    original_query=question,
+                    normalized_query=normalized_question,
+                    normalization_applied=(
+                        question.lower().strip() != normalized_question.lower().strip()
+                    ),
+                    normalization_failed=normalization_failed,
+                    sources=sources,
+                    search_mode=search_mode,
+                    effective_search_mode=effective_search_mode,
+                    retrieval_info=retrieval_info,
+                    reranking_info=rerank_info if rerank_info else None,
+                    confidence_gate_info=gate_info,
+                    final_chunks_count=len(all_documents),
+                    final_context_tokens=0,  # No context built if refused
+                    definitions_count=0,
+                    llm_called=False,
+                    validation_info={"refusal": True, "reason": refusal_reason},
+                )
                 response["debug"] = debug_dict
+
+                # Always write debug output when debug=True (stderr always, file if enabled)
+                write_debug_output(debug_dict, write_to_stderr=True)
+
+            # Audit logging (always-on for compliance)
+            from app.audit import calculate_latency_ms
+            from app.audit import log_query_response
+
+            log_query_response(
+                query=question,
+                answer=str(response["answer"]),
+                sources=sources,
+                chunks_retrieved=len(all_documents),
+                chunks_used=0,
+                tokens_input=0,
+                tokens_output=0,
+                latency_ms=calculate_latency_ms(start_time),
+                refused=True,
+                refusal_reason=refusal_reason,
+                write_to_console=log_to_console,
+            )
 
             return response
 
@@ -901,18 +979,57 @@ def query(
         }
 
         if debug:
-            post_budget_debug: dict[str, Any] = {}
-            if normalization_failed:
-                post_budget_debug["normalization_failed"] = True
-                post_budget_debug["original_query"] = question
-            post_budget_debug["normalized_query"] = normalized_question
-            if rerank_info:
-                post_budget_debug["reranking"] = rerank_info
-            if gate_info:
-                post_budget_debug["confidence_gate"] = gate_info
-            if budget_info:
-                post_budget_debug["budget"] = budget_info
-            response["debug"] = post_budget_debug
+            from app.budget import count_tokens
+
+            # Build comprehensive debug for refusal case
+            # Use format_retrieval_info for rich debug output with scores/ranks
+            retrieval_info = format_retrieval_info(all_search_results, sources)
+
+            debug_dict = build_debug_output(
+                original_query=question,
+                normalized_query=normalized_question,
+                normalization_applied=(
+                    question.lower().strip() != normalized_question.lower().strip()
+                ),
+                normalization_failed=normalization_failed,
+                sources=sources,
+                search_mode=search_mode,
+                effective_search_mode=effective_search_mode,
+                retrieval_info=retrieval_info,
+                reranking_info=rerank_info if rerank_info else None,
+                budget_info=budget_info if budget_info else None,
+                confidence_gate_info=gate_info if gate_info else None,
+                final_chunks_count=0,
+                final_context_tokens=0,
+                definitions_count=0,
+                llm_called=False,
+                validation_info={
+                    "refusal": True,
+                    "reason": "empty_context_after_budget",
+                },
+            )
+            response["debug"] = debug_dict
+
+            # Always write debug output (stderr always, file if DEBUG_LOG_ENABLED=True)
+            write_debug_output(debug_dict, write_to_stderr=True)
+
+        # Audit logging (always-on for compliance)
+        from app.audit import calculate_latency_ms
+        from app.audit import log_query_response
+
+        log_query_response(
+            query=question,
+            answer=str(response["answer"]),
+            sources=sources,
+            chunks_retrieved=budget_info.get("original_count", 0),
+            chunks_used=0,
+            tokens_input=0,
+            tokens_output=0,
+            latency_ms=calculate_latency_ms(start_time),
+            refused=True,
+            refusal_reason="empty_context_after_budget",
+            write_to_console=log_to_console,
+        )
 
         return response
 
@@ -1035,23 +1152,69 @@ The system could not generate a properly formatted response. Please try rephrasi
 
     # Add debug information if requested
     if debug:
-        debug_dict = {
-            "original_query": question,
-            "normalized_query": normalized_question,
-            "normalization_applied": question.lower().strip()
-            != normalized_question.lower().strip(),
-            "normalization_failed": normalization_failed,
-        }
-        # Add reranking info if available
-        if rerank_info:
-            debug_dict["reranking"] = rerank_info
-        # Add confidence gate info if available
-        if gate_info:
-            debug_dict["confidence_gate"] = gate_info
-        # Add budget info if available
-        if budget_info:
-            debug_dict["budget"] = budget_info
+        from app.budget import count_tokens
+
+        # Count final context tokens
+        final_context_tokens = count_tokens(context) if context else 0
+
+        # Format retrieval info with scores and ranks
+        retrieval_info = format_retrieval_info(all_search_results, sources)
+
+        # Build comprehensive debug output using Phase 8 module
+        debug_dict = build_debug_output(
+            original_query=question,
+            normalized_query=normalized_question,
+            normalization_applied=(
+                question.lower().strip() != normalized_question.lower().strip()
+            ),
+            normalization_failed=normalization_failed,
+            sources=sources,
+            search_mode=search_mode,
+            effective_search_mode=effective_search_mode,
+            retrieval_info=retrieval_info,
+            reranking_info=rerank_info if rerank_info else None,
+            budget_info=budget_info if budget_info else None,
+            confidence_gate_info=gate_info if gate_info else None,
+            final_chunks_count=len(all_documents),
+            final_context_tokens=final_context_tokens,
+            definitions_count=len(definitions_output),
+            llm_called=True,  # We always call LLM if we reach this point
+            validation_info={
+                "validation_enabled": True,
+                "answer_length": len(answer),
+            }
+            if answer
+            else None,
+        )
         response["debug"] = debug_dict
+
+        # Always write debug output when debug=True (stderr always, file if enabled)
+        write_debug_output(debug_dict, write_to_stderr=True)
+
+    # Audit logging (always-on for compliance)
+    from app.audit import calculate_latency_ms
+    from app.audit import log_query_response
+    from app.budget import count_tokens
+
+    # Count tokens for audit (prompt + completion)
+    tokens_input = count_tokens(prompt) if "prompt" in locals() else 0
+    tokens_output = count_tokens(answer) if answer else 0
+
+    log_query_response(
+        query=question,
+        answer=answer,
+        sources=sources,
+        chunks_retrieved=len(all_search_results)
+        if "all_search_results" in locals()
+        else 0,
+        chunks_used=len(all_documents),
+        tokens_input=tokens_input,
+        tokens_output=tokens_output,
+        latency_ms=calculate_latency_ms(start_time),
+        refused=False,
+        refusal_reason=None,
+        write_to_console=log_to_console,
+    )
 
     return response
 
