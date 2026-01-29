@@ -8,17 +8,22 @@ import chromadb
 from chromadb.errors import NotFoundError
 
 from app.config import CHROMA_DIR
+from app.config import CONFIDENCE_GATE_ENABLED
 from app.config import CONTEXT_BUDGET_ENABLED
 from app.config import DEFAULT_PROVIDERS
 from app.config import EMBEDDING_DIMENSIONS
 from app.config import EMBEDDING_MODEL
+from app.config import MIN_CHUNKS_REQUIRED
 from app.config import PROVIDERS
+from app.config import RELEVANCE_THRESHOLD
 from app.config import RERANKING_ENABLED
 from app.config import TOP_K
 from app.definitions import format_definitions_for_context
 from app.definitions import format_definitions_for_output
 from app.definitions import get_definitions_retriever
 from app.embed import OpenAIEmbeddingFunction
+from app.gate import get_refusal_reason_message
+from app.gate import should_refuse
 from app.llm import LLMConnectionError
 from app.llm import get_llm
 from app.logging import get_logger
@@ -76,6 +81,7 @@ def query(
     include_definitions: bool = True,
     enable_reranking: bool = RERANKING_ENABLED,
     enable_budget: bool = CONTEXT_BUDGET_ENABLED,
+    enable_confidence_gate: bool = CONFIDENCE_GATE_ENABLED,
     debug: bool = False,
 ) -> dict:
     """Query the knowledge base.
@@ -88,6 +94,7 @@ def query(
         include_definitions: If True, auto-link definitions for terms in context.
         enable_reranking: If True, use LLM to rerank chunks (Phase 4).
         enable_budget: If True, enforce token budget on context (Phase 5).
+        enable_confidence_gate: If True, refuse on low confidence (Phase 6).
         debug: If True, include normalization details in response.
 
     Returns:
@@ -291,6 +298,7 @@ def query(
     rerank_info: dict[str, Any] = {}
     kept_chunks: list[Any] = []  # Initialize to avoid unbound variable
     dropped_chunks: list[Any] = []  # Initialize to avoid unbound variable
+    fallback_triggered = False  # Track if reranking fallback was used
 
     if enable_reranking:
         log.info("reranking_started", chunk_count=len(all_search_results))
@@ -325,6 +333,9 @@ def query(
                 all_metadatas[i]["_relevance_score"] = fallback_result["score"]
                 all_metadatas[i]["_retrieval_source"] = fallback_result["source"]
 
+            # Mark fallback as triggered (scores are retrieval, not reranked)
+            fallback_triggered = True
+
             # Track fallback in debug info (only if debug mode is on)
             if debug:
                 rerank_info = {
@@ -357,6 +368,9 @@ def query(
             for i, chunk in enumerate(kept_chunks):
                 all_metadatas[i]["_relevance_score"] = chunk.relevance_score
                 all_metadatas[i]["_retrieval_source"] = chunk.source
+
+            # No fallback - using reranked scores
+            fallback_triggered = False
 
             # Track reranking info for debug mode (only if not fallback)
             if debug:
@@ -418,6 +432,96 @@ def query(
                 all_metadatas[i]["_retrieval_source"] = search_result["source"]
 
         rerank_info = {"enabled": False}
+
+    # Compute scores_are_reranked flag once (accuracy-first, explicit)
+    # True only if: reranking enabled AND produced chunks AND no fallback occurred
+    scores_are_reranked = (
+        enable_reranking and bool(kept_chunks) and not fallback_triggered
+    )
+
+    # Phase 6: Confidence Gating (apply after reranking, before budget/LLM)
+    gate_info: dict[str, Any] = {}
+    if enable_confidence_gate:
+        from app.config import RETRIEVAL_MIN_RATIO
+        from app.config import RETRIEVAL_MIN_SCORE
+
+        # Build chunk objects for gating (need relevance scores)
+        gate_chunks = []
+        for i, (doc, meta) in enumerate(zip(all_documents, all_metadatas)):
+            # Create a simple object with relevance_score
+            class ChunkForGating:
+                def __init__(self, score: float):
+                    self.relevance_score = score
+
+            score = meta.get("_relevance_score", 0)
+            gate_chunks.append(ChunkForGating(score))
+
+        refuse, refusal_reason = should_refuse(
+            gate_chunks,
+            scores_are_reranked=scores_are_reranked,
+            relevance_threshold=RELEVANCE_THRESHOLD,
+            min_chunks=MIN_CHUNKS_REQUIRED,
+            retrieval_min_score=RETRIEVAL_MIN_SCORE,
+            retrieval_min_ratio=RETRIEVAL_MIN_RATIO,
+        )
+
+        gate_info = {
+            "enabled": True,
+            "scores_are_reranked": scores_are_reranked,
+            "threshold": RELEVANCE_THRESHOLD if scores_are_reranked else None,
+            "min_chunks_required": MIN_CHUNKS_REQUIRED if scores_are_reranked else None,
+            "retrieval_min_score": RETRIEVAL_MIN_SCORE
+            if not scores_are_reranked
+            else None,
+            "retrieval_min_ratio": RETRIEVAL_MIN_RATIO
+            if not scores_are_reranked
+            else None,
+            "refused": refuse,
+            "refusal_reason": refusal_reason,
+        }
+
+        if refuse:
+            # Code-enforced refusal - skip LLM call entirely
+            log.warning(
+                "confidence_gate_refused",
+                reason=refusal_reason,
+                chunk_count=len(gate_chunks),
+            )
+
+            refusal_message = get_refusal_message(providers)
+            reason_detail = get_refusal_reason_message(refusal_reason)
+
+            response = {
+                "answer": refusal_message,
+                "context": "",
+                "citations": [],
+                "definitions": [],
+                "chunks_retrieved": len(all_documents),
+                "providers": providers,
+                "search_mode": search_mode,
+                "effective_search_mode": effective_search_mode,
+                "refused": True,
+                "refusal_reason": refusal_reason,
+                "refusal_detail": reason_detail,
+            }
+
+            if debug:
+                debug_dict: dict[str, Any] = {}
+                if normalization_failed:
+                    debug_dict["normalization_failed"] = True
+                    debug_dict["original_query"] = question
+                debug_dict["normalized_query"] = normalized_question
+                if rerank_info:
+                    debug_dict["reranking"] = rerank_info
+                if gate_info:
+                    debug_dict["confidence_gate"] = gate_info
+                response["debug"] = debug_dict
+
+            return response
+
+        log.info("confidence_gate_passed", chunk_count=len(gate_chunks))
+    else:
+        gate_info = {"enabled": False}
 
     # Phase 5: Full-Prompt Budget Enforcement (apply after reranking)
     budget_info: dict[str, Any] = {}
@@ -590,12 +694,94 @@ def query(
                                     log.debug(
                                         "definitions_recomputed_after_drops",
                                         original_terms=original_definitions_count,
-                                        final_terms=len(final_definitions_dict),
+                                        final_terms=len(definitions_dict),
                                     )
+
+                                    # Re-enforce budget after definitions recomputation for audit accuracy
+                                    _, budget_info_after_recompute = (
+                                        enforce_full_prompt_budget(
+                                            chunks=list(
+                                                zip(all_documents, all_metadatas)
+                                            ),
+                                            system_prompt=SYSTEM_PROMPT,
+                                            question=question,
+                                            definitions_context=definitions_context,
+                                            provider_label=provider_label,
+                                            max_tokens=MAX_CONTEXT_TOKENS,
+                                        )
+                                    )
+                                    budget_info = budget_info_after_recompute
+
+                                    # Try to re-add dropped chunks if definitions shrunk
+                                    if (
+                                        len(definitions_dict)
+                                        < original_definitions_count
+                                    ):
+                                        tokens_freed = original_definitions_count - len(
+                                            definitions_dict
+                                        )
+                                        if tokens_freed > 0:
+                                            # Attempt to re-add chunks that were dropped
+                                            chunks_to_try = chunks_with_metadata[
+                                                len(all_documents) :
+                                            ]
+                                            if chunks_to_try:
+                                                expanded_chunks = (
+                                                    list(
+                                                        zip(
+                                                            all_documents, all_metadatas
+                                                        )
+                                                    )
+                                                    + chunks_to_try
+                                                )
+                                                kept_expanded, budget_expanded = (
+                                                    enforce_full_prompt_budget(
+                                                        chunks=expanded_chunks,
+                                                        system_prompt=SYSTEM_PROMPT,
+                                                        question=question,
+                                                        definitions_context=definitions_context,
+                                                        provider_label=provider_label,
+                                                        max_tokens=MAX_CONTEXT_TOKENS,
+                                                    )
+                                                )
+                                                chunks_readded = len(
+                                                    kept_expanded
+                                                ) - len(all_documents)
+                                                if chunks_readded > 0:
+                                                    all_documents = [
+                                                        chunk[0]
+                                                        for chunk in kept_expanded
+                                                    ]
+                                                    all_metadatas = [
+                                                        chunk[1]
+                                                        for chunk in kept_expanded
+                                                    ]
+                                                    context = format_context(
+                                                        all_documents, all_metadatas
+                                                    )
+                                                    budget_info = budget_expanded
+                                                    log.info(
+                                                        "chunks_readded_after_definitions_shrink",
+                                                        chunks_readded=chunks_readded,
+                                                        definitions_shrink=tokens_freed,
+                                                        total_tokens=budget_expanded[
+                                                            "total_tokens"
+                                                        ],
+                                                    )
                                 else:
                                     # No definitions in final context
                                     definitions_dict = {}
                                     definitions_context = ""
+                                    # Update budget_info to reflect no definitions
+                                    _, budget_info_no_defs = enforce_full_prompt_budget(
+                                        chunks=list(zip(all_documents, all_metadatas)),
+                                        system_prompt=SYSTEM_PROMPT,
+                                        question=question,
+                                        definitions_context="",
+                                        provider_label=provider_label,
+                                        max_tokens=MAX_CONTEXT_TOKENS,
+                                    )
+                                    budget_info = budget_info_no_defs
                             except Exception as e:
                                 log.warning(
                                     "definitions_recompute_failed", error=str(e)
@@ -688,6 +874,48 @@ def query(
         except Exception as e:
             log.warning("definitions_retrieval_failed", error=str(e))
 
+    # Post-budget check: Refuse if no context remains after budget enforcement
+    # This prevents answering with empty context (budget can drop all chunks)
+    if len(all_documents) == 0:
+        log.error(
+            "empty_context_after_budget",
+            budget_enabled=enable_budget,
+            original_chunks=budget_info.get("original_count", 0),
+        )
+
+        refusal_message = get_refusal_message(providers)
+        reason_detail = get_refusal_reason_message("empty_context_after_budget")
+
+        response = {
+            "answer": refusal_message,
+            "context": "",
+            "citations": [],
+            "definitions": [],
+            "chunks_retrieved": budget_info.get("original_count", 0),
+            "providers": providers,
+            "search_mode": search_mode,
+            "effective_search_mode": effective_search_mode,
+            "refused": True,
+            "refusal_reason": "empty_context_after_budget",
+            "refusal_detail": reason_detail,
+        }
+
+        if debug:
+            post_budget_debug: dict[str, Any] = {}
+            if normalization_failed:
+                post_budget_debug["normalization_failed"] = True
+                post_budget_debug["original_query"] = question
+            post_budget_debug["normalized_query"] = normalized_question
+            if rerank_info:
+                post_budget_debug["reranking"] = rerank_info
+            if gate_info:
+                post_budget_debug["confidence_gate"] = gate_info
+            if budget_info:
+                post_budget_debug["budget"] = budget_info
+            response["debug"] = post_budget_debug
+
+        return response
+
     # Build final prompt (provider label already set during budget enforcement)
     provider_label = ", ".join(p.upper() for p in providers)
 
@@ -775,6 +1003,9 @@ def query(
         # Add reranking info if available
         if rerank_info:
             debug_dict["reranking"] = rerank_info
+        # Add confidence gate info if available
+        if gate_info:
+            debug_dict["confidence_gate"] = gate_info
         # Add budget info if available
         if budget_info:
             debug_dict["budget"] = budget_info
