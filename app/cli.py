@@ -270,7 +270,7 @@ Examples:
 
     if args.command == "ingest":
         return cmd_ingest(args)
-    elif args.command == "query":
+    elif args.command in ("query", "ask"):
         return cmd_query(args)
     elif args.command == "list":
         return cmd_list(args)
