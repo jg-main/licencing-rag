@@ -238,7 +238,7 @@ class TestStricterSystemPrompt:
     def test_adds_warning_banner(self):
         """Stricter prompt should add validation warning banner."""
         original = "You are a legal assistant."
-        stricter = get_stricter_system_prompt(original)
+        stricter = get_stricter_system_prompt(original, ["cme"])
 
         assert "CRITICAL VALIDATION WARNING" in stricter
         assert "previous response failed" in stricter
@@ -247,14 +247,14 @@ class TestStricterSystemPrompt:
     def test_preserves_original_prompt(self):
         """Stricter prompt should preserve original content."""
         original = "You are a legal assistant specializing in market data."
-        stricter = get_stricter_system_prompt(original)
+        stricter = get_stricter_system_prompt(original, ["cme"])
 
         assert original in stricter
 
     def test_mentions_required_sections(self):
         """Stricter prompt should remind about required sections."""
         original = "You are a legal assistant."
-        stricter = get_stricter_system_prompt(original)
+        stricter = get_stricter_system_prompt(original, ["cme"])
 
         assert "## Answer" in stricter
         assert "## Supporting Clauses" in stricter
@@ -263,9 +263,24 @@ class TestStricterSystemPrompt:
     def test_mentions_page_numbers(self):
         """Stricter prompt should remind about page numbers."""
         original = "You are a legal assistant."
-        stricter = get_stricter_system_prompt(original)
+        stricter = get_stricter_system_prompt(original, ["cme"])
 
         assert "page number" in stricter.lower()
+
+    def test_includes_source_in_refusal_example(self):
+        """Stricter prompt should include source name in refusal example."""
+        original = "You are a legal assistant."
+        stricter = get_stricter_system_prompt(original, ["cme"])
+
+        assert "CME" in stricter
+        assert "This is not addressed in the provided CME documents" in stricter
+
+    def test_multiple_sources_in_refusal_example(self):
+        """Stricter prompt should handle multiple sources."""
+        original = "You are a legal assistant."
+        stricter = get_stricter_system_prompt(original, ["cme", "opra"])
+
+        assert "CME, OPRA" in stricter
 
 
 class TestValidationResult:

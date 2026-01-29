@@ -21,9 +21,9 @@ class TestPrompts:
         assert "## Citations" in SYSTEM_PROMPT
         assert "## Notes" in SYSTEM_PROMPT
 
-    def test_system_prompt_requires_provider_in_citations(self) -> None:
-        """System prompt requires provider prefix in citations."""
-        assert "[PROVIDER]" in SYSTEM_PROMPT
+    def test_system_prompt_requires_source_in_citations(self) -> None:
+        """System prompt requires source prefix in citations."""
+        assert "[SOURCE]" in SYSTEM_PROMPT
 
     def test_system_prompt_requires_page_ranges(self) -> None:
         """System prompt mentions page ranges."""

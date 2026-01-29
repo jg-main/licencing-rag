@@ -29,7 +29,7 @@ class TestSystemPrompt:
     def test_system_prompt_requires_citations(self):
         """System prompt must require citations."""
         assert "citation" in SYSTEM_PROMPT.lower() or "cite" in SYSTEM_PROMPT.lower()
-        assert "PROVIDER" in SYSTEM_PROMPT
+        assert "[SOURCE]" in SYSTEM_PROMPT
         assert "Document Name" in SYSTEM_PROMPT
         assert "Page" in SYSTEM_PROMPT
 
@@ -195,7 +195,7 @@ class TestPromptIntegration:
     def test_prompts_enforce_citation_format(self):
         """Prompts should specify citation format."""
         # System prompt should show citation format
-        assert "[PROVIDER]" in SYSTEM_PROMPT
+        assert "[SOURCE]" in SYSTEM_PROMPT
         # Should specify page format
         assert "Page" in SYSTEM_PROMPT
 
@@ -254,8 +254,8 @@ class TestPromptFormatEnforcement:
 
     def test_prompt_specifies_citation_format(self):
         """Prompts should specify citation format."""
-        # Should show [PROVIDER] format
-        assert "[PROVIDER]" in SYSTEM_PROMPT
+        # Should show [SOURCE] format
+        assert "[SOURCE]" in SYSTEM_PROMPT
 
     def test_prompt_allows_optional_notes_section(self):
         """Prompts should allow optional Notes section."""
