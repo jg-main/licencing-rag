@@ -147,10 +147,11 @@ def main() -> int:
 Examples:
   rag ingest --provider cme
   rag query "What are the redistribution requirements?"
+  rag ask "What are the redistribution requirements?"
   rag query --provider cme "What fees apply to derived data?"
-  rag query --search-mode keyword "subscriber definition"
+  rag ask --search-mode keyword "subscriber definition"
   rag query --search-mode vector "What are the licensing terms?"
-  rag query --format json "What are the fees?" > result.json
+  rag ask --format json "What are the fees?" > result.json
   rag list --provider cme
         """,
     )
@@ -181,6 +182,7 @@ Examples:
     # Query command
     query_parser = subparsers.add_parser(
         "query",
+        aliases=["ask"],
         help="Query the knowledge base",
     )
     query_parser.add_argument(
