@@ -105,14 +105,14 @@ ______________________________________________________________________
 # Save to: data/raw/cme/
 
 # 2. Re-ingest with --force to rebuild indexes
-rag ingest --provider cme --force
+rag ingest --source cme --force
 
 # 3. Verify document count
-rag list --provider cme
+rag list --source cme
 
 # 4. Test with sample queries
-rag query "What are the current CME fees?" --provider cme
-rag query "What is a Subscriber?" --provider cme
+rag query "What are the current CME fees?" --source cme
+rag query "What is a Subscriber?" --source cme
 
 # 5. Update this file with new retrieval date and notes
 ```

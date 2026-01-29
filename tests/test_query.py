@@ -31,7 +31,7 @@ class TestPrompts:
 
     def test_qa_prompt_has_placeholders(self) -> None:
         """QA prompt has required placeholders."""
-        assert "{provider}" in QA_PROMPT
+        assert "{source}" in QA_PROMPT
         assert "{context}" in QA_PROMPT
         assert "{question}" in QA_PROMPT
 
@@ -57,14 +57,14 @@ class TestRefusalMessage:
         assert isinstance(msg, str)
 
 
-class TestProviderNormalization:
+class TestSourceNormalization:
     """Tests for provider list normalization."""
 
     def test_empty_providers_normalized_to_default(self) -> None:
-        """Empty providers list is normalized to DEFAULT_PROVIDERS."""
+        """Empty providers list is normalized to DEFAULT_SOURCES."""
         from pathlib import Path
 
-        from app.config import DEFAULT_PROVIDERS
+        from app.config import DEFAULT_SOURCES
         from app.query import query
 
         with (
@@ -82,7 +82,7 @@ class TestProviderNormalization:
                     [
                         {
                             "chunk_id": "chunk_1",
-                            "provider": "cme",
+                            "source": "cme",
                             "document_path": "test.pdf",
                         }
                     ]
@@ -112,18 +112,27 @@ class TestProviderNormalization:
 
             mock_rerank.side_effect = mock_rerank_fn
 
-            # Mock LLM
+            # Mock LLM with properly formatted response
             mock_llm_instance = MagicMock()
-            mock_llm_instance.generate.return_value = "Test answer"
+            mock_llm_instance.generate.return_value = """## Answer
+Test answer based on documents.
+
+## Supporting Clauses
+> "Test document text"
+> — [CME] test.pdf, Page 1
+
+## Citations
+- **[CME] test.pdf** (Page 1): Test Section
+"""
             mock_llm.return_value = mock_llm_instance
 
             with patch("app.query.CHROMA_DIR", Path("/tmp/test_chroma")):
                 with patch.object(Path, "exists", return_value=True):
-                    # Query with empty list should use DEFAULT_PROVIDERS
-                    result = query("test question", providers=[])
+                    # Query with empty list should use DEFAULT_SOURCES
+                    result = query("test question", sources=[])
 
             # Should have used default providers (cme)
-            assert result["providers"] == DEFAULT_PROVIDERS
+            assert result["sources"] == DEFAULT_SOURCES
             # LLM should have been called since chunks passed reranking
             mock_llm_instance.generate.assert_called_once()
 
@@ -156,7 +165,7 @@ class TestEffectiveSearchMode:
                     [
                         {
                             "chunk_id": "chunk_1",
-                            "provider": "cme",
+                            "source": "cme",
                             "document_path": "test.pdf",
                         }
                     ]
@@ -175,7 +184,7 @@ class TestEffectiveSearchMode:
             with patch("app.query.CHROMA_DIR", Path("/tmp/test_chroma")):
                 with patch.object(Path, "exists", return_value=True):
                     result = query(
-                        "test question", providers=["cme"], search_mode="keyword"
+                        "test question", sources=["cme"], search_mode="keyword"
                     )
 
             # Verify response includes both requested and effective mode
@@ -202,7 +211,7 @@ class TestEffectiveSearchMode:
                     [
                         {
                             "chunk_id": "chunk_1",
-                            "provider": "cme",
+                            "source": "cme",
                             "document_path": "test.pdf",
                         }
                     ]
@@ -220,7 +229,7 @@ class TestEffectiveSearchMode:
             with patch("app.query.CHROMA_DIR", Path("/tmp/test_chroma")):
                 with patch.object(Path, "exists", return_value=True):
                     result = query(
-                        "test question", providers=["cme"], search_mode="vector"
+                        "test question", sources=["cme"], search_mode="vector"
                     )
 
             # Both should be vector
@@ -249,7 +258,7 @@ class TestEmbeddingValidation:
             with patch("app.query.CHROMA_DIR", Path("/tmp/test_chroma")):
                 with patch.object(Path, "exists", return_value=True):
                     with pytest.raises(RuntimeError) as exc_info:
-                        query("test question", providers=["cme"])
+                        query("test question", sources=["cme"])
 
             assert "missing embedding metadata" in str(exc_info.value).lower()
             assert "legacy" in str(exc_info.value).lower()
@@ -272,7 +281,7 @@ class TestEmbeddingValidation:
             with patch("app.query.CHROMA_DIR", Path("/tmp/test_chroma")):
                 with patch.object(Path, "exists", return_value=True):
                     with pytest.raises(RuntimeError) as exc_info:
-                        query("test question", providers=["cme"])
+                        query("test question", sources=["cme"])
 
             assert "mismatch" in str(exc_info.value).lower()
             assert "nomic-embed-text" in str(exc_info.value)
@@ -298,7 +307,7 @@ class TestEmbeddingValidation:
             with patch("app.query.CHROMA_DIR", Path("/tmp/test_chroma")):
                 with patch.object(Path, "exists", return_value=True):
                     with pytest.raises(RuntimeError) as exc_info:
-                        query("test question", providers=["cme"])
+                        query("test question", sources=["cme"])
 
             assert "dimensions mismatch" in str(exc_info.value).lower()
             assert "768" in str(exc_info.value)
@@ -322,7 +331,7 @@ class TestEmbeddingValidation:
 
             with patch("app.query.CHROMA_DIR", Path("/tmp/test_chroma")):
                 with patch.object(Path, "exists", return_value=True):
-                    result = query("test question", providers=["cme"])
+                    result = query("test question", sources=["cme"])
 
             # Should return refusal response (no chunks retrieved)
             assert result["chunks_retrieved"] == 0
@@ -345,7 +354,7 @@ class TestEmbeddingValidation:
 
             with patch("app.query.CHROMA_DIR", Path("/tmp/test_chroma")):
                 with patch.object(Path, "exists", return_value=True):
-                    result = query("test question", providers=["cme"])
+                    result = query("test question", sources=["cme"])
 
             # Should return refusal response (no chunks retrieved)
             assert result["chunks_retrieved"] == 0

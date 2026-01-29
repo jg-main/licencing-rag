@@ -51,7 +51,7 @@ class TestChunkFormatting:
         """Format chunk with section heading."""
         text = "This is chunk text."
         metadata = {
-            "provider": "cme",
+            "source": "cme",
             "document_path": "cme/test-doc.pdf",
             "section_heading": "Fees and Charges",
             "page_start": 10,
@@ -69,7 +69,7 @@ class TestChunkFormatting:
         """Format chunk without section heading."""
         text = "This is chunk text."
         metadata = {
-            "provider": "cme",
+            "source": "cme",
             "document_name": "test-doc.pdf",
             "page_start": 5,
             "page_end": 5,
@@ -108,9 +108,9 @@ class TestBudgetEnforcement:
     def test_enforce_budget_under_budget(self):
         """Budget enforcement when all chunks fit."""
         chunks = [
-            ("Short chunk 1", {"provider": "cme", "doc_name": "test.pdf"}),
-            ("Short chunk 2", {"provider": "cme", "doc_name": "test.pdf"}),
-            ("Short chunk 3", {"provider": "cme", "doc_name": "test.pdf"}),
+            ("Short chunk 1", {"source": "cme", "doc_name": "test.pdf"}),
+            ("Short chunk 2", {"source": "cme", "doc_name": "test.pdf"}),
+            ("Short chunk 3", {"source": "cme", "doc_name": "test.pdf"}),
         ]
         kept, info = enforce_context_budget(chunks, max_tokens=10000)
         assert len(kept) == 3
@@ -125,9 +125,9 @@ class TestBudgetEnforcement:
         # Create chunks that will definitely exceed a tiny budget
         long_text = " ".join(["word"] * 1000)  # Very long chunk
         chunks = [
-            (long_text, {"provider": "cme", "doc_name": "test.pdf"}),
-            (long_text, {"provider": "cme", "doc_name": "test.pdf"}),
-            (long_text, {"provider": "cme", "doc_name": "test.pdf"}),
+            (long_text, {"source": "cme", "doc_name": "test.pdf"}),
+            (long_text, {"source": "cme", "doc_name": "test.pdf"}),
+            (long_text, {"source": "cme", "doc_name": "test.pdf"}),
         ]
         kept, info = enforce_context_budget(chunks, max_tokens=100)
         # Should drop some chunks
@@ -141,7 +141,7 @@ class TestBudgetEnforcement:
             (
                 "Low score chunk",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 1,
                     "chunk_id": "chunk_1",
@@ -150,7 +150,7 @@ class TestBudgetEnforcement:
             (
                 "High score chunk",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 3,
                     "chunk_id": "chunk_2",
@@ -159,7 +159,7 @@ class TestBudgetEnforcement:
             (
                 "Medium score chunk",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 2,
                     "chunk_id": "chunk_3",
@@ -186,7 +186,7 @@ class TestBudgetEnforcement:
             (
                 long_text,
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 2,
                     "chunk_id": "long",
@@ -195,7 +195,7 @@ class TestBudgetEnforcement:
             (
                 short_text,
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 2,
                     "chunk_id": "short",
@@ -216,7 +216,7 @@ class TestBudgetEnforcement:
             (
                 "Score 0",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 0,
                     "chunk_id": "chunk_0",
@@ -225,7 +225,7 @@ class TestBudgetEnforcement:
             (
                 "Score 1",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 1,
                     "chunk_id": "chunk_1",
@@ -234,7 +234,7 @@ class TestBudgetEnforcement:
             (
                 "Score 2",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 2,
                     "chunk_id": "chunk_2",
@@ -243,7 +243,7 @@ class TestBudgetEnforcement:
             (
                 "Score 3",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 3,
                     "chunk_id": "chunk_3",
@@ -268,8 +268,8 @@ class TestBudgetEnforcement:
     def test_enforce_budget_info_structure(self):
         """Budget info should have expected structure."""
         chunks = [
-            ("Chunk 1", {"provider": "cme", "doc_name": "test.pdf"}),
-            ("Chunk 2", {"provider": "cme", "doc_name": "test.pdf"}),
+            ("Chunk 1", {"source": "cme", "doc_name": "test.pdf"}),
+            ("Chunk 2", {"source": "cme", "doc_name": "test.pdf"}),
         ]
         kept, info = enforce_context_budget(chunks)
 
@@ -298,7 +298,7 @@ class TestBudgetEnforcement:
             (
                 long_text,
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 1,
                     "chunk_id": "test_chunk",
@@ -339,7 +339,7 @@ class TestFullPromptBudgetEnforcement:
             (
                 "Test chunk content",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "cme/test.pdf",
                     "section_heading": "Test Section",
                     "page_start": 1,
@@ -379,7 +379,7 @@ class TestFullPromptBudgetEnforcement:
             (
                 large_text,
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": f"cme/doc{i}.pdf",
                     "section_heading": f"Section {i}",
                     "page_start": i,
@@ -423,7 +423,7 @@ class TestFullPromptBudgetEnforcement:
             (
                 "Test chunk",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "cme/test.pdf",
                     "section_heading": "Test",
                     "page_start": 1,
@@ -487,7 +487,7 @@ class TestFullPromptBudgetEnforcement:
             (
                 "Low relevance chunk",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "cme/low.pdf",
                     "section_heading": "Low",
                     "page_start": 1,
@@ -499,7 +499,7 @@ class TestFullPromptBudgetEnforcement:
             (
                 "High relevance chunk",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "cme/high.pdf",
                     "section_heading": "High",
                     "page_start": 2,
@@ -511,7 +511,7 @@ class TestFullPromptBudgetEnforcement:
             (
                 "Medium relevance chunk",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "cme/mid.pdf",
                     "section_heading": "Mid",
                     "page_start": 3,
@@ -550,7 +550,7 @@ class TestFullPromptBudgetEnforcement:
             (
                 "Test",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "cme/test.pdf",
                     "section_heading": "Test",
                     "page_start": 1,
@@ -599,7 +599,7 @@ class TestBudgetIntegration:
             (
                 "High relevance",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 3,
                     "chunk_id": "high",
@@ -608,7 +608,7 @@ class TestBudgetIntegration:
             (
                 "Medium relevance",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 2,
                     "chunk_id": "medium",
@@ -617,7 +617,7 @@ class TestBudgetIntegration:
             (
                 "Low relevance",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "doc_name": "test.pdf",
                     "_relevance_score": 1,
                     "chunk_id": "low",
@@ -647,7 +647,7 @@ class TestAccuracyFirstDefinitions:
             (
                 "Important chunk" * 50,
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "cme/doc.pdf",
                     "section_heading": "Important",
                     "page_start": 1,
@@ -704,7 +704,7 @@ class TestAccuracyFirstDefinitions:
             (
                 "High priority" * 100,
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "cme/high.pdf",
                     "section_heading": "High",
                     "page_start": 1,
@@ -716,7 +716,7 @@ class TestAccuracyFirstDefinitions:
             (
                 "Low priority" * 100,
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "cme/low.pdf",
                     "section_heading": "Low",
                     "page_start": 2,
@@ -752,7 +752,7 @@ class TestAccuracyFirstDefinitions:
             (
                 "Test chunk",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "cme/test.pdf",
                     "section_heading": "Test",
                     "page_start": 1,
@@ -806,7 +806,7 @@ class TestAccuracyFirstDefinitions:
             (
                 "Test chunk",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "doc.pdf",
                     "section_heading": "Sec",
                     "page_start": 1,
@@ -852,7 +852,7 @@ class TestChunkRestorationAfterDefinitionsShrink:
             (
                 "Chunk 1",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "doc1.pdf",
                     "section_heading": "S1",
                     "page_start": 1,
@@ -863,7 +863,7 @@ class TestChunkRestorationAfterDefinitionsShrink:
             (
                 "Chunk 2",
                 {
-                    "provider": "cme",
+                    "source": "cme",
                     "document_path": "doc2.pdf",
                     "section_heading": "S2",
                     "page_start": 2,

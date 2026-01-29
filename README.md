@@ -3,7 +3,7 @@
 **Version:** 0.4\
 **Status:** OpenAI Migration (Phase 1 Complete) **Branch:** openai
 
-A high-precision, clause-level Retrieval-Augmented Generation (RAG) system that answers questions **exclusively** based on curated license agreements and exhibits from market data providers. Single provider architecture using OpenAI for both embeddings and LLM.
+A high-precision, clause-level Retrieval-Augmented Generation (RAG) system that answers questions **exclusively** based on curated license agreements and exhibits from market data sources. Single source architecture using OpenAI for both embeddings and LLM.
 
 ## Table of Contents
 
@@ -28,8 +28,8 @@ This is **not** a general chatbot and **not** a trained LLM. It is a **retrieval
 
 - ✅ Responds **only** using the provided documents
 - ✅ Explicitly refuses to answer when the documents are silent
-- ✅ Always provides **citations** (provider, document name, section, page)
-- ✅ Supports multiple data providers
+- ✅ Always provides **citations** (source, document name, section, page)
+- ✅ Supports multiple data sources
 - ✅ Uses OpenAI for embeddings (text-embedding-3-large, 3072 dimensions)
 - ✅ Uses OpenAI GPT-4.1 for answer generation
 - ✅ Supports hybrid search (vector + keyword with BM25 and RRF)
@@ -52,7 +52,7 @@ This is **not** a general chatbot and **not** a trained LLM. It is a **retrieval
 | OPRA      | ⏳ Planned | TBD            | P1       |
 | CTA/UTP   | ⏳ Planned | TBD            | P2       |
 
-**📋 [Data Sources Documentation](docs/data-sources.md)** — Track provider sources, update dates, and document retrieval information.
+**📋 [Data Sources Documentation](docs/data-sources.md)** — Track source sources, update dates, and document retrieval information.
 
 ### Model Stack (OpenAI Only)
 
@@ -72,7 +72,7 @@ ______________________________________________________________________
 - ✅ **PDF & DOCX Extraction** - Extract text with page tracking from PDF and DOCX files
 - ✅ **Smart Chunking** - Section-aware chunking with 500-800 word targets and metadata
 - ✅ **Vector Search** - ChromaDB with Ollama embeddings (nomic-embed-text)
-- ✅ **Multi-Provider Support** - Organize documents by data provider (CME, OPRA, etc.)
+- ✅ **Multi-Provider Support** - Organize documents by data source (CME, OPRA, etc.)
 - ✅ **Subdirectory Organization** - Nested folder structure (e.g., `CME/Fees/`, `CME/Agreements/`)
 - ✅ **Page-Level Citations** - Every answer includes exact document references
 - ✅ **Grounded Responses** - Explicit refusal when answer not in documents
@@ -87,9 +87,9 @@ ______________________________________________________________________
 
 #### CLI Interface
 
-- ✅ `rag ingest --provider <name>` - Ingest documents
+- ✅ `rag ingest --source <name>` - Ingest documents
 - ✅ `rag query "<question>"` - Query the knowledge base
-- ✅ `rag list --provider <name>` - List indexed documents
+- ✅ `rag list --source <name>` - List indexed documents
 - ⏳ `rag logs --tail N` - View query logs - **NOT IMPLEMENTED YET**
 - ⏳ `rag serve --port 8000` - Start REST API server - **NOT IMPLEMENTED YET**
 
@@ -131,7 +131,7 @@ ______________________________________________________________________
 - ⏳ **POST /api/v1/query** - Execute queries programmatically
 - ⏳ **GET /api/v1/documents** - List indexed documents with filtering
 - ⏳ **GET /api/v1/stats** - System statistics (doc count, chunk count, index size)
-- ⏳ **POST /api/v1/ingest/{provider}** - Trigger re-ingestion (async job)
+- ⏳ **POST /api/v1/ingest/{source}** - Trigger re-ingestion (async job)
 - ⏳ **GET /api/v1/logs** - Query logs with pagination
 - ⏳ **GET /health** - Health check endpoint
 
@@ -225,13 +225,13 @@ rag query "What are the CME fees?"
 make clean-all
 
 # 2. Ingest documents with OpenAI embeddings
-rag ingest --provider cme
+rag ingest --source cme
 
 # 3. Query the knowledge base
 rag query "What is a subscriber?"
 
 # 4. List indexed documents
-rag list --provider cme
+rag list --source cme
 ```
 
 ______________________________________________________________________
@@ -243,16 +243,16 @@ ______________________________________________________________________
 #### Ingestion
 
 ```bash
-# Ingest all documents for a provider
-rag ingest --provider cme
+# Ingest all documents for a source
+rag ingest --source cme
 
-# Ingest specific provider (future)
-rag ingest --provider opra
+# Ingest specific source (future)
+rag ingest --source opra
 ```
 
 **What it does:**
 
-- Recursively scans `data/raw/{provider}/` for PDF and DOCX files
+- Recursively scans `data/raw/{source}/` for PDF and DOCX files
 - Extracts text with page tracking
 - Chunks documents with section detection
 - Generates embeddings via Ollama
@@ -264,11 +264,11 @@ rag ingest --provider opra
 # Basic query
 rag query "What are the redistribution requirements?"
 
-# Query specific provider
-rag query --provider cme "What are the fees?"
+# Query specific source
+rag query --source cme "What are the fees?"
 
-# Query multiple providers
-rag query --provider cme --provider ice "What is a subscriber?"
+# Query multiple sources
+rag query --source cme --source ice "What is a subscriber?"
 
 # JSON output with structured schema
 rag query --format json "What are the fees?" > result.json
@@ -289,7 +289,7 @@ When using `--format json`, the output follows this structure:
     {
       "text": "Clause text from the document...",
       "source": {
-        "provider": "CME",
+        "source": "CME",
         "document": "Fees/Schedule-A.pdf",
         "section": "Section 3.1 Pricing",
         "page_start": 5,
@@ -302,7 +302,7 @@ When using `--format json`, the output follows this structure:
       "term": "Subscriber",
       "definition": "\"Subscriber\" means any individual authorized...",
       "source": {
-        "provider": "cme",
+        "source": "cme",
         "document": "Agreements/Main-Agreement.pdf",
         "section": "Definitions",
         "page_start": 2,
@@ -312,7 +312,7 @@ When using `--format json`, the output follows this structure:
   ],
   "citations": [
     {
-      "provider": "cme",
+      "source": "cme",
       "document": "Fees/Schedule-A.pdf",
       "section": "Section 3.1 Pricing",
       "page_start": 5,
@@ -320,7 +320,7 @@ When using `--format json`, the output follows this structure:
     }
   ],
   "metadata": {
-    "providers": ["cme"],
+    "sources": ["cme"],
     "chunks_retrieved": 5,
     "search_mode": "hybrid",
     "effective_search_mode": "hybrid",
@@ -342,10 +342,10 @@ When using `--format json`, the output follows this structure:
 #### Document Management
 
 ```bash
-# List all documents for a provider
-rag list --provider cme
+# List all documents for a source
+rag list --source cme
 
-# List all documents for all providers
+# List all documents for all sources
 rag list
 
 # Show statistics (NOT IMPLEMENTED YET)
@@ -358,8 +358,8 @@ rag stats
 # View recent queries
 rag logs --tail 10
 
-# Filter by provider
-rag logs --provider cme --tail 20
+# Filter by source
+rag logs --source cme --tail 20
 
 # Export logs
 rag logs --export logs_export.jsonl
@@ -390,7 +390,7 @@ curl -X POST http://localhost:8000/api/v1/query \
   -H "X-API-Key: your-api-key" \
   -d '{
     "question": "What are the redistribution requirements for CME data?",
-    "providers": ["cme"],
+    "sources": ["cme"],
     "search_mode": "hybrid",
     "top_k": 5,
     "include_definitions": true
@@ -409,7 +409,7 @@ curl -X POST http://localhost:8000/api/v1/query \
       "document": "information-license-agreement-ila-guide.pdf",
       "section": "Section 5: Redistribution",
       "page": 12,
-      "provider": "cme"
+      "source": "cme"
     }
   ],
   "definitions": [
@@ -425,7 +425,7 @@ curl -X POST http://localhost:8000/api/v1/query \
       "document": "information-license-agreement-ila-guide.pdf",
       "section": "Section 5: Redistribution",
       "pages": [12, 13],
-      "provider": "cme"
+      "source": "cme"
     }
   ],
   "metadata": {
@@ -441,7 +441,7 @@ curl -X POST http://localhost:8000/api/v1/query \
 
 ```bash
 # List documents
-GET /api/v1/documents?provider=cme
+GET /api/v1/documents?source=cme
 
 # System statistics
 GET /api/v1/stats
@@ -485,7 +485,7 @@ data/
 
 index/
 ├── chroma/                 # ChromaDB vector database
-│   └── cme_docs/           # Collection per provider
+│   └── cme_docs/           # Collection per source
 └── bm25/                   # BM25 keyword index (IMPLEMENTED)
     └── cme_index.pkl
 
@@ -512,7 +512,7 @@ cp fee-schedule.pdf data/raw/cme/Fees/
 cp license-agreement.pdf data/raw/cme/Agreements/
 
 # Ingest recursively discovers all documents
-rag ingest --provider cme
+rag ingest --source cme
 ```
 
 ### Supported Formats
@@ -571,15 +571,15 @@ ______________________________________________________________________
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Document Ingestion Pipeline                  │
 ├─────────────────────────────────────────────────────────────────┤
-│  data/raw/{provider}/**/*.pdf  →  Extract  →  Chunk  →  Embed  │
+│  data/raw/{source}/**/*.pdf  →  Extract  →  Chunk  →  Embed  │
 │                                      ↓                           │
-│                          data/text/{provider}/                   │
+│                          data/text/{source}/                   │
 │                                      ↓                           │
 │                          index/chroma/                           │
-│                     (collection per provider)                    │
+│                     (collection per source)                    │
 │                                      ↓                           │
 │                          index/bm25/                             │
-│                 (keyword index per provider) [Sprint 3]          │
+│                 (keyword index per source) [Sprint 3]          │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -622,10 +622,10 @@ ______________________________________________________________________
 
 ### Key Design Decisions
 
-1. **One ChromaDB collection per provider** — Enables provider-specific queries and simpler re-ingestion
+1. **One ChromaDB collection per source** — Enables source-specific queries and simpler re-ingestion
 1. **Hybrid search (Sprint 3)** — Combines semantic (vector) and keyword (BM25) retrieval for better coverage
 1. **Definitions auto-linking (Sprint 3)** — Automatically retrieves definition chunks when terms are referenced
-1. **Unified query interface** — Can search all providers or filter to specific ones
+1. **Unified query interface** — Can search all sources or filter to specific ones
 1. **Metadata-rich chunks** — Every chunk carries full provenance for citation
 1. **Subdirectory support** — Organize documents in folders (Fees/, Agreements/, etc.)
 1. **Query logging (Sprint 3)** — All queries logged to JSONL for audit and analysis
@@ -694,11 +694,11 @@ make qa
 
 ### Adding a New Provider
 
-1. Create directory: `mkdir -p data/raw/{provider}`
+1. Create directory: `mkdir -p data/raw/{source}`
 1. Add documents to the directory
-1. Update `app/config.py`: Add provider to `PROVIDERS` list
-1. Ingest: `rag ingest --provider {provider}`
-1. Query: `rag query --provider {provider} "Your question"`
+1. Update `app/config.py`: Add source to `PROVIDERS` list
+1. Ingest: `rag ingest --source {source}`
+1. Query: `rag query --source {source} "Your question"`
 
 ______________________________________________________________________
 
@@ -837,7 +837,7 @@ Get an API key from [https://console.anthropic.com/](https://console.anthropic.c
 **Solution:**
 
 ```bash
-rag ingest --provider cme
+rag ingest --source cme
 ```
 
 #### "Rate limit exceeded" (Claude API)
@@ -858,7 +858,7 @@ rag ingest --provider cme
 
 ```bash
 # Enable debug logging to see extraction details
-rag --debug ingest --provider cme
+rag --debug ingest --source cme
 
 # Check extracted text manually
 cat data/text/cme/your-document.pdf.txt
@@ -888,7 +888,7 @@ cat data/text/cme/your-document.pdf.txt
 rm -rf index/chroma
 
 # Re-ingest
-rag ingest --provider cme
+rag ingest --source cme
 ```
 
 ### Debug Mode
@@ -896,7 +896,7 @@ rag ingest --provider cme
 Enable verbose logging with `--debug`:
 
 ```bash
-rag --debug ingest --provider cme
+rag --debug ingest --source cme
 rag --debug query "What are the fees?"
 ```
 
@@ -929,7 +929,7 @@ ______________________________________________________________________
 
 - **[RAG Tutorial](docs/rag-tutorial.md)** - Beginner's guide to RAG concepts (if exists)
 - **[specs.v0.1.md](docs/specs.v0.1.md)** - Original MVP specifications
-- **[specs.v0.2.md](docs/specs.v0.2.md)** - Multi-provider and page tracking specifications
+- **[specs.v0.2.md](docs/specs.v0.2.md)** - Multi-source and page tracking specifications
 
 ### Sprint Progress
 

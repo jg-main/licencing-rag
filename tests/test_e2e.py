@@ -41,10 +41,11 @@ class TestIngestQuerySmokeTest:
 Based on the CME Market Data Information Policies, real-time quote data requires a monthly fee of $500.
 
 ## Supporting Clauses
-The fee schedule specifies that "Real-time Quotes" have a monthly fee of $500 and an annual fee of $5,000.
+> "Real-time Quotes have a monthly fee of $500 and an annual fee of $5,000."
+> — [CME] sample-agreement.docx, Page 1
 
 ## Citations
-- [CME] sample-agreement.docx, Pages 1
+- **[CME] sample-agreement.docx** (Page 1): Fee Schedule
 
 ## Notes
 Fee amounts are subject to change. Contact CME for current pricing."""
@@ -64,7 +65,7 @@ Fee amounts are subject to change. Contact CME for current pricing."""
         # Verify chunk metadata
         for chunk in chunks:
             assert isinstance(chunk, Chunk)
-            assert chunk.provider == "cme"
+            assert chunk.source == "cme"
             assert chunk.document_name == sample_docx.name
 
         # 3. Convert to ChromaDB format
@@ -210,7 +211,7 @@ Fee amounts are subject to change. Contact CME for current pricing."""
             temp_chroma_dir.mkdir(parents=True, exist_ok=True)
 
             # Run query
-            result = query("What is the fee for real-time quotes?", providers=["cme"])
+            result = query("What is the fee for real-time quotes?", sources=["cme"])
 
             # Verify response structure
             assert "answer" in result
@@ -338,9 +339,9 @@ class TestHybridSearchE2E:
                 ],
                 "metadatas": [
                     [
-                        {"chunk_id": "chunk_general", "provider": "test"},
-                        {"chunk_id": "chunk_subscriber", "provider": "test"},
-                        {"chunk_id": "chunk_fee_2", "provider": "test"},
+                        {"chunk_id": "chunk_general", "source": "test"},
+                        {"chunk_id": "chunk_subscriber", "source": "test"},
+                        {"chunk_id": "chunk_fee_2", "source": "test"},
                     ]
                 ],
                 "distances": [[0.1, 0.2, 0.3]],
@@ -348,7 +349,7 @@ class TestHybridSearchE2E:
             mock_collection.get.return_value = {
                 "ids": ["chunk_fee_1"],
                 "documents": [sample_documents[0][1]],
-                "metadatas": [{"chunk_id": "chunk_fee_1", "provider": "test"}],
+                "metadatas": [{"chunk_id": "chunk_fee_1", "source": "test"}],
             }
 
             # Run hybrid search
@@ -395,8 +396,8 @@ class TestHybridSearchE2E:
                 "documents": [[sample_documents[0][1], sample_documents[1][1]]],
                 "metadatas": [
                     [
-                        {"chunk_id": "chunk_1", "provider": "test"},
-                        {"chunk_id": "chunk_2", "provider": "test"},
+                        {"chunk_id": "chunk_1", "source": "test"},
+                        {"chunk_id": "chunk_2", "source": "test"},
                     ]
                 ],
                 "distances": [[0.1, 0.2]],
@@ -437,7 +438,7 @@ class TestQueryWithDefinitions:
 
         # Create and save a definitions index
         temp_definitions_dir.mkdir(parents=True, exist_ok=True)
-        index = DefinitionsIndex(provider="test_provider")
+        index = DefinitionsIndex(source="test_provider")
         entry = DefinitionEntry(
             term="Subscriber",
             normalized_term="subscriber",
@@ -448,7 +449,7 @@ class TestQueryWithDefinitions:
             page_start=5,
             page_end=5,
             definition_text="Any person or entity receiving Information from a Vendor.",
-            provider="test_provider",
+            source="test_provider",
         )
         index.add_entry(entry)
 
@@ -464,7 +465,7 @@ class TestQueryWithDefinitions:
                 [
                     {
                         "chunk_id": "chunk_1",
-                        "provider": "test_provider",
+                        "source": "test_provider",
                         "document_name": "fees.pdf",
                         "document_path": "fees.pdf",
                         "section_heading": "Fees",
@@ -489,8 +490,8 @@ The Subscriber must pay monthly fees as specified in the agreement.
 ## Citations
 - [TEST_PROVIDER] fees.pdf, Pages 10"""
 
-        # Mock PROVIDERS to include test_provider
-        test_providers = {
+        # Mock SOURCES to include test_provider
+        test_sources = {
             "test_provider": {"collection": "test_provider_docs"},
         }
 
@@ -503,7 +504,7 @@ The Subscriber must pay monthly fees as specified in the agreement.
             patch("app.query.get_llm") as mock_get_llm,
             patch("app.query.get_definitions_retriever") as mock_get_retriever,
             patch("app.query.CHROMA_DIR", tmp_path),
-            patch("app.query.PROVIDERS", test_providers),
+            patch("app.query.SOURCES", test_sources),
         ):
             # Setup mocks
             (tmp_path / "chroma.sqlite3").touch()  # Fake ChromaDB file
@@ -525,7 +526,7 @@ The Subscriber must pay monthly fees as specified in the agreement.
             # Run query with definitions enabled
             result = query(
                 question="What are the Subscriber fees?",
-                providers=["test_provider"],
+                sources=["test_provider"],
                 include_definitions=True,
             )
 
@@ -542,7 +543,7 @@ The Subscriber must pay monthly fees as specified in the agreement.
             )
             assert subscriber_def is not None
             assert "person or entity" in subscriber_def["definition"]
-            assert subscriber_def["provider"] == "test_provider"
+            assert subscriber_def["source"] == "test_provider"
 
     def test_query_no_definitions_when_disabled(
         self,
@@ -558,7 +559,7 @@ The Subscriber must pay monthly fees as specified in the agreement.
                 [
                     {
                         "chunk_id": "chunk_1",
-                        "provider": "test_provider",
+                        "source": "test_provider",
                         "document_name": "fees.pdf",
                         "document_path": "fees.pdf",
                         "section_heading": "Fees",
@@ -581,8 +582,8 @@ Monthly fees apply.
 ## Citations
 - [TEST_PROVIDER] fees.pdf, Pages 10"""
 
-        # Mock PROVIDERS to include test_provider
-        test_providers = {
+        # Mock SOURCES to include test_provider
+        test_sources = {
             "test_provider": {"collection": "test_provider_docs"},
         }
 
@@ -592,7 +593,7 @@ Monthly fees apply.
             patch("app.search.BM25Index.load") as mock_load_bm25,
             patch("app.query.get_llm") as mock_get_llm,
             patch("app.query.CHROMA_DIR", tmp_path),
-            patch("app.query.PROVIDERS", test_providers),
+            patch("app.query.SOURCES", test_sources),
         ):
             (tmp_path / "chroma.sqlite3").touch()
             mock_chroma_client.return_value = mock_client
@@ -606,7 +607,7 @@ Monthly fees apply.
             # Run query with definitions disabled
             result = query(
                 question="What are the fees?",
-                providers=["test_provider"],
+                sources=["test_provider"],
                 include_definitions=False,
             )
 
@@ -628,7 +629,7 @@ Monthly fees apply.
 
         # Create index for provider with underscore in name
         temp_definitions_dir.mkdir(parents=True, exist_ok=True)
-        index = DefinitionsIndex(provider="cta_utp")
+        index = DefinitionsIndex(source="cta_utp")
         entry = DefinitionEntry(
             term="Vendor",
             normalized_term="vendor",
@@ -639,7 +640,7 @@ Monthly fees apply.
             page_start=3,
             page_end=3,
             definition_text="A company that redistributes market data.",
-            provider="cta_utp",  # Provider stored directly
+            source="cta_utp",  # Provider stored directly
         )
         index.add_entry(entry)
 
@@ -652,8 +653,8 @@ Monthly fees apply.
         assert loaded is not None
         definitions = loaded.get_definitions("Vendor")
         assert len(definitions) == 1
-        assert definitions[0].provider == "cta_utp"
+        assert definitions[0].source == "cta_utp"
 
         # Verify format_definitions_for_output uses provider directly
         result = format_definitions_for_output({"vendor": definitions})
-        assert result[0]["provider"] == "cta_utp"  # Not "cta" from chunk_id split
+        assert result[0]["source"] == "cta_utp"  # Not "cta" from chunk_id split

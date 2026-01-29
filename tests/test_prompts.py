@@ -108,8 +108,8 @@ class TestQAPrompts:
 
     def test_qa_prompt_includes_provider_placeholder(self):
         """QA prompt must include provider placeholder."""
-        assert "{provider}" in QA_PROMPT
-        assert "{provider}" in QA_PROMPT_NO_DEFINITIONS
+        assert "{source}" in QA_PROMPT
+        assert "{source}" in QA_PROMPT_NO_DEFINITIONS
 
     def test_qa_prompt_with_definitions_has_placeholder(self):
         """QA prompt with definitions must have definitions placeholder."""

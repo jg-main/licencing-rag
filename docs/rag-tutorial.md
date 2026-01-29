@@ -307,7 +307,7 @@ ______________________________________________________________________
 
 ## Part 6: The Code Flow
 
-### Ingestion (`rag ingest --provider cme`)
+### Ingestion (`rag ingest --source cme`)
 
 ```python
 # 1. Find all PDFs
@@ -476,7 +476,7 @@ ______________________________________________________________________
 
 1. **Set up Claude API** - Get an API key from console.anthropic.com
 1. **Test a query** - `rag query "What are the CME fees?"`
-1. **Add more providers** - Put OPRA docs in `data/raw/opra/`
+1. **Add more sources** - Put OPRA docs in `data/raw/opra/`
 
 ______________________________________________________________________
 

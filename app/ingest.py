@@ -16,8 +16,8 @@ from app.config import CHROMA_DIR
 from app.config import CHUNKS_DATA_DIR
 from app.config import EMBEDDING_DIMENSIONS
 from app.config import EMBEDDING_MODEL
-from app.config import PROVIDERS
 from app.config import RAW_DATA_DIR
+from app.config import SOURCES
 from app.config import TEXT_DATA_DIR
 from app.definitions import build_definitions_index
 from app.definitions import save_definitions_index
@@ -34,52 +34,52 @@ from app.search import BM25Index
 log = get_logger(__name__)
 
 
-def get_provider_raw_dir(provider: str) -> Path:
-    """Get the raw documents directory for a provider.
+def get_provider_raw_dir(source: str) -> Path:
+    """Get the raw documents directory for a source.
 
     Args:
-        provider: Provider identifier (e.g., "cme").
+        source: Provider identifier (e.g., "cme").
 
     Returns:
-        Path to the provider's raw documents directory.
+        Path to the source's raw documents directory.
     """
-    return RAW_DATA_DIR / provider
+    return RAW_DATA_DIR / source
 
 
-def get_provider_text_dir(provider: str) -> Path:
-    """Get the extracted text directory for a provider.
+def get_provider_text_dir(source: str) -> Path:
+    """Get the extracted text directory for a source.
 
     Args:
-        provider: Provider identifier (e.g., "cme").
+        source: Provider identifier (e.g., "cme").
 
     Returns:
-        Path to the provider's text output directory.
+        Path to the source's text output directory.
     """
-    return TEXT_DATA_DIR / provider
+    return TEXT_DATA_DIR / source
 
 
-def get_provider_chunks_dir(provider: str) -> Path:
-    """Get the chunks directory for a provider.
+def get_provider_chunks_dir(source: str) -> Path:
+    """Get the chunks directory for a source.
 
     Args:
-        provider: Provider identifier (e.g., "cme").
+        source: Provider identifier (e.g., "cme").
 
     Returns:
-        Path to the provider's chunks output directory.
+        Path to the source's chunks output directory.
     """
-    return CHUNKS_DATA_DIR / provider
+    return CHUNKS_DATA_DIR / source
 
 
-def get_collection_name(provider: str) -> str:
-    """Get the ChromaDB collection name for a provider.
+def get_collection_name(source: str) -> str:
+    """Get collection name for a source.
 
     Args:
-        provider: Provider identifier.
+        source: Source identifier.
 
     Returns:
         Collection name.
     """
-    return PROVIDERS.get(provider, {}).get("collection", f"{provider}_docs")
+    return SOURCES.get(source, {}).get("collection", f"{source}_docs")
 
 
 def chunks_to_chroma_format(
@@ -104,7 +104,7 @@ def chunks_to_chroma_format(
         # Build metadata dict, excluding None values (ChromaDB rejects None)
         meta: dict[str, Any] = {
             "chunk_id": chunk.chunk_id,
-            "provider": chunk.provider,
+            "source": chunk.source,
             "document_name": chunk.document_name,
             "document_path": chunk.document_path,  # Relative path for unique identification
             "section_heading": chunk.section_heading,
@@ -124,7 +124,7 @@ def chunks_to_chroma_format(
 
 
 def prune_deleted_documents(
-    provider: str,
+    source: str,
     collection: chromadb.Collection,
     current_doc_paths: set[str],
 ) -> int:
@@ -134,7 +134,7 @@ def prune_deleted_documents(
     are also removed from ChromaDB during incremental ingestion.
 
     Args:
-        provider: Provider identifier.
+        source: Provider identifier.
         collection: ChromaDB collection to prune.
         current_doc_paths: Set of document_path values for documents currently in data/raw.
 
@@ -145,7 +145,7 @@ def prune_deleted_documents(
     try:
         results = collection.get(include=["metadatas"])
     except Exception as e:
-        log.warning("failed_to_get_collection_data", provider=provider, error=str(e))
+        log.warning("failed_to_get_collection_data", source=source, error=str(e))
         return 0
 
     if not results or not results.get("metadatas"):
@@ -181,7 +181,7 @@ def prune_deleted_documents(
         collection.delete(ids=ids_to_delete)
         log.info(
             "pruned_deleted_documents",
-            provider=provider,
+            source=source,
             documents=len(deleted_docs),
             chunks=len(ids_to_delete),
             deleted_docs=sorted(deleted_docs),
@@ -193,45 +193,41 @@ def prune_deleted_documents(
     return len(ids_to_delete)
 
 
-def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[str]]:
-    """Ingest all documents for a provider.
+def ingest_provider(source: str, force: bool = False) -> dict[str, int | list[str]]:
+    """Ingest all documents for a source.
 
     Args:
-        provider: Provider identifier (e.g., "cme").
+        source: Provider identifier (e.g., "cme").
         force: If True, delete existing collection before ingesting.
 
     Returns:
         Dictionary with ingestion statistics.
 
     Raises:
-        ValueError: If provider is not configured.
-        FileNotFoundError: If provider directory doesn't exist.
+        ValueError: If source is not configured.
+        FileNotFoundError: If source directory doesn't exist.
     """
-    if provider not in PROVIDERS:
-        log.error(
-            "unknown_provider", provider=provider, available=list(PROVIDERS.keys())
-        )
-        raise ValueError(
-            f"Unknown provider: {provider}. Available: {list(PROVIDERS.keys())}"
-        )
+    if source not in SOURCES:
+        log.error("unknown_source", source=source, available=list(SOURCES.keys()))
+        raise ValueError(f"Unknown source: {source}. Available: {list(SOURCES.keys())}")
 
-    raw_dir = get_provider_raw_dir(provider)
+    raw_dir = get_provider_raw_dir(source)
     if not raw_dir.exists():
-        log.error("provider_directory_not_found", provider=provider, path=str(raw_dir))
+        log.error("provider_directory_not_found", source=source, path=str(raw_dir))
         raise FileNotFoundError(f"Provider directory not found: {raw_dir}")
 
     # Clean up all artifacts if force=True
     if force:
-        # Clean text and chunks directories (provider-specific)
-        text_dir = get_provider_text_dir(provider)
-        chunks_dir = get_provider_chunks_dir(provider)
+        # Clean text and chunks directories (source-specific)
+        text_dir = get_provider_text_dir(source)
+        chunks_dir = get_provider_chunks_dir(source)
         for artifact_dir in [text_dir, chunks_dir]:
             if artifact_dir.exists():
                 shutil.rmtree(artifact_dir)
                 log.info("artifacts_deleted", directory=str(artifact_dir))
 
-        # Clean BM25 index (provider-specific)
-        bm25_path = BM25_INDEX_DIR / f"{provider}_index.pkl"
+        # Clean BM25 index (source-specific)
+        bm25_path = BM25_INDEX_DIR / f"{source}_index.pkl"
         if bm25_path.exists():
             bm25_path.unlink()
             log.info("bm25_index_deleted", path=str(bm25_path))
@@ -241,10 +237,10 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
     embed_fn = OpenAIEmbeddingFunction()
 
-    collection_name = get_collection_name(provider)
+    collection_name = get_collection_name(source)
 
-    # Delete existing collection if force=True (provider-specific)
-    # Note: This may leave orphaned segment folders, but preserves other providers' data
+    # Delete existing collection if force=True (source-specific)
+    # Note: This may leave orphaned segment folders, but preserves other sources' data
     if force:
         try:
             client.delete_collection(collection_name)
@@ -257,15 +253,15 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
         name=collection_name,
         embedding_function=embed_fn,  # type: ignore[arg-type]
         metadata={
-            "provider": provider,
+            "source": source,
             "embedding_model": EMBEDDING_MODEL,
             "embedding_dimensions": EMBEDDING_DIMENSIONS,
         },
     )
-    log.info("collection_ready", collection=collection_name, provider=provider)
+    log.info("collection_ready", collection=collection_name, source=source)
 
     # Initialize BM25 index for hybrid search
-    bm25_index = BM25Index(provider)
+    bm25_index = BM25Index(source)
     if force:
         bm25_index.clear()
 
@@ -281,14 +277,14 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     )
 
     if not doc_files:
-        log.warning("no_documents_found", provider=provider, path=str(raw_dir))
+        log.warning("no_documents_found", source=source, path=str(raw_dir))
         return {"documents": 0, "chunks": 0, "errors": [], "warnings": []}
 
     # Prune deleted documents if not using --force (which rebuilds from scratch)
     if not force:
         # Build set of current document paths for pruning comparison
         current_doc_paths = {str(doc.relative_to(raw_dir)) for doc in doc_files}
-        prune_deleted_documents(provider, collection, current_doc_paths)
+        prune_deleted_documents(source, collection, current_doc_paths)
 
     doc_count = 0
     chunk_count = 0
@@ -297,16 +293,16 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
 
     log.info(
         "ingestion_started",
-        provider=provider,
+        source=source,
         document_count=len(doc_files),
         force=force,
     )
-    print(f"Ingesting {len(doc_files)} documents for provider: {provider}")
+    print(f"Ingesting {len(doc_files)} documents for source: {source}")
 
     # Get text output directory for extraction artifacts
-    text_dir = get_provider_text_dir(provider)
+    text_dir = get_provider_text_dir(source)
 
-    for doc_path in tqdm(doc_files, desc=f"Processing {provider}"):
+    for doc_path in tqdm(doc_files, desc=f"Processing {source}"):
         try:
             # Calculate relative path for subdirectory support
             relative_path = doc_path.relative_to(raw_dir)
@@ -351,12 +347,12 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
             doc_version = detect_document_version(extracted.full_text)
 
             # Save extraction artifacts (.txt and .meta.json) per spec
-            save_extraction_artifacts(extracted, text_dir, provider, relative_path)
+            save_extraction_artifacts(extracted, text_dir, source, relative_path)
 
             # Chunk document with version info and relative path
             chunks = chunk_document(
                 extracted,
-                provider,
+                source,
                 document_version=doc_version,
                 relative_path=relative_path,
             )
@@ -366,7 +362,7 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
                 continue
 
             # Save chunk artifacts for visibility into chunking process
-            chunks_dir = get_provider_chunks_dir(provider)
+            chunks_dir = get_provider_chunks_dir(source)
             save_chunks_artifacts(chunks, relative_path, chunks_dir)
 
             # Convert to ChromaDB format
@@ -418,7 +414,7 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
                 all_chunks.append({"text": doc, "metadata": dict(meta)})
 
         if all_chunks:
-            definitions_index = build_definitions_index(provider, all_chunks)
+            definitions_index = build_definitions_index(source, all_chunks)
             if len(definitions_index) > 0:
                 save_definitions_index(definitions_index)
                 print(f"  Definitions index: {len(definitions_index)} terms")
@@ -427,7 +423,7 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
 
     log.info(
         "ingestion_complete",
-        provider=provider,
+        source=source,
         documents=doc_count,
         chunks=chunk_count,
         errors=len(errors),
@@ -450,20 +446,20 @@ def ingest_provider(provider: str, force: bool = False) -> dict[str, int | list[
     }
 
 
-def list_indexed_documents(provider: str) -> list[str]:
-    """List all documents indexed for a provider.
+def list_indexed_documents(source: str) -> list[str]:
+    """List all documents indexed for a source.
 
     Args:
-        provider: Provider identifier.
+        source: Provider identifier.
 
     Returns:
-        List of unique document paths (relative to provider directory).
+        List of unique document paths (relative to source directory).
     """
     if not CHROMA_DIR.exists():
         return []
 
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    collection_name = get_collection_name(provider)
+    collection_name = get_collection_name(source)
 
     try:
         collection = client.get_collection(collection_name)

@@ -2,7 +2,7 @@
 """Configuration constants for the License Intelligence System.
 
 This module defines all configuration for the OpenAI-based RAG system.
-Single provider architecture: OpenAI only (no Ollama, no Claude).
+Single source architecture: OpenAI only (no Ollama, no Claude).
 """
 
 import os
@@ -64,13 +64,13 @@ RETRIEVAL_MIN_SCORE = (
 )
 RETRIEVAL_MIN_RATIO = 1.2  # Top-1 score must be >= 1.2 × top-2 score (clear winner)
 
-# Provider configuration
-PROVIDERS: dict[str, dict[str, str]] = {
+# Source configuration
+SOURCES: dict[str, dict[str, str]] = {
     "cme": {
         "name": "CME Group",
         "collection": "cme_docs",
     },
 }
 
-# Default provider for queries
-DEFAULT_PROVIDERS = ["cme"]
+# Default source for queries
+DEFAULT_SOURCES = ["cme"]

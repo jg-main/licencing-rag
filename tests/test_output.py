@@ -2,7 +2,6 @@
 """Tests for output formatters."""
 
 import json
-from unittest.mock import patch
 
 import pytest
 
@@ -28,14 +27,14 @@ def sample_result() -> dict:
         ),
         "citations": [
             {
-                "provider": "cme",
+                "source": "cme",
                 "document": "Fees/Schedule-A.pdf",
                 "section": "Section 3.1 Pricing",
                 "page_start": 5,
                 "page_end": 5,
             },
             {
-                "provider": "cme",
+                "source": "cme",
                 "document": "Agreements/Main-Agreement.pdf",
                 "section": "Section 2.0 Definitions",
                 "page_start": 2,
@@ -53,11 +52,11 @@ def sample_result() -> dict:
                 "section": "Section 2.0 Definitions",
                 "page_start": 2,
                 "page_end": 2,
-                "provider": "cme",
+                "source": "cme",
             },
         ],
         "chunks_retrieved": 2,
-        "providers": ["cme"],
+        "sources": ["cme"],
         "search_mode": "hybrid",
         "effective_search_mode": "hybrid",
     }
@@ -72,7 +71,7 @@ def minimal_result() -> dict:
         "citations": [],
         "definitions": [],
         "chunks_retrieved": 0,
-        "providers": ["cme"],
+        "sources": ["cme"],
         "search_mode": "vector",
         "effective_search_mode": "vector",
     }
@@ -90,7 +89,7 @@ class TestQueryResult:
         assert len(qr.citations) == 2
         assert len(qr.definitions) == 1
         assert qr.chunks_retrieved == 2
-        assert qr.providers == ["cme"]
+        assert qr.sources == ["cme"]
         assert qr.search_mode == "hybrid"
         assert qr.effective_search_mode == "hybrid"
 
@@ -113,7 +112,7 @@ class TestQueryResult:
         assert qr.citations == []
         assert qr.definitions == []
         assert qr.chunks_retrieved == 0
-        assert qr.providers == []
+        assert qr.sources == []
         assert qr.search_mode == ""
         assert qr.effective_search_mode == ""
 
@@ -168,7 +167,7 @@ class TestFormatConsole:
             "citations": [],
             "definitions": [],
             "chunks_retrieved": 0,
-            "providers": ["cme", "opra"],
+            "sources": ["cme", "opra"],
             "search_mode": "hybrid",
             "effective_search_mode": "hybrid",
         }
@@ -185,7 +184,7 @@ class TestFormatConsole:
             "citations": [],
             "definitions": [],
             "chunks_retrieved": 0,
-            "providers": ["cme"],
+            "sources": ["cme"],
             "search_mode": "hybrid",
             "effective_search_mode": "vector",
         }
@@ -235,7 +234,7 @@ class TestFormatJson:
 
         # Check citation structure
         cit = citations[0]
-        assert "provider" in cit
+        assert "source" in cit
         assert "document" in cit
         assert "section" in cit
         assert "page_start" in cit
@@ -254,7 +253,7 @@ class TestFormatJson:
         assert defn["term"] == "Subscriber"
         assert "definition" in defn
         assert "source" in defn
-        assert "provider" in defn["source"]
+        assert "source" in defn["source"]
         assert "document" in defn["source"]
 
     def test_format_json_metadata(self, sample_result: dict) -> None:
@@ -263,7 +262,7 @@ class TestFormatJson:
         parsed = json.loads(output)
 
         metadata = parsed["metadata"]
-        assert metadata["providers"] == ["cme"]
+        assert metadata["sources"] == ["cme"]
         assert metadata["chunks_retrieved"] == 2
         assert metadata["search_mode"] == "hybrid"
         assert metadata["effective_search_mode"] == "hybrid"
@@ -318,7 +317,7 @@ class TestExtractClauses:
 
         assert len(clauses) == 2
         assert clauses[0]["text"] == "First clause text here."
-        assert clauses[0]["source"]["provider"] == "CME"
+        assert clauses[0]["source"]["source"] == "CME"
         assert clauses[0]["source"]["document"] == "Document.pdf"
         assert clauses[0]["source"]["page_start"] == 5
 

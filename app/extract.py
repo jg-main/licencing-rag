@@ -279,7 +279,7 @@ def detect_document_version(text: str) -> str | None:
 def save_extraction_artifacts(
     extracted: ExtractedDocument,
     output_dir: Path,
-    provider: str,
+    source: str,
     relative_path: Path | None = None,
 ) -> tuple[Path, Path]:
     """Save extraction artifacts (.txt and .meta.json) as per spec.
@@ -287,8 +287,8 @@ def save_extraction_artifacts(
     Args:
         extracted: The extracted document.
         output_dir: Directory to save artifacts (e.g., data/text/cme/).
-        provider: Provider identifier (e.g., "cme").
-        relative_path: Relative path from provider raw directory (for subdirectory support).
+        source: Provider identifier (e.g., "cme").
+        relative_path: Relative path from source raw directory (for subdirectory support).
 
     Returns:
         Tuple of (text_path, meta_path) for saved files.
@@ -312,7 +312,7 @@ def save_extraction_artifacts(
     meta_path = output_dir / f"{source_name}.meta.json"
     metadata = {
         "source_file": extracted.source_file,
-        "provider": provider,
+        "source": source,
         "extracted_at": datetime.now(timezone.utc).isoformat(),
         "page_count": extracted.page_count,
         "extraction_method": extracted.extraction_method,

@@ -42,7 +42,7 @@ CONSOLE_THEME = Theme(
         "warning": "yellow",
         "error": "red bold",
         "success": "green",
-        "provider": "cyan bold",
+        "source": "cyan bold",
         "document": "green",
         "section": "yellow",
         "page": "magenta",
@@ -66,7 +66,7 @@ class QueryResult:
     citations: list[dict[str, Any]]
     definitions: list[dict[str, Any]]
     chunks_retrieved: int
-    providers: list[str]
+    sources: list[str]
     search_mode: str
     effective_search_mode: str
     debug_info: dict[str, Any] | None = None
@@ -87,7 +87,7 @@ class QueryResult:
             citations=data.get("citations", []),
             definitions=data.get("definitions", []),
             chunks_retrieved=data.get("chunks_retrieved", 0),
-            providers=data.get("providers", []),
+            sources=data.get("sources", []),
             search_mode=data.get("search_mode", ""),
             effective_search_mode=data.get("effective_search_mode", ""),
             debug_info=data.get("debug_info"),
@@ -99,7 +99,7 @@ def format_console(result: dict[str, Any]) -> str:
 
     Produces beautifully formatted output with:
     - Answer panel with markdown rendering
-    - Source documents table with provider, document, section, and page info
+    - Source documents table with source, document, section, and page info
     - Auto-linked definitions table (if any)
     - Search mode and retrieval statistics
 
@@ -115,8 +115,8 @@ def format_console(result: dict[str, Any]) -> str:
 
     qr = QueryResult.from_dict(result)
 
-    # Header with provider info
-    provider_label = ", ".join(p.upper() for p in qr.providers) if qr.providers else ""
+    # Header with source info
+    provider_label = ", ".join(p.upper() for p in qr.sources) if qr.sources else ""
     title = f"RESPONSE (Sources: {provider_label})" if provider_label else "RESPONSE"
 
     console.print()
@@ -175,13 +175,13 @@ def format_console(result: dict[str, Any]) -> str:
             header_style="bold",
             border_style="dim",
         )
-        citations_table.add_column("Provider", style="provider", width=10)
+        citations_table.add_column("Provider", style="source", width=10)
         citations_table.add_column("Document", style="document")
         citations_table.add_column("Section", style="section")
         citations_table.add_column("Pages", style="page", justify="right")
 
         for cit in qr.citations:
-            provider = cit.get("provider", "").upper()
+            source = cit.get("source", "").upper()
             page_start = cit.get("page_start", "?")
             page_end = cit.get("page_end", page_start)
             if page_start != page_end and page_end != "?":
@@ -190,7 +190,7 @@ def format_console(result: dict[str, Any]) -> str:
                 page_str = str(page_start)
 
             citations_table.add_row(
-                provider,
+                source,
                 cit.get("document", ""),
                 cit.get("section", "N/A"),
                 page_str,
@@ -274,7 +274,7 @@ def format_json(result: dict[str, Any], pretty: bool = True) -> str:
         "definitions": [...],
         "citations": [...],
         "metadata": {
-            "providers": [...],
+            "sources": [...],
             "chunks_retrieved": int,
             "search_mode": "string",
             "effective_search_mode": "string",
@@ -300,7 +300,7 @@ def format_json(result: dict[str, Any], pretty: bool = True) -> str:
                 "term": d.get("term", ""),
                 "definition": d.get("definition", ""),
                 "source": {
-                    "provider": d.get("provider", ""),
+                    "source": d.get("source", ""),
                     "document": d.get("document_path", d.get("document", "")),
                     "section": d.get("section", ""),
                     "page_start": d.get("page_start"),
@@ -311,7 +311,7 @@ def format_json(result: dict[str, Any], pretty: bool = True) -> str:
         ],
         "citations": [
             {
-                "provider": c.get("provider", ""),
+                "source": c.get("source", ""),
                 "document": c.get("document", ""),
                 "section": c.get("section", ""),
                 "page_start": c.get("page_start"),
@@ -320,7 +320,7 @@ def format_json(result: dict[str, Any], pretty: bool = True) -> str:
             for c in qr.citations
         ],
         "metadata": {
-            "providers": qr.providers,
+            "sources": qr.sources,
             "chunks_retrieved": qr.chunks_retrieved,
             "search_mode": qr.search_mode,
             "effective_search_mode": qr.effective_search_mode,
@@ -368,11 +368,11 @@ def _extract_clauses(context: str) -> list[dict[str, Any]]:
     )
     parts = re.split(pattern, context)
 
-    # parts will be: [empty, provider, doc, section, pages, text, provider, doc, ...]
+    # parts will be: [empty, source, doc, section, pages, text, source, doc, ...]
     i = 1
     while i < len(parts):
         if i + 4 < len(parts):
-            provider = parts[i].strip()
+            source = parts[i].strip()
             document = parts[i + 1].strip()
             section = parts[i + 2].strip()
             pages_str = parts[i + 3].strip()
@@ -393,7 +393,7 @@ def _extract_clauses(context: str) -> list[dict[str, Any]]:
                     {
                         "text": text,
                         "source": {
-                            "provider": provider,
+                            "source": source,
                             "document": document,
                             "section": section,
                             "page_start": page_start,
@@ -430,10 +430,8 @@ def print_result(
 
         qr = QueryResult.from_dict(result)
 
-        # Header with provider info
-        provider_label = (
-            ", ".join(p.upper() for p in qr.providers) if qr.providers else ""
-        )
+        # Header with source info
+        provider_label = ", ".join(p.upper() for p in qr.sources) if qr.sources else ""
         title = (
             f"RESPONSE (Sources: {provider_label})" if provider_label else "RESPONSE"
         )
@@ -475,13 +473,13 @@ def print_result(
                 header_style="bold",
                 border_style="dim",
             )
-            citations_table.add_column("Provider", style="provider", width=10)
+            citations_table.add_column("Provider", style="source", width=10)
             citations_table.add_column("Document", style="document")
             citations_table.add_column("Section", style="section")
             citations_table.add_column("Pages", style="page", justify="right")
 
             for cit in qr.citations:
-                provider = cit.get("provider", "").upper()
+                source = cit.get("source", "").upper()
                 page_start = cit.get("page_start", "?")
                 page_end = cit.get("page_end", page_start)
                 if page_start != page_end and page_end != "?":
@@ -490,7 +488,7 @@ def print_result(
                     page_str = str(page_start)
 
                 citations_table.add_row(
-                    provider,
+                    source,
                     cit.get("document", ""),
                     cit.get("section", "N/A"),
                     page_str,

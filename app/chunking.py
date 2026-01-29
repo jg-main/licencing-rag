@@ -40,9 +40,9 @@ class Chunk:
 
     text: str
     chunk_id: str
-    provider: str
+    source: str
     document_name: str
-    document_path: str  # Relative path from provider dir (e.g., "Fees/schedule.pdf")
+    document_path: str  # Relative path from source dir (e.g., "Fees/schedule.pdf")
     section_heading: str
     page_start: int
     page_end: int
@@ -358,7 +358,7 @@ def _find_page_range_by_position(
 
 def chunk_document(
     document: ExtractedDocument,
-    provider: str,
+    source: str,
     document_version: str | None = None,
     relative_path: Path | None = None,
 ) -> list[Chunk]:
@@ -366,9 +366,9 @@ def chunk_document(
 
     Args:
         document: Extracted document to chunk.
-        provider: Provider identifier (e.g., \"cme\").
+        source: Provider identifier (e.g., \"cme\").
         document_version: Optional version string detected from document.
-        relative_path: Relative path from provider raw directory (for subdirectory support).
+        relative_path: Relative path from source raw directory (for subdirectory support).
 
     Returns:
         List of Chunk objects with metadata.
@@ -419,8 +419,8 @@ def chunk_document(
 
             chunk = Chunk(
                 text=text,
-                chunk_id=f"{provider}_{safe_filename}_{chunk_index}",
-                provider=provider,
+                chunk_id=f"{source}_{safe_filename}_{chunk_index}",
+                source=source,
                 document_name=document.source_file,
                 document_path=doc_path,  # Relative path for unique identification
                 section_heading=section_heading,

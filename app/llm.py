@@ -2,7 +2,7 @@
 """LLM client for OpenAI GPT-4.1.
 
 This module provides a simple OpenAI client for answer generation.
-Single provider architecture: OpenAI only (no Ollama, no Claude).
+Single source architecture: OpenAI only (no Ollama, no Claude).
 """
 
 import os
@@ -120,5 +120,5 @@ def get_llm() -> _OpenAIWrapper:
             "OPENAI_API_KEY environment variable is required. "
             "Get your key at https://platform.openai.com/api-keys"
         )
-    log.debug("initializing_llm", provider="openai", model=LLM_MODEL)
+    log.debug("initializing_llm", source="openai", model=LLM_MODEL)
     return _OpenAIWrapper()

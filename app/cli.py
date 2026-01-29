@@ -7,7 +7,7 @@ for the 'rag' command when installed via pip install -e .
 import argparse
 import sys
 
-from app.config import PROVIDERS
+from app.config import SOURCES
 from app.config import TOP_K
 from app.logging import configure_logging
 
@@ -23,22 +23,22 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     """
     from app.ingest import ingest_provider
 
-    providers_to_ingest = []
+    sources_to_ingest = []
 
     if args.all:
-        providers_to_ingest = list(PROVIDERS.keys())
-    elif args.provider:
-        providers_to_ingest = [args.provider]
+        sources_to_ingest = list(SOURCES.keys())
+    elif args.source:
+        sources_to_ingest = [args.source]
     else:
-        print("Error: Specify --provider <name> or --all")
+        print("Error: Specify --source <name> or --all")
         return 1
 
-    for provider in providers_to_ingest:
+    for source in sources_to_ingest:
         try:
             print(f"\n{'=' * 60}")
-            print(f"Ingesting provider: {provider}")
+            print(f"Ingesting source: {source}")
             print("=" * 60)
-            stats = ingest_provider(provider, force=args.force)
+            stats = ingest_provider(source, force=args.force)
             errors = stats.get("errors", [])
             if errors and isinstance(errors, list) and len(errors) > 0:
                 print(f"Completed with {len(errors)} errors")
@@ -65,7 +65,7 @@ def cmd_query(args: argparse.Namespace) -> int:
     from app.output import print_result
     from app.query import query
 
-    providers = args.provider if args.provider else None
+    sources = args.source if args.source else None
     search_mode = getattr(args, "search_mode", "hybrid")
     debug = getattr(args, "debug", False)
     enable_reranking = getattr(args, "enable_reranking", True)
@@ -75,7 +75,7 @@ def cmd_query(args: argparse.Namespace) -> int:
     try:
         result = query(
             args.question,
-            providers=providers,
+            sources=sources,
             top_k=args.top_k,
             search_mode=search_mode,
             enable_reranking=enable_reranking,
@@ -113,18 +113,18 @@ def cmd_list(args: argparse.Namespace) -> int:
     """
     from app.ingest import list_indexed_documents
 
-    providers_to_list = []
+    sources_to_list = []
 
-    if args.provider:
-        providers_to_list = [args.provider]
+    if args.source:
+        sources_to_list = [args.source]
     else:
-        providers_to_list = list(PROVIDERS.keys())
+        sources_to_list = list(SOURCES.keys())
 
-    for provider in providers_to_list:
-        print(f"\n{provider.upper()} Documents:")
+    for source in sources_to_list:
+        print(f"\n{source.upper()} Documents:")
         print("-" * 40)
 
-        documents = list_indexed_documents(provider)
+        documents = list_indexed_documents(source)
         if documents:
             for i, doc in enumerate(documents, 1):
                 print(f"  {i:3}. {doc}")
@@ -147,14 +147,14 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  rag ingest --provider cme
+  rag ingest --source cme
   rag query "What are the redistribution requirements?"
   rag ask "What are the redistribution requirements?"
-  rag query --provider cme "What fees apply to derived data?"
+  rag query --source cme "What fees apply to derived data?"
   rag ask --search-mode keyword "subscriber definition"
   rag query --search-mode vector "What are the licensing terms?"
   rag ask --format json "What are the fees?" > result.json
-  rag list --provider cme
+  rag list --source cme
         """,
     )
 
@@ -166,14 +166,14 @@ Examples:
         help="Ingest documents into the vector database",
     )
     ingest_parser.add_argument(
-        "--provider",
+        "--source",
         type=str,
-        help="Provider to ingest (e.g., cme)",
+        help="Source to ingest (e.g., cme)",
     )
     ingest_parser.add_argument(
         "--all",
         action="store_true",
-        help="Ingest all configured providers",
+        help="Ingest all configured sources",
     )
     ingest_parser.add_argument(
         "--force",
@@ -193,10 +193,10 @@ Examples:
         help="Question to ask",
     )
     query_parser.add_argument(
-        "--provider",
+        "--source",
         type=str,
         action="append",
-        help="Provider(s) to query (can be specified multiple times)",
+        help="Source(s) to query (can be specified multiple times)",
     )
     query_parser.add_argument(
         "--top-k",
@@ -256,9 +256,9 @@ Examples:
         help="List indexed documents",
     )
     list_parser.add_argument(
-        "--provider",
+        "--source",
         type=str,
-        help="Provider to list (default: all)",
+        help="Source to list (default: all)",
     )
 
     # Global options

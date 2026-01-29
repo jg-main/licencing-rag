@@ -49,7 +49,7 @@ ______________________________________________________________________
 
 ### 1. During Ingestion (Building the Indexes)
 
-When you run `rag ingest --provider cme`, we create TWO indexes:
+When you run `rag ingest --source cme`, we create TWO indexes:
 
 #### Vector Index (ChromaDB)
 
@@ -301,8 +301,8 @@ index/
     cme_docs/
       *.parquet
   bm25/                 # Keyword indexes
-    cme_index.pkl       # BM25 for CME provider
-    opra_index.pkl      # BM25 for OPRA provider
+    cme_index.pkl       # BM25 for CME source
+    opra_index.pkl      # BM25 for OPRA source
 ```
 
 ### Index Persistence
@@ -351,7 +351,7 @@ effective_mode = "vector"  # Even if you requested "hybrid"
 **You'll see a warning:**
 
 ```
-WARNING: BM25 index not found for provider 'cme'. Falling back to vector-only search.
+WARNING: BM25 index not found for source 'cme'. Falling back to vector-only search.
 ```
 
 ______________________________________________________________________
@@ -366,7 +366,7 @@ ______________________________________________________________________
 
 ```bash
 # Re-ingest to build BM25 index
-rag ingest --provider cme
+rag ingest --source cme
 ```
 
 ### "Invalid BM25 index file"
@@ -380,7 +380,7 @@ rag ingest --provider cme
 rm index/bm25/cme_index.pkl
 
 # Re-ingest
-rag ingest --provider cme
+rag ingest --source cme
 ```
 
 ### Hybrid search slower than expected
@@ -443,10 +443,10 @@ class BM25Searcher:
 
 ### Multi-Provider Queries
 
-When querying multiple providers:
+When querying multiple sources:
 
 ```bash
-rag query "Subscriber definition" --provider cme --provider opra
+rag query "Subscriber definition" --source cme --source opra
 ```
 
 **What happens:**
@@ -458,7 +458,7 @@ rag query "Subscriber definition" --provider cme --provider opra
 1. Merge all 40 results with RRF
 1. Take top 5 overall
 
-**Cross-provider boosting:** If the same concept appears in multiple provider docs, it gets boosted!
+**Cross-source boosting:** If the same concept appears in multiple source docs, it gets boosted!
 
 ______________________________________________________________________
 

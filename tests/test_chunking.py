@@ -3,21 +3,19 @@
 
 from pathlib import Path
 
-import pytest
-
-from app.chunking import (
-    Chunk,
-    _build_page_positions,
-    _find_page_range_by_position,
-    _is_important_short_section,
-    chunk_document,
-    detect_section_heading,
-    is_definitions_section,
-    is_fee_table_content,
-    split_by_sections,
-    window_chunk,
-)
-from app.extract import ExtractedDocument, PageContent, extract_pdf
+from app.chunking import Chunk
+from app.chunking import _build_page_positions
+from app.chunking import _find_page_range_by_position
+from app.chunking import _is_important_short_section
+from app.chunking import chunk_document
+from app.chunking import detect_section_heading
+from app.chunking import is_definitions_section
+from app.chunking import is_fee_table_content
+from app.chunking import split_by_sections
+from app.chunking import window_chunk
+from app.extract import ExtractedDocument
+from app.extract import PageContent
+from app.extract import extract_pdf
 
 
 class TestWindowChunk:
@@ -116,7 +114,7 @@ class TestWindowChunk:
         text = " ".join(f"word{i}" for i in range(10))
 
         # Without allow_short, would return empty
-        result_normal = window_chunk(text, size=100, overlap=20, allow_short=False)
+        _ = window_chunk(text, size=100, overlap=20, allow_short=False)
 
         # With allow_short, should preserve the content
         result_short = window_chunk(text, size=100, overlap=20, allow_short=True)
@@ -241,34 +239,26 @@ class TestIsImportantShortSection:
         """Body text containing fee keywords returns True even without heading keywords."""
         # Heading has no keywords, but body mentions fees
         assert _is_important_short_section(
-            "SECTION 5",
-            "The monthly fee for data access shall be $500."
+            "SECTION 5", "The monthly fee for data access shall be $500."
         )
         assert _is_important_short_section(
-            "Article VII",
-            "Payment is due within 30 days of invoice."
+            "Article VII", "Payment is due within 30 days of invoice."
         )
         assert _is_important_short_section(
-            "Part 3",
-            "Termination of this agreement requires 90 days notice."
+            "Part 3", "Termination of this agreement requires 90 days notice."
         )
 
     def test_definitions_section_detected(self) -> None:
         """Definitions sections are detected as important."""
-        assert _is_important_short_section(
-            "ARTICLE I",
-            "Definitions. 'Data' means..."
-        )
+        assert _is_important_short_section("ARTICLE I", "Definitions. 'Data' means...")
 
     def test_non_important_section(self) -> None:
         """Sections without important keywords return False."""
         assert not _is_important_short_section(
-            "SECTION 1",
-            "This agreement is entered into between the parties."
+            "SECTION 1", "This agreement is entered into between the parties."
         )
         assert not _is_important_short_section(
-            "Background",
-            "The company was founded in 2020."
+            "Background", "The company was founded in 2020."
         )
 
     def test_body_scan_limited_to_500_chars(self) -> None:
@@ -276,8 +266,7 @@ class TestIsImportantShortSection:
         # Fee keyword appears after 500 characters
         filler = "x" * 510
         assert not _is_important_short_section(
-            "SECTION 1",
-            f"{filler} The fee is $100."
+            "SECTION 1", f"{filler} The fee is $100."
         )
 
 
@@ -289,7 +278,7 @@ class TestSplitBySectionsOffsetAlignment:
         text = """Preamble content here.
 
 SECTION 1 First Section
-   Content with leading whitespace.   
+   Content with leading whitespace.
 
 SECTION 2 Second Section
 More content here."""
@@ -306,11 +295,11 @@ More content here."""
 
     def test_offsets_trim_whitespace(self) -> None:
         """Offsets exclude leading/trailing whitespace from sections."""
-        text = """   
+        text = """
 SECTION 1 Test
-   
-   Some content here   
-   
+
+   Some content here
+
 """
         sections = split_by_sections(text)
 
@@ -319,7 +308,9 @@ SECTION 1 Test
             assert section_text == section_text.strip()
             # Offsets should not include outer whitespace
             if content_start > 0:
-                assert text[content_start - 1].isspace() or text[content_start - 1] == "\n"
+                assert (
+                    text[content_start - 1].isspace() or text[content_start - 1] == "\n"
+                )
             if content_end < len(text):
                 assert text[content_end].isspace() or text[content_end] == "\n"
 
@@ -368,7 +359,9 @@ class TestPagePositions:
 
         # Chunk in page 3
         page3_start = 100 + 1 + 100 + 1  # Two pages + newlines
-        assert _find_page_range_by_position(page3_start + 10, page3_start + 50, positions, doc) == (3, 3)
+        assert _find_page_range_by_position(
+            page3_start + 10, page3_start + 50, positions, doc
+        ) == (3, 3)
 
 
 class TestChunkDocument:
@@ -389,7 +382,7 @@ class TestChunkDocument:
         chunks = chunk_document(extracted, "cme")
 
         for chunk in chunks:
-            assert chunk.provider == "cme"
+            assert chunk.source == "cme"
             assert chunk.document_name == sample_pdf.name
             assert chunk.page_start >= 1
             assert chunk.page_end >= chunk.page_start

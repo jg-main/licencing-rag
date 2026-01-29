@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-01-27
 
-This document tracks the sources of all market data provider documentation used in the License Intelligence System.
+This document tracks the sources of all market data source documentation used in the License Intelligence System.
 
 ______________________________________________________________________
 
@@ -29,36 +29,36 @@ ______________________________________________________________________
 
 Re-ingestion is recommended when:
 
-1. **Quarterly** - Routine update check for all providers
-1. **Fee Changes** - When providers announce fee schedule updates
+1. **Quarterly** - Routine update check for all sources
+1. **Fee Changes** - When sources announce fee schedule updates
 1. **Policy Changes** - When new agreements or policies are published
 1. **User Reports** - When users report outdated information
 
 ### How to Update
 
 ```bash
-# 1. Download updated documents from provider source
-# Place in data/raw/{provider}/
+# 1. Download updated documents from source source
+# Place in data/raw/{source}/
 
 # 2. Re-ingest with --force to rebuild index
-rag ingest --provider cme --force
+rag ingest --source cme --force
 
 # 3. Verify document count and test queries
-rag list --provider cme
-rag query "What are the current fees?" --provider cme
+rag list --source cme
+rag query "What are the current fees?" --source cme
 
 # 4. Update this document with new retrieval date
 ```
 
 ### Version Tracking
 
-Since providers don't use explicit versioning:
+Since sources don't use explicit versioning:
 
 - **Retrieval Date** serves as the primary version identifier
 - **File Modification Dates** in `data/raw/` indicate when files were downloaded
 - **Document Content** is the authoritative source (not filename)
 
-**Recommendation:** Maintain update history in each provider's detail file (see [sources/](sources/) directory).
+**Recommendation:** Maintain update history in each source's detail file (see [sources/](sources/) directory).
 
 ______________________________________________________________________
 
@@ -66,13 +66,13 @@ ______________________________________________________________________
 
 **Important Notes:**
 
-1. **Public Documents Only** - All ingested documents are publicly available from official provider sources
+1. **Public Documents Only** - All ingested documents are publicly available from official source sources
 1. **No Redistribution** - This system is for internal analysis only; documents are not redistributed
-1. **Authoritative Source** - Always verify critical licensing decisions against the original provider documents
+1. **Authoritative Source** - Always verify critical licensing decisions against the original source documents
 1. **Currency** - Document retrieval dates are tracked; users should verify currency for time-sensitive queries
 
 **Disclaimer:**\
-This system provides analysis of publicly available licensing documentation. It is not legal advice. For binding contractual terms, consult the official agreements with each provider and seek appropriate legal counsel.
+This system provides analysis of publicly available licensing documentation. It is not legal advice. For binding contractual terms, consult the official agreements with each source and seek appropriate legal counsel.
 
 ______________________________________________________________________
 

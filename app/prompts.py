@@ -11,7 +11,7 @@ Phase 7 Implementation: LLM Prompt Discipline
 SYSTEM_PROMPT = """You are a legal analysis assistant specializing in market data licensing agreements.
 
 CONTEXT ABOUT THE USER:
-- AlgoSeek is a Vendor of Record and Distributor of market data for {provider}.
+- AlgoSeek is a Vendor of Record and Distributor of market data for {source}.
 - Questions are typically about AlgoSeek's obligations, fees, and compliance requirements
 - Focus on vendor/distributor responsibilities when interpreting license terms
 
@@ -30,7 +30,7 @@ GROUNDING REQUIREMENTS (Accuracy-First):
 
 MANDATORY REFUSAL (Code-Enforced Accuracy):
 8. If the complete answer is not explicitly in the context, you MUST refuse to answer
-9. Refusal format (use exactly): "This is not addressed in the provided PROVIDER documents." where PROVIDER is the uppercase provider name(s)
+9. Refusal format (use exactly): "This is not addressed in the provided PROVIDER documents." where PROVIDER is the uppercase source name(s)
 10. When refusing, explain what specific information is missing or ambiguous
 11. NEVER answer "based on typical practice" or "in most cases" - refuse instead
 12. NEVER say "while not explicitly stated" and then provide an answer - refuse instead
@@ -40,7 +40,7 @@ CITATION REQUIREMENTS (Mandatory Traceability):
 14. ALWAYS cite specific documents, sections, and page numbers for EVERY claim
 15. Citations are not optional - they are mandatory audit trails
 16. If you cannot provide a citation for a statement, delete that statement
-17. Use provider-prefixed citations: [CME], [OPRA], etc.
+17. Use source-prefixed citations: [CME], [OPRA], etc.
 18. Quote exact text when making specific claims about fees, requirements, or definitions
 
 DEFINITIONS AND TERMINOLOGY:
@@ -114,7 +114,7 @@ Your purpose is legal accuracy, not user satisfaction. Do not compromise accurac
 Do not guess. Do not generalize. Do not speculate. Do not extrapolate. Quote and cite."""
 
 QA_PROMPT = """════════════════════════════════════════════════════════════════════
-CONTEXT FROM {provider} DOCUMENTS
+CONTEXT FROM {source} DOCUMENTS
 ════════════════════════════════════════════════════════════════════
 
 {context}
@@ -148,13 +148,13 @@ REFUSAL CRITERIA (Refuse if ANY apply):
 
 REFUSAL FORMAT (Use exactly as shown):
 "This is not addressed in the provided PROVIDER documents. [Explain what specific information is missing or unclear.]"
-Replace PROVIDER with the actual provider name(s) from the context header above.
+Replace PROVIDER with the actual source name(s) from the context header above.
 
 ACCURACY REMINDER: Better to refuse than to answer with uncertainty. Legal accuracy > user satisfaction."""
 
 
 QA_PROMPT_NO_DEFINITIONS = """════════════════════════════════════════════════════════════════════
-CONTEXT FROM {provider} DOCUMENTS
+CONTEXT FROM {source} DOCUMENTS
 ════════════════════════════════════════════════════════════════════
 
 {context}
@@ -185,26 +185,24 @@ REFUSAL CRITERIA (Refuse if ANY apply):
 
 REFUSAL FORMAT (Use exactly as shown):
 "This is not addressed in the provided PROVIDER documents. [Explain what specific information is missing or unclear.]"
-Replace PROVIDER with the actual provider name(s) from the context header above.
+Replace PROVIDER with the actual source name(s) from the context header above.
 
 ACCURACY REMINDER: Better to refuse than to answer with uncertainty. Legal accuracy > user satisfaction."""
 
 
-def get_refusal_message(providers: list[str]) -> str:
-    """Get provider-specific refusal message.
+def get_refusal_message(sources: list[str]) -> str:
+    """Get source-specific refusal message.
 
     Args:
-        providers: List of provider names queried.
+        sources: List of source names queried.
 
     Returns:
-        Refusal message with provider context.
+        Refusal message with source context.
     """
-    if len(providers) == 1:
-        return (
-            f"This is not addressed in the provided {providers[0].upper()} documents."
-        )
+    if len(sources) == 1:
+        return f"This is not addressed in the provided {sources[0].upper()} documents."
     else:
-        provider_names = ", ".join(p.upper() for p in providers)
+        provider_names = ", ".join(p.upper() for p in sources)
         return f"This is not addressed in the provided {provider_names} documents."
 
 

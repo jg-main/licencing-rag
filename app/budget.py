@@ -59,9 +59,9 @@ def format_chunk_for_context(text: str, metadata: dict[str, Any]) -> str:
     Returns:
         Formatted string as it will appear in context.
     """
-    provider = metadata.get("provider", "unknown").upper()
+    source_name = metadata.get("source", metadata.get("provider", "unknown")).upper()
     # Prefer document_path (includes subdirectory) for unambiguous citations
-    source = metadata.get("document_path") or metadata.get("document_name", "Unknown")
+    doc_path = metadata.get("document_path") or metadata.get("document_name", "Unknown")
     section = metadata.get("section_heading", "N/A")
     page_start = metadata.get("page_start", "?")
     page_end = metadata.get("page_end", "?")
@@ -71,7 +71,7 @@ def format_chunk_for_context(text: str, metadata: dict[str, Any]) -> str:
     else:
         page_info = f"Pages {page_start}-{page_end}"
 
-    header = f"--- [{provider}] {source} | {section} | {page_info} ---"
+    header = f"--- [{source_name}] {doc_path} | {section} | {page_info} ---"
     return f"{header}\n{text}"
 
 
@@ -144,7 +144,7 @@ def enforce_full_prompt_budget(
                 context=context,
                 definitions_section=definitions_context,
                 question=question,
-                provider=provider_label,
+                source=provider_label,
             )
         else:
             from app.prompts import QA_PROMPT_NO_DEFINITIONS
@@ -152,7 +152,7 @@ def enforce_full_prompt_budget(
             qa_prompt = QA_PROMPT_NO_DEFINITIONS.format(
                 context=context,
                 question=question,
-                provider=provider_label,
+                source=provider_label,
             )
 
         encoding = get_encoding()
@@ -208,13 +208,13 @@ def enforce_full_prompt_budget(
                 context=context,
                 definitions_section=definitions_context,
                 question=question,
-                provider=provider_label,
+                source=provider_label,
             )
         else:
             qa_prompt = QA_PROMPT_NO_DEFINITIONS.format(
                 context=context,
                 question=question,
-                provider=provider_label,
+                source=provider_label,
             )
 
         # Measure FULL prompt tokens
@@ -275,13 +275,13 @@ def enforce_full_prompt_budget(
             context=context,
             definitions_section=definitions_context,
             question=question,
-            provider=provider_label,
+            source=provider_label,
         )
     else:
         qa_prompt = QA_PROMPT_NO_DEFINITIONS.format(
             context=context,
             question=question,
-            provider=provider_label,
+            source=provider_label,
         )
 
     total_tokens = measure_full_prompt_tokens(system_prompt, qa_prompt, encoding)

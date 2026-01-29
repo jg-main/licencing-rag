@@ -1,10 +1,7 @@
 """Tests for definitions auto-linking implementation."""
 
 from pathlib import Path
-from unittest.mock import MagicMock
 from unittest.mock import patch
-
-import pytest
 
 from app.definitions import COMMON_DEFINED_TERMS
 from app.definitions import DefinitionEntry
@@ -172,7 +169,7 @@ class TestDefinitionsIndex:
 
     def test_add_and_get_entry(self) -> None:
         """Can add and retrieve definition entries."""
-        index = DefinitionsIndex(provider="test")
+        index = DefinitionsIndex(source="test")
         entry = DefinitionEntry(
             term="Subscriber",
             normalized_term="subscriber",
@@ -183,7 +180,7 @@ class TestDefinitionsIndex:
             page_start=1,
             page_end=1,
             definition_text="A person receiving data.",
-            provider="test",
+            source="test",
         )
         index.add_entry(entry)
 
@@ -193,7 +190,7 @@ class TestDefinitionsIndex:
 
     def test_case_insensitive_lookup(self) -> None:
         """Lookup is case-insensitive."""
-        index = DefinitionsIndex(provider="test")
+        index = DefinitionsIndex(source="test")
         entry = DefinitionEntry(
             term="Subscriber",
             normalized_term="subscriber",
@@ -204,7 +201,7 @@ class TestDefinitionsIndex:
             page_start=1,
             page_end=1,
             definition_text="A person receiving data.",
-            provider="test",
+            source="test",
         )
         index.add_entry(entry)
 
@@ -215,7 +212,7 @@ class TestDefinitionsIndex:
 
     def test_has_term(self) -> None:
         """has_term returns correct boolean."""
-        index = DefinitionsIndex(provider="test")
+        index = DefinitionsIndex(source="test")
         entry = DefinitionEntry(
             term="Subscriber",
             normalized_term="subscriber",
@@ -226,7 +223,7 @@ class TestDefinitionsIndex:
             page_start=1,
             page_end=1,
             definition_text="A person receiving data.",
-            provider="test",
+            source="test",
         )
         index.add_entry(entry)
 
@@ -236,7 +233,7 @@ class TestDefinitionsIndex:
 
     def test_len(self) -> None:
         """Length returns number of unique terms."""
-        index = DefinitionsIndex(provider="test")
+        index = DefinitionsIndex(source="test")
         assert len(index) == 0
 
         entry1 = DefinitionEntry(
@@ -249,7 +246,7 @@ class TestDefinitionsIndex:
             page_start=1,
             page_end=1,
             definition_text="A person receiving data.",
-            provider="test",
+            source="test",
         )
         index.add_entry(entry1)
         assert len(index) == 1
@@ -265,14 +262,14 @@ class TestDefinitionsIndex:
             page_start=5,
             page_end=5,
             definition_text="Another definition.",
-            provider="test",
+            source="test",
         )
         index.add_entry(entry2)
         assert len(index) == 1  # Same term, still just one unique term
 
     def test_get_all_terms(self) -> None:
         """get_all_terms returns all indexed terms."""
-        index = DefinitionsIndex(provider="test")
+        index = DefinitionsIndex(source="test")
         entry1 = DefinitionEntry(
             term="Subscriber",
             normalized_term="subscriber",
@@ -283,7 +280,7 @@ class TestDefinitionsIndex:
             page_start=1,
             page_end=1,
             definition_text="A person receiving data.",
-            provider="test",
+            source="test",
         )
         entry2 = DefinitionEntry(
             term="Vendor",
@@ -295,7 +292,7 @@ class TestDefinitionsIndex:
             page_start=2,
             page_end=2,
             definition_text="A data provider.",
-            provider="test",
+            source="test",
         )
         index.add_entry(entry1)
         index.add_entry(entry2)
@@ -367,7 +364,7 @@ class TestSaveLoadDefinitionsIndex:
 
     def test_save_and_load(self, tmp_path: Path) -> None:
         """Can save and load index correctly."""
-        index = DefinitionsIndex(provider="test")
+        index = DefinitionsIndex(source="test")
         entry = DefinitionEntry(
             term="Subscriber",
             normalized_term="subscriber",
@@ -378,7 +375,7 @@ class TestSaveLoadDefinitionsIndex:
             page_start=1,
             page_end=1,
             definition_text="A person receiving data.",
-            provider="test",
+            source="test",
         )
         index.add_entry(entry)
 
@@ -404,7 +401,7 @@ class TestDefinitionsRetriever:
     def test_get_definition(self, tmp_path: Path) -> None:
         """Can retrieve definitions for a term."""
         # Create and save an index
-        index = DefinitionsIndex(provider="test")
+        index = DefinitionsIndex(source="test")
         entry = DefinitionEntry(
             term="Subscriber",
             normalized_term="subscriber",
@@ -415,7 +412,7 @@ class TestDefinitionsRetriever:
             page_start=1,
             page_end=1,
             definition_text="A person receiving data.",
-            provider="test",
+            source="test",
         )
         index.add_entry(entry)
 
@@ -432,7 +429,7 @@ class TestDefinitionsRetriever:
     def test_find_definitions_in_text(self, tmp_path: Path) -> None:
         """Finds definitions for terms mentioned in text."""
         # Create and save an index
-        index = DefinitionsIndex(provider="test")
+        index = DefinitionsIndex(source="test")
         entry = DefinitionEntry(
             term="Subscriber",
             normalized_term="subscriber",
@@ -443,7 +440,7 @@ class TestDefinitionsRetriever:
             page_start=1,
             page_end=1,
             definition_text="A person receiving data.",
-            provider="test",
+            source="test",
         )
         index.add_entry(entry)
 
@@ -459,7 +456,7 @@ class TestDefinitionsRetriever:
 
     def test_caching(self, tmp_path: Path) -> None:
         """Caches definition lookups."""
-        index = DefinitionsIndex(provider="test")
+        index = DefinitionsIndex(source="test")
         entry = DefinitionEntry(
             term="Subscriber",
             normalized_term="subscriber",
@@ -470,7 +467,7 @@ class TestDefinitionsRetriever:
             page_start=1,
             page_end=1,
             definition_text="A person receiving data.",
-            provider="test",
+            source="test",
         )
         index.add_entry(entry)
 
@@ -516,7 +513,7 @@ class TestFormatDefinitionsForContext:
                     page_start=1,
                     page_end=1,
                     definition_text="A person receiving data.",
-                    provider="cme",
+                    source="cme",
                 )
             ]
         }
@@ -553,7 +550,7 @@ class TestFormatDefinitionsForOutput:
                     page_start=1,
                     page_end=1,
                     definition_text="A person receiving data.",
-                    provider="cme",
+                    source="cme",
                 )
             ]
         }
@@ -564,7 +561,7 @@ class TestFormatDefinitionsForOutput:
         assert result[0]["term"] == "Subscriber"
         assert result[0]["definition"] == "A person receiving data."
         assert result[0]["document"] == "test.pdf"
-        assert result[0]["provider"] == "cme"  # Now uses entry.provider directly
+        assert result[0]["source"] == "cme"  # Now uses entry.source directly
 
     def test_empty_definitions(self) -> None:
         """Returns empty list for empty definitions."""

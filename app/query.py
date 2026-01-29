@@ -10,13 +10,13 @@ from chromadb.errors import NotFoundError
 from app.config import CHROMA_DIR
 from app.config import CONFIDENCE_GATE_ENABLED
 from app.config import CONTEXT_BUDGET_ENABLED
-from app.config import DEFAULT_PROVIDERS
+from app.config import DEFAULT_SOURCES
 from app.config import EMBEDDING_DIMENSIONS
 from app.config import EMBEDDING_MODEL
 from app.config import MIN_CHUNKS_REQUIRED
-from app.config import PROVIDERS
 from app.config import RELEVANCE_THRESHOLD
 from app.config import RERANKING_ENABLED
+from app.config import SOURCES
 from app.config import TOP_K
 from app.definitions import format_definitions_for_context
 from app.definitions import format_definitions_for_output
@@ -36,6 +36,8 @@ from app.rerank import rerank_chunks
 from app.search import BM25Index
 from app.search import HybridSearcher
 from app.search import SearchMode
+from app.validate import get_stricter_system_prompt
+from app.validate import validate_llm_output
 
 log = get_logger(__name__)
 
@@ -55,9 +57,9 @@ def format_context(
     """
     context_parts = []
     for doc, meta in zip(documents, metadatas):
-        provider = meta.get("provider", "unknown").upper()
+        source_name = meta.get("source", meta.get("provider", "unknown")).upper()
         # Prefer document_path (includes subdirectory) for unambiguous citations
-        source = meta.get("document_path") or meta.get("document_name", "Unknown")
+        doc_path = meta.get("document_path") or meta.get("document_name", "Unknown")
         section = meta.get("section_heading", "N/A")
         page_start = meta.get("page_start", "?")
         page_end = meta.get("page_end", "?")
@@ -67,7 +69,7 @@ def format_context(
         else:
             page_info = f"Pages {page_start}-{page_end}"
 
-        header = f"--- [{provider}] {source} | {section} | {page_info} ---"
+        header = f"--- [{source_name}] {doc_path} | {section} | {page_info} ---"
         context_parts.append(f"{header}\n{doc}")
 
     return "\n\n".join(context_parts)
@@ -75,7 +77,7 @@ def format_context(
 
 def query(
     question: str,
-    providers: list[str] | None = None,
+    sources: list[str] | None = None,
     top_k: int = TOP_K,
     search_mode: str = "hybrid",
     include_definitions: bool = True,
@@ -88,8 +90,8 @@ def query(
 
     Args:
         question: User question.
-        providers: List of providers to query. Defaults to all configured.
-        top_k: Number of chunks to retrieve per provider.
+        sources: List of sources to query. Defaults to all configured.
+        top_k: Number of chunks to retrieve per source.
         search_mode: Search mode - "vector", "keyword", or "hybrid" (default).
         include_definitions: If True, auto-link definitions for terms in context.
         enable_reranking: If True, use LLM to rerank chunks (Phase 4).
@@ -105,19 +107,17 @@ def query(
 
     Raises:
         RuntimeError: If no collections are available.
-        ValueError: If invalid provider or search mode.
+        ValueError: If invalid source or search mode.
     """
-    if providers is None or len(providers) == 0:
-        providers = DEFAULT_PROVIDERS
+    if sources is None or len(sources) == 0:
+        sources = DEFAULT_SOURCES
 
-    # Validate providers
-    invalid = [p for p in providers if p not in PROVIDERS]
+    # Validate sources
+    invalid = [p for p in sources if p not in SOURCES]
     if invalid:
-        log.error(
-            "invalid_providers", invalid=invalid, available=list(PROVIDERS.keys())
-        )
+        log.error("invalid_sources", invalid=invalid, available=list(SOURCES.keys()))
         raise ValueError(
-            f"Unknown providers: {invalid}. Available: {list(PROVIDERS.keys())}"
+            f"Unknown sources: {invalid}. Available: {list(SOURCES.keys())}"
         )
 
     # Validate and convert search mode
@@ -130,7 +130,7 @@ def query(
 
     if not CHROMA_DIR.exists():
         log.error("no_index_found", path=str(CHROMA_DIR))
-        raise RuntimeError("No index found. Run 'rag ingest --provider <name>' first.")
+        raise RuntimeError("No index found. Run 'rag ingest --source <name>' first.")
 
     # Normalize query for improved retrieval
     normalized_question = normalize_query(question)
@@ -150,7 +150,7 @@ def query(
         "query_started",
         question=question[:100],
         normalized=normalized_question[:100],
-        providers=providers,
+        sources=sources,
         top_k=top_k,
         search_mode=search_mode,
     )
@@ -163,8 +163,8 @@ def query(
     # Track actual mode used (may differ from requested due to fallbacks)
     actual_modes_used: set[str] = set()
 
-    for provider in providers:
-        collection_name = PROVIDERS[provider].get("collection", f"{provider}_docs")
+    for source in sources:
+        collection_name = SOURCES[source].get("collection", f"{source}_docs")
 
         try:
             collection = client.get_collection(
@@ -186,7 +186,7 @@ def query(
                 raise RuntimeError(
                     f"Index '{collection_name}' is missing embedding metadata. "
                     "This may be a legacy Ollama index. "
-                    "Re-ingest with 'rag ingest --provider <name> --force'."
+                    "Re-ingest with 'rag ingest --source <name> --force'."
                 )
 
             if stored_model != EMBEDDING_MODEL:
@@ -199,7 +199,7 @@ def query(
                 raise RuntimeError(
                     f"Embedding model mismatch: index uses '{stored_model}', "
                     f"but current config uses '{EMBEDDING_MODEL}'. "
-                    "Re-ingest with 'rag ingest --provider <name> --force'."
+                    "Re-ingest with 'rag ingest --source <name> --force'."
                 )
 
             if stored_dims and stored_dims != EMBEDDING_DIMENSIONS:
@@ -212,13 +212,13 @@ def query(
                 raise RuntimeError(
                     f"Embedding dimensions mismatch: index uses {stored_dims}, "
                     f"but current config uses {EMBEDDING_DIMENSIONS}. "
-                    "Re-ingest with 'rag ingest --provider <name> --force'."
+                    "Re-ingest with 'rag ingest --source <name> --force'."
                 )
         except (NotFoundError, ValueError):
             # NotFoundError: ChromaDB >= 1.4.1
             # ValueError: ChromaDB < 1.4.1 (legacy compatibility)
             log.warning(
-                "collection_not_found", collection=collection_name, provider=provider
+                "collection_not_found", collection=collection_name, source=source
             )
             continue
 
@@ -226,11 +226,11 @@ def query(
         bm25_index = None
         effective_mode = mode
         if mode in (SearchMode.HYBRID, SearchMode.KEYWORD):
-            bm25_index = BM25Index.load(provider)
+            bm25_index = BM25Index.load(source)
             if bm25_index is None and mode == SearchMode.KEYWORD:
                 log.warning(
                     "bm25_index_missing_fallback",
-                    provider=provider,
+                    source=source,
                     requested_mode="keyword",
                     fallback_mode="vector",
                 )
@@ -239,7 +239,7 @@ def query(
 
         # Use hybrid searcher for all search modes
         # Use normalized query for better retrieval
-        searcher = HybridSearcher(provider, collection, bm25_index)
+        searcher = HybridSearcher(source, collection, bm25_index)
         search_results = searcher.search(
             normalized_question, mode=effective_mode, top_k=top_k
         )
@@ -263,7 +263,7 @@ def query(
     if len(actual_modes_used) == 1:
         effective_search_mode = actual_modes_used.pop()
     elif len(actual_modes_used) > 1:
-        # Multiple providers used different modes (rare edge case)
+        # Multiple sources used different modes (rare edge case)
         effective_search_mode = "mixed"
     else:
         # No results retrieved, use requested mode
@@ -272,12 +272,12 @@ def query(
     if not all_search_results:
         log.info("no_chunks_retrieved", question=question[:100])
         response = {
-            "answer": get_refusal_message(providers),
+            "answer": get_refusal_message(sources),
             "context": "",
             "citations": [],
             "definitions": [],
             "chunks_retrieved": 0,
-            "providers": providers,
+            "sources": sources,
             "search_mode": search_mode,
             "effective_search_mode": effective_search_mode,
         }
@@ -488,7 +488,7 @@ def query(
                 chunk_count=len(gate_chunks),
             )
 
-            refusal_message = get_refusal_message(providers)
+            refusal_message = get_refusal_message(sources)
             reason_detail = get_refusal_reason_message(refusal_reason)
 
             response = {
@@ -497,7 +497,7 @@ def query(
                 "citations": [],
                 "definitions": [],
                 "chunks_retrieved": len(all_documents),
-                "providers": providers,
+                "sources": sources,
                 "search_mode": search_mode,
                 "effective_search_mode": effective_search_mode,
                 "refused": True,
@@ -532,8 +532,8 @@ def query(
         # Prepare chunks with metadata including relevance scores
         chunks_with_metadata = list(zip(all_documents, all_metadatas))
 
-        # Build provider label
-        provider_label = ", ".join(p.upper() for p in providers)
+        # Build source label
+        source_label = ", ".join(p.upper() for p in sources)
 
         # First pass: enforce budget WITHOUT definitions to get final chunks
         # This prevents definitions from terms in dropped chunks
@@ -542,7 +542,7 @@ def query(
             system_prompt=SYSTEM_PROMPT,
             question=question,
             definitions_context="",  # No definitions yet
-            provider_label=provider_label,
+            provider_label=source_label,
             max_tokens=MAX_CONTEXT_TOKENS,
         )
 
@@ -569,12 +569,12 @@ def query(
             )
             # Return refusal - cannot answer if base prompt is too large
             return {
-                "answer": get_refusal_message(providers),
+                "answer": get_refusal_message(sources),
                 "context": "",
                 "citations": [],
                 "definitions": [],
                 "chunks_retrieved": 0,
-                "providers": providers,
+                "sources": sources,
                 "search_mode": search_mode,
                 "effective_search_mode": effective_search_mode,
                 "error": "prompt_too_large",
@@ -591,7 +591,7 @@ def query(
     definitions_context = ""
     if include_definitions:
         try:
-            retriever = get_definitions_retriever(tuple(providers))
+            retriever = get_definitions_retriever(tuple(sources))
             # Find definitions for terms in question + final context only
             combined_text = question + " " + context
             definitions_dict = retriever.find_definitions_in_text(
@@ -610,7 +610,7 @@ def query(
                 # Accuracy-first: prefer keeping chunks over definitions
                 if enable_budget:
                     chunks_with_metadata = list(zip(all_documents, all_metadatas))
-                    provider_label = ", ".join(p.upper() for p in providers)
+                    source_label = ", ".join(p.upper() for p in sources)
 
                     # Calculate chunks before second pass for accurate drop reporting
                     chunks_before_second_pass = len(all_documents)
@@ -620,7 +620,7 @@ def query(
                         system_prompt=SYSTEM_PROMPT,
                         question=question,
                         definitions_context=definitions_context,
-                        provider_label=provider_label,
+                        provider_label=source_label,
                         max_tokens=MAX_CONTEXT_TOKENS,
                     )
 
@@ -649,7 +649,7 @@ def query(
                                 system_prompt=SYSTEM_PROMPT,
                                 question=question,
                                 definitions_context="",  # No definitions
-                                provider_label=provider_label,
+                                provider_label=source_label,
                                 max_tokens=MAX_CONTEXT_TOKENS,
                             )
                         )
@@ -676,7 +676,7 @@ def query(
                             # This prevents stale definitions for dropped chunks
                             original_definitions_count = len(definitions_dict)
                             try:
-                                retriever = get_definitions_retriever(tuple(providers))
+                                retriever = get_definitions_retriever(tuple(sources))
                                 combined_text = question + " " + context
                                 final_definitions_dict = (
                                     retriever.find_definitions_in_text(
@@ -706,7 +706,7 @@ def query(
                                             system_prompt=SYSTEM_PROMPT,
                                             question=question,
                                             definitions_context=definitions_context,
-                                            provider_label=provider_label,
+                                            provider_label=source_label,
                                             max_tokens=MAX_CONTEXT_TOKENS,
                                         )
                                     )
@@ -740,7 +740,7 @@ def query(
                                                         system_prompt=SYSTEM_PROMPT,
                                                         question=question,
                                                         definitions_context=definitions_context,
-                                                        provider_label=provider_label,
+                                                        provider_label=source_label,
                                                         max_tokens=MAX_CONTEXT_TOKENS,
                                                     )
                                                 )
@@ -778,7 +778,7 @@ def query(
                                         system_prompt=SYSTEM_PROMPT,
                                         question=question,
                                         definitions_context="",
-                                        provider_label=provider_label,
+                                        provider_label=source_label,
                                         max_tokens=MAX_CONTEXT_TOKENS,
                                     )
                                     budget_info = budget_info_no_defs
@@ -799,7 +799,7 @@ def query(
                                 system_prompt=SYSTEM_PROMPT,
                                 question=question,
                                 definitions_context=definitions_context,
-                                provider_label=provider_label,
+                                provider_label=source_label,
                                 max_tokens=MAX_CONTEXT_TOKENS,
                             )
                             budget_info = budget_info_after_recompute
@@ -826,7 +826,7 @@ def query(
                                         system_prompt=SYSTEM_PROMPT,
                                         question=question,
                                         definitions_context=definitions_context,
-                                        provider_label=provider_label,
+                                        provider_label=source_label,
                                         max_tokens=MAX_CONTEXT_TOKENS,
                                     )
 
@@ -883,7 +883,7 @@ def query(
             original_chunks=budget_info.get("original_count", 0),
         )
 
-        refusal_message = get_refusal_message(providers)
+        refusal_message = get_refusal_message(sources)
         reason_detail = get_refusal_reason_message("empty_context_after_budget")
 
         response = {
@@ -892,7 +892,7 @@ def query(
             "citations": [],
             "definitions": [],
             "chunks_retrieved": budget_info.get("original_count", 0),
-            "providers": providers,
+            "sources": sources,
             "search_mode": search_mode,
             "effective_search_mode": effective_search_mode,
             "refused": True,
@@ -916,8 +916,8 @@ def query(
 
         return response
 
-    # Build final prompt (provider label already set during budget enforcement)
-    provider_label = ", ".join(p.upper() for p in providers)
+    # Build final prompt (source label already set during budget enforcement)
+    source_label = ", ".join(p.upper() for p in sources)
 
     # Use appropriate prompt based on whether definitions were found
     if definitions_context:
@@ -925,22 +925,60 @@ def query(
             context=context,
             definitions_section=definitions_context,
             question=question,
-            provider=provider_label,
+            source=source_label,
         )
     else:
         prompt = QA_PROMPT_NO_DEFINITIONS.format(
             context=context,
             question=question,
-            provider=provider_label,
+            source=source_label,
         )
 
     # Call LLM
     log.debug("calling_llm")
     try:
         llm = get_llm()
-        # Format system prompt with provider label to avoid literal {provider} placeholder
-        formatted_system_prompt = SYSTEM_PROMPT.format(provider=provider_label)
+        # Format system prompt with source label to avoid literal {source} placeholder
+        formatted_system_prompt = SYSTEM_PROMPT.format(source=source_label)
         answer = llm.generate(system=formatted_system_prompt, prompt=prompt)
+
+        # Validate LLM output
+        validation = validate_llm_output(answer, sources)
+
+        if not validation.is_valid:
+            log.warning(
+                "llm_output_validation_failed_retrying",
+                errors=validation.errors,
+                is_refusal=validation.is_refusal,
+            )
+
+            # Retry once with stricter system prompt
+            stricter_prompt = get_stricter_system_prompt(formatted_system_prompt)
+            answer = llm.generate(system=stricter_prompt, prompt=prompt)
+
+            # Validate retry
+            validation_retry = validate_llm_output(answer, sources)
+
+            if not validation_retry.is_valid:
+                # If retry also fails, return canonical refusal
+                log.error(
+                    "llm_output_validation_failed_after_retry",
+                    errors=validation_retry.errors,
+                    is_refusal=validation_retry.is_refusal,
+                )
+                answer = f"""## Answer
+{get_refusal_message(sources)}
+
+The system could not generate a properly formatted response. Please try rephrasing your question or contact support if this persists."""
+            else:
+                log.info("llm_output_validation_succeeded_on_retry")
+        else:
+            if validation.warnings:
+                log.info(
+                    "llm_output_has_warnings",
+                    warnings=validation.warnings,
+                )
+
     except LLMConnectionError as e:
         log.error("llm_connection_failed", error=str(e))
         raise RuntimeError(f"LLM connection failed: {e}") from e
@@ -962,9 +1000,9 @@ def query(
         section = meta.get("section_heading", "N/A")
         page_start = meta.get("page_start", "?")
         page_end = meta.get("page_end", page_start)  # Default to start if no end
-        provider = meta.get("provider", "unknown")
+        source = meta.get("source", "unknown")
         # Use document_path in key to prevent same-filename-different-subdirectory collisions
-        key = (provider, doc_path, section, page_start, page_end)
+        key = (source, doc_path, section, page_start, page_end)
         if key not in seen:
             seen.add(key)
             citations.append(
@@ -973,7 +1011,7 @@ def query(
                     "section": section,
                     "page_start": page_start,
                     "page_end": page_end,
-                    "provider": meta.get("provider", "unknown"),
+                    "source": meta.get("source", "unknown"),
                 }
             )
 
@@ -988,7 +1026,7 @@ def query(
         "citations": citations,
         "definitions": definitions_output,
         "chunks_retrieved": len(all_documents),
-        "providers": providers,
+        "sources": sources,
         "search_mode": search_mode,
         "effective_search_mode": effective_search_mode,
     }

@@ -20,7 +20,7 @@ class TestChunksToChromaFormat:
             Chunk(
                 text="Test content",
                 chunk_id="test_doc_0",
-                provider="cme",
+                source="cme",
                 document_name="test.pdf",
                 document_path="test.pdf",
                 section_heading="Section 1",
@@ -47,7 +47,7 @@ class TestChunksToChromaFormat:
             Chunk(
                 text="Test",
                 chunk_id="cme_doc_0",
-                provider="cme",
+                source="cme",
                 document_name="doc.pdf",
                 document_path="Fees/doc.pdf",
                 section_heading="Definitions",
@@ -64,7 +64,7 @@ class TestChunksToChromaFormat:
         meta = metadatas[0]
 
         assert meta["chunk_id"] == "cme_doc_0"
-        assert meta["provider"] == "cme"
+        assert meta["source"] == "cme"
         assert meta["document_name"] == "doc.pdf"
         assert meta["document_path"] == "Fees/doc.pdf"
         assert meta["section_heading"] == "Definitions"
@@ -81,7 +81,7 @@ class TestChunksToChromaFormat:
             Chunk(
                 text=f"Content {i}",
                 chunk_id=f"cme_doc_{i}",
-                provider="cme",
+                source="cme",
                 document_name="doc.pdf",
                 document_path="doc.pdf",
                 section_heading="Section",
@@ -107,7 +107,7 @@ class TestChunksToChromaFormat:
             Chunk(
                 text="Test content",
                 chunk_id="test_doc_0",
-                provider="cme",
+                source="cme",
                 document_name="test.pdf",
                 document_path="test.pdf",
                 section_heading="Section 1",

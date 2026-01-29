@@ -87,13 +87,13 @@ class BM25Index:
     Can be saved to and loaded from disk for persistence across sessions.
     """
 
-    def __init__(self, provider: str) -> None:
-        """Initialize BM25 index for a provider.
+    def __init__(self, source: str) -> None:
+        """Initialize BM25 index for a source.
 
         Args:
-            provider: Provider identifier (e.g., "cme").
+            source: Provider identifier (e.g., "cme").
         """
-        self.provider = provider
+        self.source = source
         self.chunk_ids: list[str] = []
         self.documents: list[str] = []
         self.tokenized_corpus: list[list[str]] = []
@@ -122,7 +122,7 @@ class BM25Index:
 
         log.debug(
             "bm25_documents_added",
-            provider=self.provider,
+            source=self.source,
             count=len(documents),
             total=len(self.chunk_ids),
         )
@@ -133,13 +133,13 @@ class BM25Index:
         Must be called after all documents are added and before querying.
         """
         if not self.tokenized_corpus:
-            log.warning("bm25_build_empty", provider=self.provider)
+            log.warning("bm25_build_empty", source=self.source)
             return
 
         self.bm25 = BM25Okapi(self.tokenized_corpus)
         log.info(
             "bm25_index_built",
-            provider=self.provider,
+            source=self.source,
             document_count=len(self.chunk_ids),
         )
 
@@ -154,7 +154,7 @@ class BM25Index:
             List of (chunk_id, score) tuples sorted by score descending.
         """
         if self.bm25 is None:
-            log.warning("bm25_query_no_index", provider=self.provider)
+            log.warning("bm25_query_no_index", source=self.source)
             return []
 
         query_tokens = tokenize(question)
@@ -171,17 +171,17 @@ class BM25Index:
         return [(self.chunk_ids[i], score) for i, score in top_indices if score > 0]
 
     def get_index_path(self) -> Path:
-        """Get the file path for this provider's BM25 index.
+        """Get the file path for this source's BM25 index.
 
         Returns:
             Path to the index pickle file.
         """
-        return BM25_INDEX_DIR / f"{self.provider}_index.pkl"
+        return BM25_INDEX_DIR / f"{self.source}_index.pkl"
 
     def save(self) -> None:
         """Save the BM25 index to disk.
 
-        Saves to index/bm25/{provider}_index.pkl with metadata for validation.
+        Saves to index/bm25/{source}_index.pkl with metadata for validation.
         Includes version info and document count for integrity checking.
         """
         index_path = self.get_index_path()
@@ -189,7 +189,7 @@ class BM25Index:
 
         data = {
             "version": BM25_INDEX_VERSION,
-            "provider": self.provider,
+            "source": self.source,
             "document_count": len(self.chunk_ids),
             "chunk_ids": self.chunk_ids,
             "documents": self.documents,
@@ -203,29 +203,29 @@ class BM25Index:
 
         log.info(
             "bm25_index_saved",
-            provider=self.provider,
+            source=self.source,
             path=str(index_path),
             document_count=len(self.chunk_ids),
             version=BM25_INDEX_VERSION,
         )
 
     @classmethod
-    def load(cls, provider: str) -> "BM25Index | None":
+    def load(cls, source: str) -> "BM25Index | None":
         """Load a BM25 index from disk.
 
         Validates magic bytes and version for integrity. See module docstring
         for security considerations regarding pickle deserialization.
 
         Args:
-            provider: Provider identifier.
+            source: Provider identifier.
 
         Returns:
             BM25Index instance or None if not found or invalid.
         """
-        index_path = BM25_INDEX_DIR / f"{provider}_index.pkl"
+        index_path = BM25_INDEX_DIR / f"{source}_index.pkl"
 
         if not index_path.exists():
-            log.debug("bm25_index_not_found", provider=provider, path=str(index_path))
+            log.debug("bm25_index_not_found", source=source, path=str(index_path))
             return None
 
         try:
@@ -235,7 +235,7 @@ class BM25Index:
                 if magic != BM25_INDEX_MAGIC:
                     log.error(
                         "bm25_index_invalid_format",
-                        provider=provider,
+                        source=source,
                         error="Invalid magic bytes - file may be corrupted or tampered",
                     )
                     return None
@@ -247,7 +247,7 @@ class BM25Index:
             if file_version != BM25_INDEX_VERSION:
                 log.warning(
                     "bm25_index_version_mismatch",
-                    provider=provider,
+                    source=source,
                     file_version=file_version,
                     expected_version=BM25_INDEX_VERSION,
                 )
@@ -259,13 +259,13 @@ class BM25Index:
             if expected_count != actual_count:
                 log.error(
                     "bm25_index_integrity_error",
-                    provider=provider,
+                    source=source,
                     expected_count=expected_count,
                     actual_count=actual_count,
                 )
                 return None
 
-            index = cls(provider)
+            index = cls(source)
             index.chunk_ids = data["chunk_ids"]
             index.documents = data["documents"]
             index.tokenized_corpus = data["tokenized_corpus"]
@@ -273,14 +273,14 @@ class BM25Index:
 
             log.info(
                 "bm25_index_loaded",
-                provider=provider,
+                source=source,
                 document_count=len(index.chunk_ids),
                 version=file_version,
             )
             return index
 
         except Exception as e:
-            log.error("bm25_index_load_failed", provider=provider, error=str(e))
+            log.error("bm25_index_load_failed", source=source, error=str(e))
             return None
 
     def clear(self) -> None:
@@ -293,7 +293,7 @@ class BM25Index:
         index_path = self.get_index_path()
         if index_path.exists():
             index_path.unlink()
-            log.info("bm25_index_deleted", provider=self.provider)
+            log.info("bm25_index_deleted", source=self.source)
 
 
 def rrf_score(rank: int, k: int = 60) -> float:
@@ -362,18 +362,18 @@ class HybridSearcher:
 
     def __init__(
         self,
-        provider: str,
+        source: str,
         collection: Any,
         bm25_index: BM25Index | None = None,
     ) -> None:
         """Initialize hybrid searcher.
 
         Args:
-            provider: Provider identifier.
+            source: Provider identifier.
             collection: ChromaDB collection for vector search.
             bm25_index: Optional BM25 index for keyword search.
         """
-        self.provider = provider
+        self.source = source
         self.collection = collection
         self.bm25_index = bm25_index
 
@@ -444,7 +444,7 @@ class HybridSearcher:
 
         log.debug(
             "vector_search_complete",
-            provider=self.provider,
+            source=self.source,
             question=question[:50],
             results=len(search_results),
         )
@@ -461,7 +461,7 @@ class HybridSearcher:
             List of SearchResult objects.
         """
         if self.bm25_index is None:
-            log.warning("keyword_search_no_index", provider=self.provider)
+            log.warning("keyword_search_no_index", source=self.source)
             return []
 
         bm25_results = self.bm25_index.query(question, top_k)
@@ -495,7 +495,7 @@ class HybridSearcher:
 
         log.debug(
             "keyword_search_complete",
-            provider=self.provider,
+            source=self.source,
             question=question[:50],
             results=len(search_results),
         )
@@ -532,7 +532,7 @@ class HybridSearcher:
 
         # If no BM25 index, fall back to vector-only
         if not bm25_tuples:
-            log.debug("hybrid_fallback_to_vector", provider=self.provider)
+            log.debug("hybrid_fallback_to_vector", source=self.source)
             return vector_results[:top_k]
 
         # Merge using RRF
@@ -582,7 +582,7 @@ class HybridSearcher:
 
         log.info(
             "hybrid_search_complete",
-            provider=self.provider,
+            source=self.source,
             vector_count=len(vector_results),
             bm25_count=len(bm25_tuples),
             final_count=len(final_results),

@@ -10,7 +10,7 @@ ______________________________________________________________________
 
 ## Overview
 
-This branch implements a new approach using **OpenAI as the single provider** for both embeddings and LLM reasoning. This is a significant departure from the previous Ollama/Claude hybrid approach.
+This branch implements a new approach using **OpenAI as the single source** for both embeddings and LLM reasoning. This is a significant departure from the previous Ollama/Claude hybrid approach.
 
 ### Key Changes from v1.x
 
@@ -39,7 +39,7 @@ ______________________________________________________________________
 - [x] Remove `anthropic` package (no longer needed)
 - [x] Remove `ollama` package (no longer needed)
 - [x] Update `app/config.py` with OpenAI model constants
-- [x] Remove `LLM_PROVIDER` abstraction (single provider)
+- [x] Remove `LLM_PROVIDER` abstraction (single source)
 
 #### 1.2 Embedding Function Rewrite
 
@@ -55,7 +55,7 @@ ______________________________________________________________________
 - [x] Remove `OllamaProvider` class
 - [x] Remove `AnthropicProvider` class
 - [x] Implement simple OpenAI client with `gpt-4.1`
-- [x] Remove provider abstraction (direct OpenAI client)
+- [x] Remove source abstraction (direct OpenAI client)
 
 #### 1.4 Index Migration
 
@@ -309,7 +309,7 @@ ______________________________________________________________________
 
 - [ ] Delete Ollama-specific code
 - [ ] Delete Anthropic-specific code
-- [ ] Delete LLM provider abstraction
+- [ ] Delete LLM source abstraction
 - [ ] Remove unused imports
 - [ ] Update all docstrings
 
@@ -346,7 +346,7 @@ The following sections document work completed in the master branch. They are ke
 - [x] Update import in `query.py`
 - [x] Replace ChromaDB `Client` → `PersistentClient`
 - [x] Remove deprecated `client.persist()` calls
-- [x] Fix path: `RAW_DATA_DIR` to support provider subdirs
+- [x] Fix path: `RAW_DATA_DIR` to support source subdirs
 
 #### 1.2 Core Infrastructure
 
@@ -362,9 +362,9 @@ The following sections document work completed in the master branch. They are ke
 
 #### 1.4 Pipeline Refactoring
 
-- [x] Refactor `ingest.py` for multi-provider support
+- [x] Refactor `ingest.py` for multi-source support
 - [x] Refactor `query.py` with embedding function
-- [x] Add provider-based collection naming
+- [x] Add source-based collection naming
 
 #### 1.5 CLI Implementation
 
@@ -387,7 +387,7 @@ The following sections document work completed in the master branch. They are ke
 #### 1.7 Claude API Integration
 
 - [x] Add `anthropic` to dependencies
-- [x] Create `app/llm.py` with provider abstraction
+- [x] Create `app/llm.py` with source abstraction
 - [x] Add `LLM_PROVIDER` config (ollama/anthropic)
 - [x] Update `query.py` to use LLM abstraction
 - [x] Test with Claude API (claude-sonnet-4-5-20250929)
@@ -410,7 +410,7 @@ The following sections document work completed in the master branch. They are ke
 - [x] Add `rank-bm25` dependency to pyproject.toml
 - [x] Create `app/search.py` module
 - [x] Implement BM25 index building during ingestion
-- [x] Save BM25 index to `index/bm25/{provider}_index.pkl`
+- [x] Save BM25 index to `index/bm25/{source}_index.pkl`
 - [x] Implement Reciprocal Rank Fusion (RRF) algorithm
 - [x] Update `query.py` to use hybrid search
 - [x] Add search mode parameter (vector/keyword/hybrid)
@@ -455,7 +455,7 @@ The following items from v0.3 are deferred until the OpenAI migration is complet
 ### Additional Data Providers
 
 - OPRA, CTA/UTP document ingestion
-- Cross-provider queries
+- Cross-source queries
 
 ______________________________________________________________________
 

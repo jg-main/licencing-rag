@@ -134,21 +134,21 @@ class TestRerankChunks:
             {
                 "chunk_id": "chunk_1",
                 "text": "CME market data fees are $105/month for professionals.",
-                "metadata": {"provider": "cme"},
+                "metadata": {"source": "cme"},
                 "score": 0.8,
                 "source": "hybrid",
             },
             {
                 "chunk_id": "chunk_2",
                 "text": "The Exchange reserves the right to modify these terms.",
-                "metadata": {"provider": "cme"},
+                "metadata": {"source": "cme"},
                 "score": 0.6,
                 "source": "hybrid",
             },
             {
                 "chunk_id": "chunk_3",
                 "text": "Historical data is available through the archive service.",
-                "metadata": {"provider": "cme"},
+                "metadata": {"source": "cme"},
                 "score": 0.5,
                 "source": "hybrid",
             },
@@ -306,7 +306,7 @@ class TestRerankChunks:
             {
                 "chunk_id": "chunk_1",
                 "text": "Text 1",
-                "metadata": {"provider": "cme", "page_start": 5},
+                "metadata": {"source": "cme", "page_start": 5},
                 "score": 0.8,
                 "source": "hybrid",
             },
@@ -327,7 +327,7 @@ class TestRerankChunks:
         try:
             kept, dropped = rerank_chunks(chunks, "test question")
             assert len(kept) == 1
-            assert kept[0].metadata["provider"] == "cme"
+            assert kept[0].metadata["source"] == "cme"
             assert kept[0].metadata["page_start"] == 5
             assert kept[0].source == "hybrid"
             assert kept[0].original_score == 0.8
@@ -354,7 +354,7 @@ class TestRerankIntegration:
 
         result = query(
             "What are the CME market data fees?",
-            providers=["cme"],
+            sources=["cme"],
             enable_reranking=True,
             debug=True,
         )
@@ -372,7 +372,7 @@ class TestRerankIntegration:
 
         result = query(
             "What are the CME market data fees?",
-            providers=["cme"],
+            sources=["cme"],
             enable_reranking=False,
             debug=True,
         )

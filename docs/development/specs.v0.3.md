@@ -9,14 +9,14 @@
 - **Added**: Deployment specifications (Docker, AWS ECS/Fargate)
 - **Added**: CI/CD pipeline requirements
 - **Added**: Subdirectory support for document organization
-- **Clarified**: Multi-provider architecture details
+- **Clarified**: Multi-source architecture details
 - **Updated**: Performance and scalability targets
 
 ______________________________________________________________________
 
 ## 1. Objective
 
-Build a **local, private legal Q&A system** that answers questions **exclusively** based on curated license agreements and exhibits from multiple market data providers.
+Build a **local, private legal Q&A system** that answers questions **exclusively** based on curated license agreements and exhibits from multiple market data sources.
 
 ### Supported Data Provider (Current & Planned)
 
@@ -37,7 +37,7 @@ The system must:
 
 - Respond **only** using the provided documents
 - Explicitly refuse to answer when the documents are silent
-- Always provide **citations** (provider, document name, section, page)
+- Always provide **citations** (source, document name, section, page)
 - Use LLM API for answer generation (with local Ollama as fallback option)
 - Use local embeddings via Ollama (nomic-embed-text)
 - Support hybrid search (vector + keyword) for improved retrieval
@@ -46,7 +46,7 @@ The system must:
 - Provide REST API for programmatic access
 - Be deployable to cloud infrastructure
 - Be maintainable as documents are updated
-- Support querying across providers or within a specific provider
+- Support querying across sources or within a specific source
 - Support subdirectory organization (e.g., `Fees/`, `Agreements/`)
 
 This is **not** a general chatbot and **not** a trained LLM. It is a **retrieval-grounded legal analysis tool**.
@@ -73,15 +73,15 @@ The system follows a **Retrieval-Augmented Generation (RAG)** pattern with hybri
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Document Ingestion Pipeline                  │
 ├─────────────────────────────────────────────────────────────────┤
-│  data/raw/{provider}/**/*.pdf  →  Extract  →  Chunk  →  Embed  │
+│  data/raw/{source}/**/*.pdf  →  Extract  →  Chunk  →  Embed  │
 │                                      ↓                           │
-│                          data/text/{provider}/                   │
+│                          data/text/{source}/                   │
 │                                      ↓                           │
 │                          index/chroma/                           │
-│                     (collection per provider)                    │
+│                     (collection per source)                    │
 │                                      ↓                           │
 │                          index/bm25/                             │
-│                     (keyword index per provider)                 │
+│                     (keyword index per source)                 │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -105,10 +105,10 @@ The system follows a **Retrieval-Augmented Generation (RAG)** pattern with hybri
 
 ### Key Design Decisions
 
-1. **One ChromaDB collection per provider** — Enables provider-specific queries and simpler re-ingestion
+1. **One ChromaDB collection per source** — Enables source-specific queries and simpler re-ingestion
 1. **Hybrid search** — Combines semantic (vector) and keyword (BM25) retrieval for better coverage
 1. **Definitions auto-linking** — Automatically retrieves definition chunks when terms are referenced
-1. **Unified query interface** — Can search all providers or filter to specific ones
+1. **Unified query interface** — Can search all sources or filter to specific ones
 1. **Metadata-rich chunks** — Every chunk carries full provenance for citation
 1. **Subdirectory support** — Organize documents in folders (Fees/, Agreements/, etc.)
 1. **Query logging** — All queries logged to JSONL for audit and analysis
@@ -165,7 +165,7 @@ For offline or local-only execution, switch to Ollama:
 export LLM_PROVIDER="ollama"
 ```
 
-**Note:** Embeddings always use local Ollama (nomic-embed-text) regardless of LLM provider.
+**Note:** Embeddings always use local Ollama (nomic-embed-text) regardless of LLM source.
 
 ______________________________________________________________________
 
@@ -196,7 +196,7 @@ licencing-rag/
 │   │   ├── opra/
 │   │   └── cta_utp/
 │   └── chunks/
-│       └── {provider}/     # Optional: serialized chunks for debugging
+│       └── {source}/     # Optional: serialized chunks for debugging
 ├── index/
 │   ├── chroma/             # ChromaDB persistent storage
 │   └── bm25/               # BM25 index storage (NEW)
@@ -257,15 +257,15 @@ data/raw/cme/
 
 For each source document, produce:
 
-1. **Clean text file** — `data/text/{provider}/{path-encoded-name}.txt`
-1. **Metadata JSON** — `data/text/{provider}/{path-encoded-name}.meta.json`
+1. **Clean text file** — `data/text/{source}/{path-encoded-name}.txt`
+1. **Metadata JSON** — `data/text/{source}/{path-encoded-name}.meta.json`
 
 Metadata JSON schema:
 
 ```json
 {
   "source_file": "information-license-agreement-ila-guide.pdf",
-  "provider": "cme",
+  "source": "cme",
   "relative_path": "Agreements/ila-guide.pdf",
   "extracted_at": "2026-01-27T10:30:00Z",
   "page_count": 42,
@@ -317,8 +317,8 @@ SECTION_PATTERNS = [
 
 ```python
 {
-    "chunk_id": str,           # Unique: "{provider}_{relative_path}_{index}"
-    "provider": str,           # "cme", "opra", "cta_utp"
+    "chunk_id": str,           # Unique: "{source}_{relative_path}_{index}"
+    "source": str,           # "cme", "opra", "cta_utp"
     "document_name": str,      # Source filename
     "relative_path": str,      # Subdirectory path (e.g., "Fees/schedule.pdf")
     "document_version": str,   # If detectable (e.g., "v5.0")
@@ -348,10 +348,10 @@ import chromadb
 
 client = chromadb.PersistentClient(path="index/chroma")
 
-# One collection per provider
+# One collection per source
 cme_collection = client.get_or_create_collection(
     name="cme_docs",
-    metadata={"provider": "cme"},
+    metadata={"source": "cme"},
     embedding_function=ollama_embedding_function,
 )
 ```
@@ -362,12 +362,12 @@ cme_collection = client.get_or_create_collection(
 from rank_bm25 import BM25Okapi
 import pickle
 
-# Build BM25 index per provider
+# Build BM25 index per source
 tokenized_corpus = [chunk["text"].split() for chunk in chunks]
 bm25_index = BM25Okapi(tokenized_corpus)
 
 # Save to disk
-with open(f"index/bm25/{provider}_index.pkl", "wb") as f:
+with open(f"index/bm25/{source}_index.pkl", "wb") as f:
     pickle.dump(bm25_index, f)
 ```
 
@@ -392,7 +392,7 @@ ______________________________________________________________________
 ### Query Flow
 
 1. Parse user question
-1. Optionally filter by provider(s)
+1. Optionally filter by source(s)
 1. **Embed question** using same embedding model
 1. **Vector search**: Retrieve top-k chunks from ChromaDB
 1. **BM25 search**: Retrieve top-k chunks using keyword matching (NEW)
@@ -410,7 +410,7 @@ ______________________________________________________________________
 | top_k (vector)      | 10      | Number of chunks from vector search        |
 | top_k (BM25)        | 10      | Number of chunks from keyword search (NEW) |
 | final_top_n         | 5       | After hybrid ranking (NEW)                 |
-| provider_filter     | None    | Optional: limit to specific provider(s)    |
+| provider_filter     | None    | Optional: limit to specific source(s)      |
 | include_definitions | True    | Auto-link definitions (NEW)                |
 
 ### Hybrid Search Algorithm (NEW)
@@ -440,7 +440,7 @@ def extract_quoted_terms(text: str) -> list[str]:
     """Extract terms in quotes from text."""
     return re.findall(r'"([^"]+)"', text)
 
-def retrieve_definitions(terms: list[str], provider: str) -> list[Chunk]:
+def retrieve_definitions(terms: list[str], source: str) -> list[Chunk]:
     """Retrieve definition chunks for given terms."""
     # Query chunks with is_definitions=true
     # Filter by term presence in text
@@ -458,7 +458,7 @@ The LLM **must**:
 
 Standard refusal:
 
-> "This is not addressed in the provided {provider} documents."
+> "This is not addressed in the provided {source} documents."
 
 ______________________________________________________________________
 
@@ -530,7 +530,7 @@ For programmatic access or web UI integration, output is structured as JSON:
   ],
   "citations": [
     {
-      "provider": "cme",
+      "source": "cme",
       "document": "Document Name",
       "relative_path": "Fees/schedule.pdf",
       "section": "Section heading",
@@ -540,7 +540,7 @@ For programmatic access or web UI integration, output is structured as JSON:
   "notes": "Any ambiguities or cross-references",
   "metadata": {
     "query_id": "uuid-string",
-    "providers": ["cme"],
+    "sources": ["cme"],
     "chunks_retrieved": 5,
     "response_time_ms": 2847,
     "llm_provider": "anthropic"
@@ -552,7 +552,7 @@ For programmatic access or web UI integration, output is structured as JSON:
 
 Each citation must include:
 
-- Provider name (if multi-provider query)
+- Provider name (if multi-source query)
 - Document filename (or relative path if in subdirectory)
 - Section heading or identifier
 - Page number(s)
@@ -570,7 +570,7 @@ All queries are logged to `logs/queries.jsonl` for audit and analysis.
   "timestamp": "2026-01-27T14:30:00Z",
   "query_id": "uuid-string",
   "question": "What are the redistribution requirements?",
-  "providers": ["cme"],
+  "sources": ["cme"],
   "vector_chunks": ["cme_Fees__schedule_12", "cme_Agreements__ila_5"],
   "bm25_chunks": ["cme_Agreements__ila_5", "cme_Fees__rates_3"],
   "final_chunks": ["cme_Agreements__ila_5", "cme_Fees__schedule_12"],
@@ -613,7 +613,7 @@ Execute a query against the document collection.
 ```json
 {
   "question": "What are the redistribution requirements for CME data?",
-  "providers": ["cme"],
+  "sources": ["cme"],
   "search_mode": "hybrid",
   "top_k": 10,
   "include_definitions": true
@@ -631,7 +631,7 @@ Execute a query against the document collection.
   "citations": [...],
   "notes": null,
   "metadata": {
-    "providers": ["cme"],
+    "sources": ["cme"],
     "chunks_retrieved": 5,
     "response_time_ms": 2847,
     "llm_provider": "anthropic"
@@ -641,15 +641,15 @@ Execute a query against the document collection.
 
 #### 12.2 Document Listing Endpoint
 
-**GET** `/api/v1/documents?provider={provider}`
+**GET** `/api/v1/documents?source={source}`
 
-List all indexed documents for a provider.
+List all indexed documents for a source.
 
 **Response** (200 OK):
 
 ```json
 {
-  "provider": "cme",
+  "source": "cme",
   "documents": [
     {
       "filename": "information-license-agreement-ila-guide.pdf",
@@ -665,16 +665,16 @@ List all indexed documents for a provider.
 
 #### 12.3 Ingestion Trigger Endpoint
 
-**POST** `/api/v1/ingest/{provider}`
+**POST** `/api/v1/ingest/{source}`
 
-Trigger re-ingestion for a specific provider.
+Trigger re-ingestion for a specific source.
 
 **Response** (202 Accepted):
 
 ```json
 {
   "job_id": "uuid-string",
-  "provider": "cme",
+  "source": "cme",
   "status": "started",
   "message": "Ingestion job queued"
 }
@@ -690,7 +690,7 @@ Retrieve system statistics.
 
 ```json
 {
-  "providers": [
+  "sources": [
     {
       "name": "cme",
       "document_count": 35,
@@ -718,7 +718,7 @@ Retrieve recent query logs (paginated).
       "timestamp": "2026-01-27T14:30:00Z",
       "query_id": "uuid-string",
       "question": "What are the redistribution requirements?",
-      "providers": ["cme"],
+      "sources": ["cme"],
       "response_time_ms": 2847,
       "error": null
     }
@@ -893,16 +893,16 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
-      
+
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
-      
+
       - name: Build and push Docker image
         run: |
           docker build -t licencing-rag .
           docker tag licencing-rag:latest $ECR_REGISTRY/licencing-rag:latest
           docker push $ECR_REGISTRY/licencing-rag:latest
-      
+
       - name: Deploy to ECS
         run: |
           aws ecs update-service \
@@ -936,17 +936,17 @@ python -m rag --help
 ### Commands
 
 ```bash
-# Ingest documents for a provider
-rag ingest --provider cme
+# Ingest documents for a source
+rag ingest --source cme
 
-# Ingest all providers
+# Ingest all sources
 rag ingest --all
 
 # Query with default settings (hybrid search)
 rag query "What are the redistribution requirements?"
 
-# Query specific provider
-rag query --provider cme "What fees apply to derived data?"
+# Query specific source
+rag query --source cme "What fees apply to derived data?"
 
 # Query with search mode override
 rag query --mode vector "Definition of subscriber"
@@ -955,18 +955,18 @@ rag query --mode vector "Definition of subscriber"
 rag query --format json "Definition of subscriber" > result.json
 rag query --format console "What are the fees?"  # default (using rich)
 
-# Query multiple providers
-rag query --provider cme --provider opra "Definition of subscriber"
+# Query multiple sources
+rag query --source cme --source opra "Definition of subscriber"
 
 # List indexed documents
-rag list --provider cme
+rag list --source cme
 
-# List all providers
+# List all sources
 rag list
 
 # View query logs
 rag logs --tail 10
-rag logs --provider cme --since "2026-01-27"
+rag logs --source cme --since "2026-01-27"
 
 # Start REST API server
 rag serve --port 8000 --host 0.0.0.0
@@ -1024,7 +1024,7 @@ The system is successful if:
 | Performance     | \<10s response time on standard laptop        |
 | UI Usability    | Non-technical users complete queries in \<30s |
 | Deployment      | Zero-downtime updates via ECS rolling deploy  |
-| Extensibility   | New provider added without code changes       |
+| Extensibility   | New source added without code changes         |
 
 ______________________________________________________________________
 
@@ -1070,7 +1070,7 @@ ______________________________________________________________________
 1. **Traceability** — Every statement must cite its source
 1. **Refusal is a feature** — Saying "not found" is a correct answer
 1. **Simplicity** — Minimal dependencies, clear code, no magic
-1. **Extensibility** — Adding providers should be configuration, not code surgery
+1. **Extensibility** — Adding sources should be configuration, not code surgery
 1. **Performance** — Fast enough to be useful, not overengineered
 1. **Privacy** — Local-first, optional cloud deployment with explicit user control
 1. **Auditability** — All queries logged for compliance and analysis

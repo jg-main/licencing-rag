@@ -9,8 +9,8 @@ ______________________________________________________________________
 
 ## Changelog from v0.3
 
-- **BREAKING**: Switched to OpenAI as single provider for both embeddings and LLM
-- **BREAKING**: Removed Ollama/Claude support (single-provider architecture)
+- **BREAKING**: Switched to OpenAI as single source for both embeddings and LLM
+- **BREAKING**: Removed Ollama/Claude support (single-source architecture)
 - **Added**: Query normalization (pre-retrieval processing) - Phase 2
 - **Added**: LLM-based reranking with GPT-4.1 - Phase 4
 - **Added**: Context budget enforcement (≤60k tokens) - Phase 5
@@ -18,7 +18,7 @@ ______________________________________________________________________
 - **Added**: LLM prompt discipline (accuracy-first prompting) - Phase 7
 - **Added**: Debug/audit mode for transparency - Phase 8 (planned)
 - **Added**: Evaluation set for clause retrieval accuracy - Phase 9 (planned)
-- **Removed**: Multi-LLM provider abstraction (Ollama, Anthropic)
+- **Removed**: Multi-LLM source abstraction (Ollama, Anthropic)
 - **Removed**: Local embedding model support
 - **Updated**: Refusal is now enforced in code AND prompts (layered defense)
 
@@ -68,7 +68,7 @@ ______________________________________________________________________
 export OPENAI_API_KEY="sk-..."
 ```
 
-No fallback providers. OpenAI is the single source for all model operations.
+No fallback sources. OpenAI is the single source for all model operations.
 
 ______________________________________________________________________
 
@@ -79,7 +79,7 @@ ______________________________________________________________________
 1. **Refusal is enforced in code, not only via prompt** — Deterministic gating
 1. **Context trimming is mandatory** — Quality + cost control
 1. **All answers must be traceable to documents** — Full citation chain
-1. **Single provider only (OpenAI)** — No provider abstraction complexity
+1. **Single source only (OpenAI)** — No source abstraction complexity
 
 ______________________________________________________________________
 
@@ -90,7 +90,7 @@ ______________________________________________________________________
 - Prompt-only fixes for retrieval
 - Using the LLM to infer missing terms
 - External browsing or general legal knowledge
-- Multi-provider support (Ollama, Claude, etc.)
+- Multi-source support (Ollama, Claude, etc.)
 - OCR for image-based PDFs
 - Automated clause negotiation or contract generation
 
@@ -102,7 +102,7 @@ ______________________________________________________________________
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Document Ingestion Pipeline                  │
 ├─────────────────────────────────────────────────────────────────┤
-│  data/raw/{provider}/**/*.pdf                                   │
+│  data/raw/{source}/**/*.pdf                                   │
 │         ↓                                                        │
 │     Extract (PyMuPDF)                                           │
 │         ↓                                                        │
@@ -219,9 +219,9 @@ licencing-rag/
 │   ├── output.py           # Output formatting
 │   └── logging.py          # Structured logging
 ├── data/
-│   ├── raw/{provider}/     # Source documents
-│   ├── text/{provider}/    # Extracted text
-│   └── chunks/{provider}/  # Serialized chunks
+│   ├── raw/{source}/     # Source documents
+│   ├── text/{source}/    # Extracted text
+│   └── chunks/{source}/  # Serialized chunks
 ├── index/
 │   ├── chroma/             # ChromaDB vectors
 │   └── bm25/               # BM25 keyword index
@@ -506,7 +506,7 @@ if enable_confidence_gate:
     if refuse:
         # Skip LLM call entirely
         return {
-            "answer": get_refusal_message(providers),
+            "answer": get_refusal_message(sources),
             "refused": True,
             "refusal_reason": reason,
             ...
@@ -515,7 +515,7 @@ if enable_confidence_gate:
 # Post-budget check: refuse if budget dropped all chunks
 if len(all_documents) == 0:
     return {
-        "answer": get_refusal_message(providers),
+        "answer": get_refusal_message(sources),
         "refused": True,
         "refusal_reason": "empty_context_after_budget",
         ...
@@ -677,7 +677,7 @@ Enforce accuracy-first behavior through comprehensive prompt engineering that co
 
    - Always cite documents, sections, and page numbers
    - Citations are mandatory audit trails, not optional
-   - Use provider-prefixed citations: [CME], [OPRA]
+   - Use source-prefixed citations: [CME], [OPRA]
    - Quote exact text for fees, requirements, definitions
 
 1. **Quality Verification (4 rules)**:
@@ -938,7 +938,7 @@ ______________________________________________________________________
 
 1. **Re-embed all documents** — Ollama embeddings incompatible with OpenAI
 1. **Delete existing ChromaDB index** — Different dimensions (768 → 3072)
-1. **Remove Ollama/Claude config** — Single provider only
+1. **Remove Ollama/Claude config** — Single source only
 1. **Update environment variables** — `OPENAI_API_KEY` required
 
 ### Migration Steps
@@ -951,7 +951,7 @@ export OPENAI_API_KEY="sk-..."
 rm -rf index/chroma index/bm25
 
 # 3. Re-ingest all documents
-rag ingest --provider cme --force
+rag ingest --source cme --force
 
 # 4. Verify with test query
 rag query "fee schedule" --debug

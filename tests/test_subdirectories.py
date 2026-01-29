@@ -1,13 +1,13 @@
 """Test subdirectory support for ingestion pipeline."""
 
-from pathlib import Path
-import tempfile
 import shutil
+from pathlib import Path
+
 import pytest
 
-from app.ingest import ingest_provider
-from app.extract import save_extraction_artifacts, extract_document
-from app.chunking import save_chunks_artifacts, chunk_document
+from app.chunking import chunk_document
+from app.chunking import save_chunks_artifacts
+from app.extract import save_extraction_artifacts
 
 
 class TestSubdirectoryDiscovery:
@@ -31,7 +31,11 @@ class TestSubdirectoryDiscovery:
         raw_dir = tmp_path / "raw" / "test_provider"
         supported_extensions = {".pdf", ".docx"}
         doc_files = sorted(
-            [f for f in raw_dir.rglob("*") if f.is_file() and f.suffix.lower() in supported_extensions],
+            [
+                f
+                for f in raw_dir.rglob("*")
+                if f.is_file() and f.suffix.lower() in supported_extensions
+            ],
             key=lambda p: p.relative_to(raw_dir).as_posix().lower(),
         )
 
@@ -57,7 +61,11 @@ class TestSubdirectoryDiscovery:
         # Test discovery
         supported_extensions = {".pdf", ".docx"}
         doc_files = sorted(
-            [f for f in raw_dir.rglob("*") if f.is_file() and f.suffix.lower() in supported_extensions],
+            [
+                f
+                for f in raw_dir.rglob("*")
+                if f.is_file() and f.suffix.lower() in supported_extensions
+            ],
             key=lambda p: p.relative_to(raw_dir).as_posix().lower(),
         )
 
@@ -74,7 +82,11 @@ class TestSubdirectoryDiscovery:
         raw_dir = tmp_path / "raw" / "test_provider"
         supported_extensions = {".pdf", ".docx"}
         doc_files = sorted(
-            [f for f in raw_dir.rglob("*") if f.is_file() and f.suffix.lower() in supported_extensions],
+            [
+                f
+                for f in raw_dir.rglob("*")
+                if f.is_file() and f.suffix.lower() in supported_extensions
+            ],
             key=lambda p: p.relative_to(raw_dir).as_posix().lower(),
         )
 
@@ -89,7 +101,8 @@ class TestArtifactNaming:
     def test_extraction_artifact_path_encoding(self, tmp_path):
         """Verify extraction artifacts use path encoding for subdirectories."""
         # Create a mock extracted document using dataclass
-        from app.extract import ExtractedDocument, PageContent
+        from app.extract import ExtractedDocument
+        from app.extract import PageContent
 
         extracted = ExtractedDocument(
             source_file="test.pdf",
@@ -113,7 +126,8 @@ class TestArtifactNaming:
 
     def test_extraction_artifact_backward_compatibility(self, tmp_path):
         """Verify extraction artifacts work without relative_path (flat structure)."""
-        from app.extract import ExtractedDocument, PageContent
+        from app.extract import ExtractedDocument
+        from app.extract import PageContent
 
         extracted = ExtractedDocument(
             source_file="document.pdf",
@@ -140,7 +154,7 @@ class TestArtifactNaming:
             Chunk(
                 text="Test chunk",
                 chunk_id="test_0",
-                provider="test_provider",
+                source="test_provider",
                 document_name="test.pdf",
                 document_path="Agreements/test.pdf",
                 section_heading="Section 1",
@@ -156,7 +170,9 @@ class TestArtifactNaming:
         output_dir = tmp_path / "chunks"
         relative_path = Path("Agreements/license.pdf")
 
-        chunks_path, meta_path = save_chunks_artifacts(chunks, relative_path, output_dir)
+        chunks_path, meta_path = save_chunks_artifacts(
+            chunks, relative_path, output_dir
+        )
 
         # Verify path encoding: Agreements/license.pdf -> Agreements__license
         assert chunks_path.name == "Agreements__license.chunks.jsonl"
@@ -172,7 +188,7 @@ class TestArtifactNaming:
             Chunk(
                 text="Test chunk",
                 chunk_id="test_0",
-                provider="test_provider",
+                source="test_provider",
                 document_name="test.pdf",
                 document_path="test.pdf",
                 section_heading="Section 1",
@@ -188,7 +204,9 @@ class TestArtifactNaming:
         output_dir = tmp_path / "chunks"
 
         # Call with string (legacy behavior)
-        chunks_path, meta_path = save_chunks_artifacts(chunks, "document.pdf", output_dir)
+        chunks_path, meta_path = save_chunks_artifacts(
+            chunks, "document.pdf", output_dir
+        )
 
         assert chunks_path.name == "document.chunks.jsonl"
         assert meta_path.name == "document.chunks.meta.json"
@@ -199,7 +217,8 @@ class TestCollisionPrevention:
 
     def test_same_filename_different_subdirs_no_collision(self, tmp_path):
         """Verify same filename in different subdirectories creates distinct artifacts."""
-        from app.extract import ExtractedDocument, PageContent
+        from app.extract import ExtractedDocument
+        from app.extract import PageContent
 
         extracted = ExtractedDocument(
             source_file="agreement.pdf",
@@ -232,11 +251,14 @@ class TestChunkIDUniqueness:
 
     def test_chunk_ids_include_relative_path(self):
         """Verify chunk IDs use encoded relative path to ensure uniqueness."""
-        from app.extract import ExtractedDocument, PageContent
+        from app.extract import ExtractedDocument
+        from app.extract import PageContent
 
         # Create longer text that will actually chunk
-        text = "Section 1: Fees and Charges\n\n" + " ".join(["This is test content."] * 50)
-        
+        text = "Section 1: Fees and Charges\n\n" + " ".join(
+            ["This is test content."] * 50
+        )
+
         extracted = ExtractedDocument(
             source_file="test.pdf",
             pages=[PageContent(page_num=1, text=text)],
@@ -248,7 +270,7 @@ class TestChunkIDUniqueness:
 
         chunks = chunk_document(
             extracted,
-            provider="test_provider",
+            source="test_provider",
             document_version="v1",
             relative_path=relative_path,
         )
@@ -261,11 +283,14 @@ class TestChunkIDUniqueness:
 
     def test_chunk_ids_backward_compatible(self):
         """Verify chunk IDs work without relative_path (flat structure)."""
-        from app.extract import ExtractedDocument, PageContent
+        from app.extract import ExtractedDocument
+        from app.extract import PageContent
 
         # Create longer text that will actually chunk
-        text = "Section 1: Overview\n\n" + " ".join(["This is test document content."] * 50)
-        
+        text = "Section 1: Overview\n\n" + " ".join(
+            ["This is test document content."] * 50
+        )
+
         extracted = ExtractedDocument(
             source_file="test.pdf",
             pages=[PageContent(page_num=1, text=text)],
@@ -276,7 +301,7 @@ class TestChunkIDUniqueness:
         # Call without relative_path
         chunks = chunk_document(
             extracted,
-            provider="test_provider",
+            source="test_provider",
             document_version="v1",
         )
 
@@ -291,7 +316,7 @@ class TestEndToEndSubdirectories:
     def test_deterministic_ordering_across_subdirs(self, tmp_path):
         """Verify ingestion order is deterministic across subdirectories."""
         fixtures_dir = Path(__file__).parent / "fixtures" / "subdir_test"
-        
+
         if not fixtures_dir.exists():
             pytest.skip("Subdirectory test fixtures not available")
 
@@ -300,20 +325,28 @@ class TestEndToEndSubdirectories:
 
         # Find files twice
         supported_extensions = {".pdf", ".docx"}
-        
+
         files1 = sorted(
-            [f for f in raw_dir.rglob("*") if f.is_file() and f.suffix.lower() in supported_extensions],
+            [
+                f
+                for f in raw_dir.rglob("*")
+                if f.is_file() and f.suffix.lower() in supported_extensions
+            ],
             key=lambda p: p.relative_to(raw_dir).as_posix().lower(),
         )
-        
+
         files2 = sorted(
-            [f for f in raw_dir.rglob("*") if f.is_file() and f.suffix.lower() in supported_extensions],
+            [
+                f
+                for f in raw_dir.rglob("*")
+                if f.is_file() and f.suffix.lower() in supported_extensions
+            ],
             key=lambda p: p.relative_to(raw_dir).as_posix().lower(),
         )
 
         # Verify identical ordering
         assert files1 == files2
-        
+
         # Verify alphabetical by relative path
         rel_paths = [f.relative_to(raw_dir).as_posix() for f in files1]
         assert rel_paths == sorted(rel_paths)

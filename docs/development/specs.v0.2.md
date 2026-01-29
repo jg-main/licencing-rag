@@ -4,7 +4,7 @@
 
 ## Changelog from v0.1
 
-- Added multi-provider architecture (CME, OPRA, CTA/UTP)
+- Added multi-source architecture (CME, OPRA, CTA/UTP)
 - Clarified ChromaDB usage patterns (PersistentClient)
 - Added page number tracking for citations
 - Defined metadata schema explicitly
@@ -15,7 +15,7 @@ ______________________________________________________________________
 
 ## 1. Objective
 
-Build a **local, private legal Q&A system** that answers questions **exclusively** based on curated license agreements and exhibits from multiple market data providers.
+Build a **local, private legal Q&A system** that answers questions **exclusively** based on curated license agreements and exhibits from multiple market data sources.
 
 ### Supported Providers (Current & Planned)
 
@@ -29,11 +29,11 @@ The system must:
 
 - Respond **only** using the provided documents
 - Explicitly refuse to answer when the documents are silent
-- Always provide **citations** (provider, document name, section, page)
+- Always provide **citations** (source, document name, section, page)
 - Use Claude API for answer generation (with local Ollama as fallback option)
 - Use local embeddings via Ollama (nomic-embed-text)
 - Be maintainable as documents are updated
-- Support querying across providers or within a specific provider
+- Support querying across sources or within a specific source
 
 This is **not** a general chatbot and **not** a trained LLM. It is a **retrieval-grounded legal analysis tool**.
 
@@ -46,7 +46,7 @@ ______________________________________________________________________
 - No web scraping or internet content retrieval
 - No legal advice generation beyond document interpretation
 - No "best practice" or industry commentary unless explicitly stated in the documents
-- No cross-provider comparison or harmonization (Phase 1)
+- No cross-source comparison or harmonization (Phase 1)
 
 ______________________________________________________________________
 
@@ -58,12 +58,12 @@ The system follows a **Retrieval-Augmented Generation (RAG)** pattern:
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Document Ingestion Pipeline                  │
 ├─────────────────────────────────────────────────────────────────┤
-│  data/raw/{provider}/*.pdf  →  Extract  →  Chunk  →  Embed     │
+│  data/raw/{source}/*.pdf  →  Extract  →  Chunk  →  Embed     │
 │                                   ↓                              │
-│                          data/text/{provider}/                   │
+│                          data/text/{source}/                   │
 │                                   ↓                              │
 │                          index/chroma/                           │
-│                     (collection per provider)                    │
+│                     (collection per source)                    │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -79,8 +79,8 @@ The system follows a **Retrieval-Augmented Generation (RAG)** pattern:
 
 ### Key Design Decisions
 
-1. **One ChromaDB collection per provider** — Enables provider-specific queries and simpler re-ingestion
-1. **Unified query interface** — Can search all providers or filter to specific ones
+1. **One ChromaDB collection per source** — Enables source-specific queries and simpler re-ingestion
+1. **Unified query interface** — Can search all sources or filter to specific ones
 1. **Metadata-rich chunks** — Every chunk carries full provenance for citation
 
 ______________________________________________________________________
@@ -128,7 +128,7 @@ For offline or local-only execution, switch to Ollama:
 export LLM_PROVIDER="ollama"
 ```
 
-**Note:** Embeddings always use local Ollama (nomic-embed-text) regardless of LLM provider.
+**Note:** Embeddings always use local Ollama (nomic-embed-text) regardless of LLM source.
 
 ______________________________________________________________________
 
@@ -154,7 +154,7 @@ licencing-rag/
 │   │   ├── opra/
 │   │   └── cta_utp/
 │   └── chunks/
-│       └── {provider}/     # Optional: serialized chunks for debugging
+│       └── {source}/     # Optional: serialized chunks for debugging
 ├── index/
 │   └── chroma/             # ChromaDB persistent storage
 ├── docs/
@@ -182,8 +182,8 @@ ______________________________________________________________________
 
 For each source document, produce:
 
-1. **Clean text file** — `data/text/{provider}/{source_filename}.txt`
-1. **Metadata JSON** — `data/text/{provider}/{source_filename}.meta.json`
+1. **Clean text file** — `data/text/{source}/{source_filename}.txt`
+1. **Metadata JSON** — `data/text/{source}/{source_filename}.meta.json`
 
 Note: The full source filename is preserved (e.g., `document.pdf.txt`) to maintain traceability.
 
@@ -192,7 +192,7 @@ Metadata JSON schema:
 ```json
 {
   "source_file": "information-license-agreement-ila-guide.pdf",
-  "provider": "cme",
+  "source": "cme",
   "extracted_at": "2026-01-26T10:30:00Z",
   "page_count": 42,
   "extraction_method": "pymupdf"
@@ -241,8 +241,8 @@ SECTION_PATTERNS = [
 
 ```python
 {
-    "chunk_id": str,           # Unique: "{provider}_{filename}_{index}"
-    "provider": str,           # "cme", "opra", "cta_utp"
+    "chunk_id": str,           # Unique: "{source}_{filename}_{index}"
+    "source": str,           # "cme", "opra", "cta_utp"
     "document_name": str,      # Source filename
     "document_version": str,   # If detectable (e.g., "v5.0")
     "section_heading": str,    # Detected section title or "N/A"
@@ -269,10 +269,10 @@ import chromadb
 
 client = chromadb.PersistentClient(path="index/chroma")
 
-# One collection per provider
+# One collection per source
 cme_collection = client.get_or_create_collection(
     name="cme_docs",
-    metadata={"provider": "cme"},
+    metadata={"source": "cme"},
     embedding_function=ollama_embedding_function,
 )
 ```
@@ -298,7 +298,7 @@ ______________________________________________________________________
 ### Query Flow
 
 1. Parse user question
-1. Optionally filter by provider(s)
+1. Optionally filter by source(s)
 1. Embed question using same embedding model
 1. Retrieve top-k chunks from relevant collection(s)
 1. Construct prompt with retrieved context
@@ -307,10 +307,10 @@ ______________________________________________________________________
 
 ### Retrieval Parameters
 
-| Parameter       | Default | Notes                                   |
-| --------------- | ------- | --------------------------------------- |
-| top_k           | 5       | Number of chunks to retrieve            |
-| provider_filter | None    | Optional: limit to specific provider(s) |
+| Parameter       | Default | Notes                                 |
+| --------------- | ------- | ------------------------------------- |
+| top_k           | 5       | Number of chunks to retrieve          |
+| provider_filter | None    | Optional: limit to specific source(s) |
 
 ### Answer Constraints (Hard Rules)
 
@@ -323,7 +323,7 @@ The LLM **must**:
 
 Standard refusal:
 
-> "This is not addressed in the provided {provider} documents."
+> "This is not addressed in the provided {source} documents."
 
 ______________________________________________________________________
 
@@ -355,7 +355,7 @@ ______________________________________________________________________
 
 Each citation must include:
 
-- Provider name (if multi-provider query)
+- Provider name (if multi-source query)
 - Document filename
 - Section heading or identifier
 - Page number(s)
@@ -367,23 +367,23 @@ ______________________________________________________________________
 ### Commands
 
 ```bash
-# Ingest documents for a provider
-rag ingest --provider cme
+# Ingest documents for a source
+rag ingest --source cme
 
-# Ingest all providers
+# Ingest all sources
 rag ingest --all
 
 # Query with default settings
 rag query "What are the redistribution requirements?"
 
-# Query specific provider
-rag query --provider cme "What fees apply to derived data?"
+# Query specific source
+rag query --source cme "What fees apply to derived data?"
 
-# Query multiple providers
-rag query --provider cme --provider opra "Definition of subscriber"
+# Query multiple sources
+rag query --source cme --source opra "Definition of subscriber"
 
 # List indexed documents
-rag list --provider cme
+rag list --source cme
 ```
 
 ### Exit Codes
@@ -418,7 +418,7 @@ The system is successful if:
 | Refusal         | Correctly refuses when info not found       |
 | Maintainability | Adding documents requires re-ingestion only |
 | Performance     | \<10s response time on standard laptop      |
-| Extensibility   | New provider added without code changes     |
+| Extensibility   | New source added without code changes       |
 
 ______________________________________________________________________
 
@@ -442,4 +442,4 @@ ______________________________________________________________________
 1. **Traceability** — Every statement must cite its source
 1. **Refusal is a feature** — Saying "not found" is a correct answer
 1. **Simplicity** — Minimal dependencies, clear code, no magic
-1. **Extensibility** — Adding providers should be configuration, not code surgery
+1. **Extensibility** — Adding sources should be configuration, not code surgery

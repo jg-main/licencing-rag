@@ -94,7 +94,7 @@ class DefinitionEntry:
     page_start: int
     page_end: int
     definition_text: str  # The actual definition text (excerpt)
-    provider: str = ""  # Provider identifier (e.g., "cme", "cta_utp")
+    source: str = ""  # Provider identifier (e.g., "cme", "cta_utp")
 
 
 @dataclass
@@ -105,7 +105,7 @@ class DefinitionsIndex:
     Multiple definitions for the same term are supported (from different docs).
     """
 
-    provider: str
+    source: str
     version: str = DEFINITIONS_INDEX_VERSION
     entries: dict[str, list[DefinitionEntry]] = field(default_factory=dict)
     chunk_id_to_terms: dict[str, list[str]] = field(default_factory=dict)
@@ -303,7 +303,7 @@ def extract_definition_from_chunk(
 
 
 def build_definitions_index(
-    provider: str,
+    source: str,
     chunks: list[dict[str, Any]],
 ) -> DefinitionsIndex:
     """Build a definitions index from chunks.
@@ -312,13 +312,13 @@ def build_definitions_index(
     term-definition mappings.
 
     Args:
-        provider: Provider identifier.
+        source: Provider identifier.
         chunks: List of chunk dictionaries with text and metadata.
 
     Returns:
         DefinitionsIndex with all extracted definitions.
     """
-    index = DefinitionsIndex(provider=provider)
+    index = DefinitionsIndex(source=source)
 
     for chunk in chunks:
         metadata = chunk.get("metadata", {})
@@ -355,7 +355,7 @@ def build_definitions_index(
                     page_start=metadata.get("page_start", 1),
                     page_end=metadata.get("page_end", 1),
                     definition_text=definition,
-                    provider=provider,
+                    source=source,
                 )
                 index.add_entry(entry)
                 log.debug(
@@ -367,7 +367,7 @@ def build_definitions_index(
 
     log.info(
         "definitions_index_built",
-        provider=provider,
+        source=source,
         terms=len(index),
         total_entries=sum(len(v) for v in index.entries.values()),
     )
@@ -388,7 +388,7 @@ def save_definitions_index(index: DefinitionsIndex) -> Path:
         Uses pickle for serialization. Only load indexes from trusted sources.
     """
     DEFINITIONS_INDEX_DIR.mkdir(parents=True, exist_ok=True)
-    index_path = DEFINITIONS_INDEX_DIR / f"{index.provider}_definitions.pkl"
+    index_path = DEFINITIONS_INDEX_DIR / f"{index.source}_definitions.pkl"
 
     with open(index_path, "wb") as f:
         f.write(DEFINITIONS_INDEX_MAGIC)
@@ -398,11 +398,11 @@ def save_definitions_index(index: DefinitionsIndex) -> Path:
     return index_path
 
 
-def load_definitions_index(provider: str) -> DefinitionsIndex | None:
+def load_definitions_index(source: str) -> DefinitionsIndex | None:
     """Load a definitions index from disk.
 
     Args:
-        provider: Provider identifier.
+        source: Provider identifier.
 
     Returns:
         DefinitionsIndex if found and valid, None otherwise.
@@ -410,10 +410,10 @@ def load_definitions_index(provider: str) -> DefinitionsIndex | None:
     Security Note:
         Uses pickle for deserialization. Only load indexes from trusted sources.
     """
-    index_path = DEFINITIONS_INDEX_DIR / f"{provider}_definitions.pkl"
+    index_path = DEFINITIONS_INDEX_DIR / f"{source}_definitions.pkl"
 
     if not index_path.exists():
-        log.debug("definitions_index_not_found", provider=provider)
+        log.debug("definitions_index_not_found", source=source)
         return None
 
     try:
@@ -422,7 +422,7 @@ def load_definitions_index(provider: str) -> DefinitionsIndex | None:
             if magic != DEFINITIONS_INDEX_MAGIC:
                 log.warning(
                     "definitions_index_invalid_magic",
-                    provider=provider,
+                    source=source,
                     path=str(index_path),
                 )
                 return None
@@ -432,18 +432,18 @@ def load_definitions_index(provider: str) -> DefinitionsIndex | None:
             if not isinstance(index, DefinitionsIndex):
                 log.warning(
                     "definitions_index_invalid_type",
-                    provider=provider,
+                    source=source,
                     actual_type=type(index).__name__,
                 )
                 return None
 
-            log.debug("definitions_index_loaded", provider=provider, terms=len(index))
+            log.debug("definitions_index_loaded", source=source, terms=len(index))
             return index
 
     except (pickle.UnpicklingError, EOFError) as e:
         log.warning(
             "definitions_index_load_failed",
-            provider=provider,
+            source=source,
             error=str(e),
         )
         return None
@@ -455,46 +455,46 @@ class DefinitionsRetriever:
     Provides caching and batch retrieval to minimize redundant lookups.
     """
 
-    def __init__(self, providers: list[str]) -> None:
-        """Initialize the retriever for specified providers.
+    def __init__(self, sources: list[str]) -> None:
+        """Initialize the retriever for specified sources.
 
         Args:
-            providers: List of provider identifiers to load indexes for.
+            sources: List of source identifiers to load indexes for.
         """
-        self.providers = providers
+        self.sources = sources
         self.indexes: dict[str, DefinitionsIndex] = {}
         self._cache: dict[str, list[DefinitionEntry]] = {}
 
-        # Load indexes for all providers
-        for provider in providers:
-            index = load_definitions_index(provider)
+        # Load indexes for all sources
+        for source in sources:
+            index = load_definitions_index(source)
             if index:
-                self.indexes[provider] = index
-                log.debug("loaded_definitions_index", provider=provider)
+                self.indexes[source] = index
+                log.debug("loaded_definitions_index", source=source)
 
     def get_definition(
         self,
         term: str,
-        provider: str | None = None,
+        source: str | None = None,
     ) -> list[DefinitionEntry]:
         """Get definitions for a term.
 
         Args:
             term: Term to look up.
-            provider: Optional provider to limit search to.
+            source: Optional source to limit search to.
 
         Returns:
             List of DefinitionEntry objects.
         """
-        cache_key = f"{provider or 'all'}:{normalize_term(term)}"
+        cache_key = f"{source or 'all'}:{normalize_term(term)}"
         if cache_key in self._cache:
             return self._cache[cache_key]
 
         results: list[DefinitionEntry] = []
 
-        if provider:
-            if provider in self.indexes:
-                results = self.indexes[provider].get_definitions(term)
+        if source:
+            if source in self.indexes:
+                results = self.indexes[source].get_definitions(term)
         else:
             for idx in self.indexes.values():
                 results.extend(idx.get_definitions(term))
@@ -505,13 +505,13 @@ class DefinitionsRetriever:
     def get_definitions_for_terms(
         self,
         terms: list[str],
-        provider: str | None = None,
+        source: str | None = None,
     ) -> dict[str, list[DefinitionEntry]]:
         """Get definitions for multiple terms.
 
         Args:
             terms: List of terms to look up.
-            provider: Optional provider to limit search to.
+            source: Optional source to limit search to.
 
         Returns:
             Dictionary mapping normalized terms to their definitions.
@@ -519,7 +519,7 @@ class DefinitionsRetriever:
         results: dict[str, list[DefinitionEntry]] = {}
 
         for term in terms:
-            definitions = self.get_definition(term, provider)
+            definitions = self.get_definition(term, source)
             if definitions:
                 results[normalize_term(term)] = definitions
 
@@ -528,7 +528,7 @@ class DefinitionsRetriever:
     def find_definitions_in_text(
         self,
         text: str,
-        provider: str | None = None,
+        source: str | None = None,
         max_definitions: int = 10,
     ) -> dict[str, list[DefinitionEntry]]:
         """Find and retrieve definitions for terms mentioned in text.
@@ -538,7 +538,7 @@ class DefinitionsRetriever:
 
         Args:
             text: Text to scan for defined terms.
-            provider: Optional provider to limit search to.
+            source: Optional source to limit search to.
             max_definitions: Maximum number of definitions to return.
 
         Returns:
@@ -563,7 +563,7 @@ class DefinitionsRetriever:
                 unique_terms.append(term)
 
         # Get definitions for each term
-        results = self.get_definitions_for_terms(unique_terms, provider)
+        results = self.get_definitions_for_terms(unique_terms, source)
 
         # Limit total definitions
         if len(results) > max_definitions:
@@ -601,7 +601,7 @@ def format_definitions_for_context(
     for term, entries in definitions.items():
         # Use the first definition (usually the most authoritative)
         entry = entries[0]
-        provider_upper = entry.provider.upper() if entry.provider else "UNKNOWN"
+        provider_upper = entry.source.upper() if entry.source else "UNKNOWN"
         page_info = (
             f"Page {entry.page_start}"
             if entry.page_start == entry.page_end
@@ -640,7 +640,7 @@ def format_definitions_for_output(
                     "section": entry.section_heading,
                     "page_start": entry.page_start,
                     "page_end": entry.page_end,
-                    "provider": entry.provider,
+                    "source": entry.source,
                 }
             )
 
@@ -654,7 +654,7 @@ def get_definitions_retriever(providers_tuple: tuple[str, ...]) -> DefinitionsRe
     Uses LRU cache to avoid reloading indexes for repeated queries.
 
     Args:
-        providers_tuple: Tuple of provider identifiers (must be hashable).
+        providers_tuple: Tuple of source identifiers (must be hashable).
 
     Returns:
         DefinitionsRetriever instance.

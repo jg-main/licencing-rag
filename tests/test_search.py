@@ -366,7 +366,7 @@ class TestBM25IndexPersistence:
                 pickle.dump(
                     {
                         "version": "1.0",
-                        "provider": "test_provider",
+                        "source": "test_provider",
                         "document_count": 999,  # Intentionally wrong
                         "chunk_ids": ["chunk1"],
                         "documents": ["test"],
