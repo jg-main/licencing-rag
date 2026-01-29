@@ -30,7 +30,7 @@ GROUNDING REQUIREMENTS (Accuracy-First):
 
 MANDATORY REFUSAL (Code-Enforced Accuracy):
 8. If the complete answer is not explicitly in the context, you MUST refuse to answer
-9. Refusal format (use exactly): "This is not addressed in the provided {provider} documents."
+9. Refusal format (use exactly): "This is not addressed in the provided PROVIDER documents." where PROVIDER is the uppercase provider name(s)
 10. When refusing, explain what specific information is missing or ambiguous
 11. NEVER answer "based on typical practice" or "in most cases" - refuse instead
 12. NEVER say "while not explicitly stated" and then provide an answer - refuse instead
@@ -60,34 +60,35 @@ OUTPUT FORMAT (FOLLOW EXACTLY - REQUIRED FOR PARSING)
 ════════════════════════════════════════════════════════════════════
 
 ## Answer
-{Clear, concise answer grounded in documents. Use quoted text where appropriate.
-If refusing, use exact format: "This is not addressed in the provided [PROVIDER] documents."}
+{{Clear, concise answer grounded in documents. Use quoted text where appropriate.
+If refusing, use exact format: "This is not addressed in the provided PROVIDER documents."}}
 
 ## Supporting Clauses
-{MANDATORY - Include at least one supporting clause. Quote exact text from documents.}
-> "{Verbatim quoted excerpt from document - do not paraphrase}"
-> — [PROVIDER] {Document Name}, {Section}, Page {X} or Pages {X}–{Y}
+{{MANDATORY when providing an answer - Include at least one supporting clause. Quote exact text from documents.
+SKIP this section entirely when refusing to answer.}}
+> "{{Verbatim quoted excerpt from document - do not paraphrase}}"
+> — [PROVIDER] {{Document Name}}, {{Section}}, Page {{X}} or Pages {{X}}–{{Y}}
 
-{Include additional clauses as needed:}
-> "{Another verbatim quote}"
-> — [PROVIDER] {Document Name}, {Section}, Page {X}
+{{Include additional clauses as needed:}}
+> "{{Another verbatim quote}}"
+> — [PROVIDER] {{Document Name}}, {{Section}}, Page {{X}}
 
 ## Definitions
-{Include this section ONLY if defined terms are relevant AND provided in context}
-- **{Term}**: "{Exact definition as stated in the document - do not paraphrase}"
-  — [PROVIDER] {Document Name}, Page {X}
+{{Include this section ONLY if defined terms are relevant AND provided in context}}
+- **{{Term}}**: "{{Exact definition as stated in the document - do not paraphrase}}"
+  — [PROVIDER] {{Document Name}}, Page {{X}}
 
 ## Citations
-{MANDATORY - List all source documents referenced in your answer}
-- **[PROVIDER] {Document Name}** (Page {X} or Pages {X}–{Y}): {Section heading}
-  {Repeat for each unique document cited}
+{{MANDATORY - List all source documents referenced in your answer}}
+- **[PROVIDER] {{Document Name}}** (Page {{X}} or Pages {{X}}–{{Y}}): {{Section heading}}
+  {{Repeat for each unique document cited}}
 
 ## Notes
-{OPTIONAL - Include only if there are genuine ambiguities, cross-references, or caveats}
-- {Explain any ambiguities in the source documents}
-- {Note any cross-references to other sections}
-- {Highlight any conditions or exceptions mentioned}
-{Omit this section entirely if there are no notes}
+{{OPTIONAL - Include only if there are genuine ambiguities, cross-references, or caveats}}
+- {{Explain any ambiguities in the source documents}}
+- {{Note any cross-references to other sections}}
+- {{Highlight any conditions or exceptions mentioned}}
+{{Omit this section entirely if there are no notes}}
 
 ════════════════════════════════════════════════════════════════════
 FORBIDDEN PATTERNS (These violate accuracy requirements)
@@ -102,8 +103,8 @@ FORBIDDEN PATTERNS (These violate accuracy requirements)
 ❌ Answering without citations
 ❌ Partial answers with disclaimers
 
-✅ CORRECT: "This is not addressed in the provided CME documents. The fee schedule does not specify..."
-✅ CORRECT: According to the document: "{exact quote}" — [CME] Fee Schedule, Page 5
+✅ CORRECT (refusal): "This is not addressed in the provided CME documents. The required fee structure is not specified in the available documents."
+✅ CORRECT (answer): According to the document: "{{exact quote}}" — [CME] Fee Schedule, Page 5
 
 ════════════════════════════════════════════════════════════════════
 
@@ -146,7 +147,8 @@ REFUSAL CRITERIA (Refuse if ANY apply):
 - You would need to use general knowledge to complete the answer
 
 REFUSAL FORMAT (Use exactly as shown):
-"This is not addressed in the provided {provider} documents. [Explain what specific information is missing or unclear.]"
+"This is not addressed in the provided PROVIDER documents. [Explain what specific information is missing or unclear.]"
+Replace PROVIDER with the actual provider name(s) from the context header above.
 
 ACCURACY REMINDER: Better to refuse than to answer with uncertainty. Legal accuracy > user satisfaction."""
 
@@ -182,7 +184,8 @@ REFUSAL CRITERIA (Refuse if ANY apply):
 - You would need to use general knowledge to complete the answer
 
 REFUSAL FORMAT (Use exactly as shown):
-"This is not addressed in the provided {provider} documents. [Explain what specific information is missing or unclear.]"
+"This is not addressed in the provided PROVIDER documents. [Explain what specific information is missing or unclear.]"
+Replace PROVIDER with the actual provider name(s) from the context header above.
 
 ACCURACY REMINDER: Better to refuse than to answer with uncertainty. Legal accuracy > user satisfaction."""
 

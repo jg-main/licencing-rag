@@ -938,7 +938,9 @@ def query(
     log.debug("calling_llm")
     try:
         llm = get_llm()
-        answer = llm.generate(system=SYSTEM_PROMPT, prompt=prompt)
+        # Format system prompt with provider label to avoid literal {provider} placeholder
+        formatted_system_prompt = SYSTEM_PROMPT.format(provider=provider_label)
+        answer = llm.generate(system=formatted_system_prompt, prompt=prompt)
     except LLMConnectionError as e:
         log.error("llm_connection_failed", error=str(e))
         raise RuntimeError(f"LLM connection failed: {e}") from e
