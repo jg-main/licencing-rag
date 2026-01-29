@@ -802,34 +802,164 @@ ______________________________________________________________________
 
 ## 14. Debug & Audit Mode (Phase 8)
 
-### Debug Flag
+### 14.1 Debug Mode (Pipeline Transparency)
+
+**Purpose**: Provide complete visibility into the query pipeline for troubleshooting and optimization.
+
+**Output Destinations**:
+
+- **Console (stderr)**: Real-time JSON output when `--debug` flag used
+- **File**: Always writes to `logs/debug.jsonl` (rotating, 10MB, 5 backups)
+
+**CLI Usage**:
 
 ```bash
 rag query "fee schedule" --debug
 ```
 
-### Debug Output
+**Debug Output Format**:
 
 ```json
 {
+  "timestamp": "2026-01-29T10:15:30.123456Z",
   "original_query": "What is the fee schedule?",
   "normalized_query": "fee schedule",
-  "retrieved_chunks": [
-    {"chunk_id": "cme_fees_schedule.pdf_0", "bm25_rank": 1, "vector_rank": 3},
-    {"chunk_id": "cme_fees_schedule.pdf_1", "bm25_rank": 2, "vector_rank": 1}
-  ],
-  "rerank_scores": [
-    {"chunk_id": "cme_fees_schedule.pdf_0", "score": 3},
-    {"chunk_id": "cme_fees_schedule.pdf_1", "score": 2}
-  ],
-  "dropped_chunks": [
-    {"chunk_id": "cme_general_terms.pdf_5", "score": 0, "reason": "below_threshold"}
-  ],
-  "final_context_tokens": 4523,
-  "confidence_gate": "PASS",
-  "answer_generated": true
+  "retrieval": {
+    "vector": {"count": 10, "top_score": 0.85},
+    "bm25": {"count": 10, "top_score": 12.3},
+    "merged": {"count": 12, "unique_chunks": 12}
+  },
+  "reranking": {
+    "input_chunks": 12,
+    "kept_chunks": 3,
+    "dropped_chunks": 9,
+    "scores": [
+      {"chunk_id": "cme_fees_schedule.pdf_0", "score": 3, "kept": true},
+      {"chunk_id": "cme_fees_schedule.pdf_1", "score": 2, "kept": true},
+      {"chunk_id": "cme_general_terms.pdf_5", "score": 0, "kept": false}
+    ]
+  },
+  "confidence_gate": {
+    "enabled": true,
+    "passed": true,
+    "top_score": 3,
+    "threshold": 2,
+    "min_chunks_required": 1,
+    "chunks_above_threshold": 2
+  },
+  "budget": {
+    "target_tokens": 60000,
+    "final_tokens": 4523,
+    "chunks_kept": 3,
+    "chunks_dropped": 0,
+    "under_budget": true
+  },
+  "llm": {
+    "model": "gpt-4.1",
+    "prompt_tokens": 4523,
+    "completion_tokens": 234,
+    "total_tokens": 4757
+  },
+  "answer_generated": true,
+  "latency_ms": 3421
 }
 ```
+
+**Implementation**:
+
+- Created `app/debug.py` module with `log_debug_info()` function
+- Rotating file handler prevents unbounded disk growth
+- ISO 8601 UTC timestamps for audit compliance
+- Integrated at all query pipeline stages
+
+### 14.2 Query/Response Audit Logging (Compliance)
+
+**Purpose**: Track all queries and responses for compliance, usage analytics, and cost monitoring. Separate from debug mode - debug is for troubleshooting, audit is for business metrics.
+
+**Key Differences from Debug Mode**:
+
+| Feature         | Debug Mode              | Audit Logging              |
+| --------------- | ----------------------- | -------------------------- |
+| **Purpose**     | Troubleshooting         | Compliance/analytics       |
+| **Verbosity**   | High (pipeline details) | Low (business metrics)     |
+| **Activation**  | Optional (`--debug`)    | Always on                  |
+| **Console Out** | Yes (stderr)            | Optional (`--log-queries`) |
+| **File Output** | `logs/debug.jsonl`      | `logs/queries.jsonl`       |
+| **Rotation**    | 10MB x 5 (50MB)         | 50MB x 10 (500MB)          |
+
+**Configuration** (`app/config.py`):
+
+```python
+# Query/Response Audit Logging
+AUDIT_LOG_FILE = LOGS_DIR / "queries.jsonl"
+AUDIT_LOG_MAX_BYTES = 50 * 1024 * 1024  # 50MB per file
+AUDIT_LOG_BACKUP_COUNT = 10  # Keep 10 old files (500MB total)
+```
+
+**CLI Usage**:
+
+```bash
+# File logging only (default)
+rag query "What is the CME market data fee?"
+
+# File + console logging
+rag query "What is the CME market data fee?" --log-queries
+```
+
+**Audit Log Format** (`logs/queries.jsonl`):
+
+```json
+{
+  "timestamp": "2026-01-29T10:15:30.123456Z",
+  "query": "What is the CME market data fee for real-time equity quotes?",
+  "answer": "## Answer\nThe CME market data fee for real-time equity quotes is $15/month per device...",
+  "sources": ["cme"],
+  "chunks_retrieved": 12,
+  "chunks_used": 3,
+  "tokens_input": 4523,
+  "tokens_output": 234,
+  "latency_ms": 3421,
+  "refused": false,
+  "refusal_reason": null,
+  "user_id": null
+}
+```
+
+**Tracked Metrics**:
+
+- `timestamp`: ISO 8601 UTC
+- `query`: Original user input
+- `answer`: LLM response or refusal message
+- `sources`: Data sources queried (e.g., ["cme"])
+- `chunks_retrieved`: Count before reranking
+- `chunks_used`: Count after reranking + budget enforcement
+- `tokens_input`: Prompt tokens (for cost tracking)
+- `tokens_output`: Completion tokens (for cost tracking)
+- `latency_ms`: Total query time (for performance monitoring)
+- `refused`: Boolean (was query refused?)
+- `refusal_reason`: Why refused (e.g., "confidence_too_low", "no_chunks_retrieved", "empty_context_after_budget")
+- `user_id`: Future API authentication (null for CLI)
+
+**Implementation**:
+
+- Created `app/audit.py` module with `log_query_response()` function
+- Rotating file handler with 500MB total capacity (50MB x 10 files)
+- Always writes to file (compliance requirement)
+- Optional stderr output via `--log-queries` flag
+- Integrated at all 4 query exit points:
+  1. No chunks retrieved
+  1. Confidence gate refusal
+  1. Budget enforcement dropped all chunks
+  1. Successful response
+- Latency tracking via `time.time()` and `calculate_latency_ms()`
+- Token counting via `app.budget.count_tokens()`
+
+**Privacy & Compliance**:
+
+- Log rotation prevents unbounded disk usage
+- Future: PII redaction/hashing option
+- Future: GDPR compliance for user data (when API added)
+- Current: No PII collected (CLI only, no user identification)
 
 ______________________________________________________________________
 

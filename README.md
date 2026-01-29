@@ -111,6 +111,27 @@ ______________________________________________________________________
 - ✅ **Automatic Retrieval** - Auto-fetch and include relevant definitions
 - ✅ **Definition Caching** - LRU cache to reduce redundant retrievals
 
+#### Debug & Audit Mode (IMPLEMENTED - Phase 8)
+
+- ✅ **Comprehensive Debug Output** - Full pipeline transparency for accuracy verification
+- ✅ **Dual Output** - Debug info to stderr (real-time) + logs/debug.jsonl (audit trail)
+- ✅ **Log Rotation** - 10MB max file size, 5 backup files
+- ✅ **JSONL Format** - Machine-parsable logs with ISO 8601 UTC timestamps
+- ✅ **Pipeline Visibility** - Tracks all 7 phases: normalization, retrieval, reranking, confidence gating, budget enforcement, LLM calls, validation
+- ✅ **Accuracy Support** - Complete transparency enables verification of system decisions
+
+**Usage:**
+
+```bash
+# Enable debug mode for any query
+rag query "What is CME?" --debug
+
+# Debug output appears on stderr and in logs/debug.jsonl
+# Analyze debug logs with jq:
+jq -r '.retrieval.per_source_results' logs/debug.jsonl | head -1
+jq 'select(.confidence_gate.refused == true)' logs/debug.jsonl
+```
+
 #### Query Logging
 
 - ⏳ **JSONL Audit Logs** - Log all queries to `logs/queries.jsonl`

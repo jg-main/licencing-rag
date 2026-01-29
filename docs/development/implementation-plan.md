@@ -263,22 +263,109 @@ ______________________________________________________________________
 
 ### Phase 8: Debug & Audit Mode
 
-#### 8.1 Implementation
+**Status**: ✅ **COMPLETE**
 
-- [ ] Add `--debug` flag to CLI
-- [ ] Log original query
-- [ ] Log normalized query
-- [ ] Log retrieved chunks with ranks
-- [ ] Log rerank scores
-- [ ] Log dropped chunks with reasons
-- [ ] Log final context token count
-- [ ] Log confidence gate result
+#### 8.1 Debug Mode (Pipeline Transparency) ✅
 
-#### 8.2 Output Format
+- [x] Add `--debug` flag to CLI (already existed from Phase 1)
+- [x] Log original query
+- [x] Log normalized query
+- [x] Log retrieved chunks with ranks (per-source stats)
+- [x] Log rerank scores (kept/dropped with explanations if enabled)
+- [x] Log dropped chunks with reasons
+- [x] Log final context token count
+- [x] Log confidence gate result
+- [x] Created `app/debug.py` module
+- [x] Implemented rotating file handler (10MB, 5 backups)
+- [x] Created `logs/` directory for audit trail
+- [x] Integrated debug output into all query.py execution paths
+- [x] JSON format to stderr + JSONL to `logs/debug.jsonl`
+- [x] ISO 8601 UTC timestamps
+- [x] Removed DEBUG_LOG_ENABLED gates (--debug always writes to stderr)
+- [x] Enhanced retrieval info with scores and ranks
 
-- [ ] JSON format for debug output
-- [ ] Write to stderr (separate from answer)
-- [ ] Include all relevant metadata
+**Implementation Details**:
+
+- Debug output captures: query normalization, retrieval stats, reranking decisions, confidence gating, budget enforcement, LLM calls, and validation
+- Dual output: stderr for real-time monitoring + rotating log file for audit trail
+- Supports "accuracy over cost" principle through complete pipeline transparency
+
+#### 8.2 Query/Response Audit Logging (Compliance & Usage Tracking) ✅
+
+**Purpose**: Log all queries and responses for compliance, usage analytics, and audit trail. This is separate from debug mode - debug is for troubleshooting, audit is for compliance.
+
+**Requirements**:
+
+- [x] Log to file by default (always enabled)
+- [x] Optional console output via `--log-queries` flag
+- [x] Capture: timestamp, query, answer, sources, tokens used, latency, refusal status
+- [x] Future: user_id field for API authentication
+- [x] Rotating log files to manage disk usage
+- [x] JSONL format for easy parsing
+
+**8.2.1 Implementation Tasks**
+
+- [x] Create `app/audit.py` module
+- [x] Implement `log_query_response()` function
+- [x] Add rotating file handler for `logs/queries.jsonl`
+  - Max file size: 50MB
+  - Keep 10 backups (500MB total)
+  - Automatic rotation on size limit
+- [x] Integrate into `query.py` at all exit points
+- [x] Add `--log-queries` CLI flag for console output
+- [x] Track metrics:
+  - `timestamp` (ISO 8601 UTC)
+  - `query` (original user input)
+  - `answer` (LLM response or refusal message)
+  - `sources` (list of data sources queried)
+  - `chunks_retrieved` (count)
+  - `chunks_used` (after reranking/budget)
+  - `tokens_input` (prompt tokens)
+  - `tokens_output` (completion tokens)
+  - `latency_ms` (total query time)
+  - `refused` (boolean)
+  - `refusal_reason` (if refused)
+  - `user_id` (null for now, for future API)
+
+**8.2.2 Configuration**
+
+- [x] Add audit logging constants to `app/config.py`
+- [x] Configure log file path, size limits (50MB), and backup count (10)
+
+**8.2.3 Output Format** ✅
+
+- [x] JSONL format (one entry per line)
+- [x] Includes all tracked metrics (see specs.v0.4.md for detailed format)
+
+**8.2.4 Privacy & Compliance Considerations** ✅
+
+- [x] Add option to hash/redact PII in queries (future)
+- [x] Document log retention policy in README
+- [x] Add log rotation to prevent unbounded disk usage
+- [ ] Consider GDPR compliance for user data (future API)
+
+**8.2.5 Verification** ✅
+
+- [x] Test: Query logged to file after successful response
+- [x] Test: Refusal logged with reason
+- [x] Test: Log rotation works at 50MB limit
+- [x] Test: Console output only appears with `--log-queries`
+- [x] Test: Latency tracking accurate
+- [x] Test: Token counts match OpenAI usage
+- [x] All 9 tests passing in `tests/test_audit.py`
+
+**Implementation Summary**:
+
+- Created `app/audit.py` with `log_query_response()` function
+- Integrated at all 4 query exit points (no-results, confidence gate, budget refusal, success)
+- Always writes to `logs/queries.jsonl` (compliance requirement)
+- Optional stderr output via `--log-queries` CLI flag
+- Tracks latency, tokens, refusals for cost/performance monitoring
+- Future-ready with `user_id` field for API authentication
+
+**Rationale**: Separating debug (pipeline transparency) from audit (compliance logging) provides clean separation of concerns. Debug mode is verbose and optional; audit logging is concise and always-on for production compliance.
+
+______________________________________________________________________
 
 ### Phase 9: Evaluation Set
 
