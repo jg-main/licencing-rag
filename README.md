@@ -429,7 +429,7 @@ curl -X POST http://localhost:8000/api/v1/query \
     }
   ],
   "metadata": {
-    "providers_searched": ["cme"],
+    "sources_searched": ["cme"],
     "chunks_retrieved": 5,
     "search_mode": "hybrid",
     "response_time_ms": 1420
