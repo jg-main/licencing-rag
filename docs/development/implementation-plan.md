@@ -165,28 +165,54 @@ ______________________________________________________________________
 - [x] **Tie-breaking**: Prefer shorter chunks when scores are equal
 - [x] **Debug visibility**: Full budget metrics in debug mode
 
-### Phase 6: Retrieval Confidence Gating
+### Phase 6: Retrieval Confidence Gating ✅
 
 #### 6.1 Implementation
 
-- [ ] Create `app/gate.py` module
-- [ ] Define `RELEVANCE_THRESHOLD = 2`
-- [ ] Define `CONFIDENCE_THRESHOLD = 2`
-- [ ] Implement `should_refuse()` function
-- [ ] Return standard refusal message
+- [x] Create `app/gate.py` module
+- [x] Implement two-tier gating strategy (reranked vs retrieval scores)
+- [x] Define `RELEVANCE_THRESHOLD = 2` for reranked scores
+- [x] Define `RETRIEVAL_MIN_SCORE = 0.05` for retrieval scores (prevents weak/near-zero accepts)
+- [x] Define `RETRIEVAL_MIN_RATIO = 1.2` for retrieval scores (requires clear winner, simpler than median-gap)
+- [x] Define `MIN_CHUNKS_REQUIRED = 1`
+- [x] Implement `should_refuse()` function with score type awareness
+- [x] Return standard refusal message
 
 #### 6.2 Rules (Code-Enforced)
 
-- [ ] Refuse if no chunk score ≥ 2
-- [ ] Refuse if top score < 2
-- [ ] Refuse if all chunks score 0-1
-- [ ] Log refusal reason in debug mode
+**Reranked Scores (0-3):**
+
+- [x] Refuse if no chunk score ≥ 2
+- [x] Refuse if top score < 2
+- [x] Refuse if all chunks score 0-1
+- [x] Log refusal reason in debug mode
+
+**Retrieval Scores (vector/BM25/RRF):**
+
+- [x] Refuse if top score \<= absolute minimum (prevents negative/near-zero accepts)
+- [x] Refuse if top-1/top-2 ratio < 1.2 (no clear winner)
+- [x] Refuse if single chunk with score ≤ 0.05
+- [x] Handle zero/negative top-2 case with special ratio proxy
 
 #### 6.3 Integration
 
-- [ ] Update `query.py` to gate before LLM call
-- [ ] Skip LLM call entirely on refusal
-- [ ] Return deterministic refusal message
+- [x] Update `query.py` to track whether scores are reranked
+- [x] Pass `scores_are_reranked` flag to gate
+- [x] Gate before LLM call (after reranking)
+- [x] Skip LLM call entirely on refusal
+- [x] Return deterministic refusal message
+- [x] Add `--no-gate` CLI flag
+- [x] Add post-budget empty context check
+- [x] Add comprehensive test suite (41 tests)
+
+#### 6.4 Test Coverage
+
+- [x] Test reranked score gating (11 tests)
+- [x] Test retrieval score gating (8 tests)
+- [x] Test two-tier gating integration (4 tests)
+- [x] Test refusal messages (10 tests)
+- [x] Test configuration variations (3 tests)
+- [x] Test post-budget refusal (5 tests)
 
 ### Phase 7: LLM Prompt Discipline
 

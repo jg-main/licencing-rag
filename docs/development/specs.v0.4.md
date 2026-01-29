@@ -397,43 +397,139 @@ ______________________________________________________________________
 
 ### Objective
 
-Refuse when evidence is weak or missing.
+Refuse when evidence is weak or missing. Code-enforced gating prevents hallucinations by skipping the LLM call entirely when retrieval confidence is too low.
+
+### Two-Tier Gating Strategy
+
+The system uses different gating strategies depending on whether scores come from reranking (0-3 scale) or raw retrieval (vector/BM25/RRF scores):
+
+**Tier 1: Reranked Scores (0-3 scale)**
+
+- Used when reranking succeeds
+- Threshold-based gating: require chunks ≥ RELEVANCE_THRESHOLD (2)
+
+**Tier 2: Retrieval Scores (raw scores)**
+
+- Used when reranking disabled or fallback triggered
+- Ratio-based gating: require top-1/top-2 ratio ≥ 1.2 (clear winner) and top score > 0.05
+
+This prevents false refusals/accepts when reranking is bypassed.
 
 ### Rules (Enforced in Code)
 
-| Condition            | Action |
-| -------------------- | ------ |
-| No chunk score ≥ 2   | REFUSE |
-| Top score < 2        | REFUSE |
-| All chunks score 0-1 | REFUSE |
+**Reranked Scores (0-3):**
+
+| Condition                             | Action |
+| ------------------------------------- | ------ |
+| No chunks retrieved                   | REFUSE |
+| No chunk score ≥ 2                    | REFUSE |
+| Top score < 2                         | REFUSE |
+| All chunks score 0-1                  | REFUSE |
+| Fewer than min_chunks above threshold | REFUSE |
+
+**Retrieval Scores (vector/BM25/RRF):**
+
+| Condition                                   | Action |
+| ------------------------------------------- | ------ |
+| No chunks retrieved                         | REFUSE |
+| Top score ≤ 0.05 (too weak)                 | REFUSE |
+| Top-1 / top-2 ratio < 1.2 (no clear winner) | REFUSE |
+| Single chunk with score ≤ 0.05              | REFUSE |
+
+### Configuration
+
+**Reranked Score Gating:**
+
+- `RELEVANCE_THRESHOLD = 2` (minimum score to consider chunk RELEVANT)
+- `MIN_CHUNKS_REQUIRED = 1` (minimum chunks above threshold to proceed)
+
+**Retrieval Score Gating:**
+
+- `RETRIEVAL_MIN_SCORE = 0.05` (top score must exceed weak positives, prevents near-zero accepts)
+- `RETRIEVAL_MIN_RATIO = 1.2` (top-1 / top-2 ≥ 1.2, requires clear winner)
+
+**General:**
+
+- `CONFIDENCE_GATE_ENABLED = True` (enabled by default)
 
 ### Implementation
 
 ```python
 # app/gate.py
 
-RELEVANCE_THRESHOLD = 2  # Minimum score to consider relevant
-CONFIDENCE_THRESHOLD = 2  # Minimum top score to proceed
+def should_refuse(
+    chunks: list[Any],
+    scores_are_reranked: bool = True,
+    relevance_threshold: float = RELEVANCE_THRESHOLD,
+    min_chunks: int = MIN_CHUNKS_REQUIRED,
+    retrieval_min_score: float = RETRIEVAL_MIN_SCORE,
+    retrieval_min_ratio: float = RETRIEVAL_MIN_RATIO,
+) -> tuple[bool, str | None]:
+    """Determine if query should be refused based on retrieval confidence.
 
-def should_refuse(scored_chunks: list[tuple[dict, int]]) -> bool:
-    """Determine if query should be refused based on retrieval confidence."""
-    if not scored_chunks:
-        return True
+    Two-tier gating:
+    - If scores_are_reranked=True: Use 0-3 threshold-based gating
+    - If scores_are_reranked=False: Use absolute minimum + gap-based gating
+    """
+    if not chunks:
+        return True, "no_chunks_retrieved"
 
-    top_score = scored_chunks[0][1]
-
-    # Refuse if top score below threshold
-    if top_score < CONFIDENCE_THRESHOLD:
-        return True
-
-    # Refuse if no chunk meets relevance threshold
-    if not any(score >= RELEVANCE_THRESHOLD for _, score in scored_chunks):
-        return True
-
-    return False
-
-REFUSAL_MESSAGE = "This is not addressed in the provided CME documents."
+    if scores_are_reranked:
+        # Tier 1: Reranked scores (0-3 scale)
+        return _gate_reranked_scores(scores, relevance_threshold, min_chunks)
+    else:
+        # Tier 2: Retrieval scores (absolute minimum + gap)
+        return _gate_retrieval_scores(scores, retrieval_min_score, retrieval_gap)
 ```
+
+### Integration
+
+Gating happens AFTER reranking but BEFORE budget enforcement:
+
+```python
+# In query.py, after reranking:
+
+# Track whether scores are reranked (0-3) or retrieval scores
+# Computed once for accuracy and explicitness
+scores_are_reranked = enable_reranking and bool(kept_chunks) and not fallback_triggered
+
+if enable_confidence_gate:
+    refuse, reason = should_refuse(
+        kept_chunks,
+        scores_are_reranked=scores_are_reranked,
+        relevance_threshold=RELEVANCE_THRESHOLD,
+        min_chunks=MIN_CHUNKS_REQUIRED,
+        retrieval_min_score=RETRIEVAL_MIN_SCORE,
+        retrieval_gap=RETRIEVAL_MIN_GAP,
+    )
+    if refuse:
+        # Skip LLM call entirely
+        return {
+            "answer": get_refusal_message(providers),
+            "refused": True,
+            "refusal_reason": reason,
+            ...
+        }
+
+# Post-budget check: refuse if budget dropped all chunks
+if len(all_documents) == 0:
+    return {
+        "answer": get_refusal_message(providers),
+        "refused": True,
+        "refusal_reason": "empty_context_after_budget",
+        ...
+    }
+```
+
+### Benefits
+
+1. **Cost Savings**: No LLM call when confidence is low
+1. **Accuracy**: Code-enforced refusal (cannot be bypassed by prompts)
+1. **Scale-Aware**: Different strategies for reranked vs retrieval scores
+1. **Fallback-Safe**: Prevents false refusals when reranking fallback is triggered
+1. **Transparency**: Refusal reason logged and returned in response
+1. **Configurability**: Can disable with `--no-gate` flag
+1. **Post-Budget Safety**: Catches empty context after budget enforcement
 
 ______________________________________________________________________
 
