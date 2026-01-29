@@ -70,6 +70,7 @@ def cmd_query(args: argparse.Namespace) -> int:
     debug = getattr(args, "debug", False)
     enable_reranking = getattr(args, "enable_reranking", True)
     enable_budget = getattr(args, "enable_budget", True)
+    enable_confidence_gate = getattr(args, "enable_confidence_gate", True)
 
     try:
         result = query(
@@ -79,6 +80,7 @@ def cmd_query(args: argparse.Namespace) -> int:
             search_mode=search_mode,
             enable_reranking=enable_reranking,
             enable_budget=enable_budget,
+            enable_confidence_gate=enable_confidence_gate,
             debug=debug,
         )
 
@@ -239,6 +241,13 @@ Examples:
         action="store_false",
         default=True,
         help="Disable context budget enforcement (Phase 5 feature, enabled by default)",
+    )
+    query_parser.add_argument(
+        "--no-gate",
+        dest="enable_confidence_gate",
+        action="store_false",
+        default=True,
+        help="Disable confidence gating (Phase 6 feature, enabled by default)",
     )
 
     # List command

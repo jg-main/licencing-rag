@@ -51,6 +51,19 @@ CONTEXT_BUDGET_ENABLED = True  # Enable token budget enforcement
 # the FULL prompt (system + QA template + question + definitions + context) with
 # tiktoken to guarantee the 60k limit. This is the accuracy-first approach.
 
+# Confidence Gating parameters (Phase 6)
+CONFIDENCE_GATE_ENABLED = True  # Enable confidence gating by default
+
+# Reranking-based gating (0-3 scale)
+RELEVANCE_THRESHOLD = 2  # Minimum relevance score (2=RELEVANT, 3=HIGHLY RELEVANT)
+MIN_CHUNKS_REQUIRED = 1  # Minimum chunks above threshold to proceed
+
+# Retrieval-score gating (when reranking disabled or fallback)
+RETRIEVAL_MIN_SCORE = (
+    0.05  # Top chunk must exceed minimum (prevents weak positives like 0.0001)
+)
+RETRIEVAL_MIN_RATIO = 1.2  # Top-1 score must be >= 1.2 × top-2 score (clear winner)
+
 # Provider configuration
 PROVIDERS: dict[str, dict[str, str]] = {
     "cme": {
