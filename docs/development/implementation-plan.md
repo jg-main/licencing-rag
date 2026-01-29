@@ -214,21 +214,52 @@ ______________________________________________________________________
 - [x] Test configuration variations (3 tests)
 - [x] Test post-budget refusal (5 tests)
 
-### Phase 7: LLM Prompt Discipline
+### Phase 7: LLM Prompt Discipline ✅
 
 #### 7.1 System Prompt Update
 
-- [ ] Update `app/prompts.py` with strict rules
-- [ ] Emphasize: use ONLY provided context
-- [ ] Emphasize: NEVER extrapolate
-- [ ] Enforce: mandatory citations
-- [ ] Add explicit refusal instruction
+- [x] Update `app/prompts.py` with strict rules
+- [x] Emphasize: use ONLY provided context
+- [x] Emphasize: NEVER extrapolate
+- [x] Enforce: mandatory citations
+- [x] Add explicit refusal instruction
+- [x] Add quality verification checklist (pre-response)
+- [x] Include forbidden patterns section
+- [x] Add structured formatting for LLM clarity
+- [x] Strengthen accuracy-over-cost principle throughout
 
 #### 7.2 Output Format
 
-- [ ] Enforce: "Answer: <text>" format
-- [ ] Enforce: "Citations: <list>" format
-- [ ] Test refusal message consistency
+- [x] Enforce: "## Answer" section format
+- [x] Enforce: "## Supporting Clauses" with verbatim quotes
+- [x] Enforce: "## Citations" with mandatory page numbers
+- [x] Test refusal message consistency
+- [x] Add pre-response verification prompts
+- [x] Strengthen QA prompts with refusal criteria
+
+#### 7.3 Implementation Enhancements (Deviation from Spec)
+
+**Deviations that add value:**
+
+1. **Pre-response Verification Checklists**: Added mandatory verification steps in both SYSTEM_PROMPT and QA_PROMPT to ensure LLM checks accuracy before responding
+1. **Forbidden Patterns Section**: Explicitly listed patterns to avoid (e.g., "Based on typical industry practice...") with visual markers (❌/✅)
+1. **Structured Formatting**: Used visual separators (═══) to improve LLM parsing and comprehension
+1. **Refusal Criteria Enumeration**: Listed specific conditions that should trigger refusal in QA prompts
+1. **Quality Verification Section**: Added "QUALITY VERIFICATION (Before Responding)" with numbered checklist
+1. **Accuracy-First Principle**: Made explicit that "It is better to refuse than to answer with ANY uncertainty"
+1. **Verbatim Quote Requirement**: Strengthened from "quote" to "verbatim quote" with explicit anti-paraphrasing rules
+
+**Rationale:** These enhancements align with the accuracy-first principle stated in README.md: "This is not a general chatbot. It is a retrieval-grounded legal analysis tool." The additional structure and verification steps reduce hallucination risk beyond what basic prompt engineering can achieve.
+
+#### 7.4 Testing
+
+- [x] Create `tests/test_prompts.py` with 40 validation tests
+- [x] Test prompt structure and required sections
+- [x] Test accuracy enforcement rules
+- [x] Test refusal message formatting
+- [x] Test citation requirements
+- [x] Test format enforcement
+- [x] Adjust `test_budget.py` for enhanced prompt token count
 
 ### Phase 8: Debug & Audit Mode
 

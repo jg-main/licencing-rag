@@ -2,7 +2,7 @@
 
 **Project Name:** License Intelligence System (OpenAI RAG)\
 **Version:** 0.4\
-**Last Updated:** 2026-01-28\
+**Last Updated:** 2026-01-29\
 **Branch:** openai
 
 ______________________________________________________________________
@@ -11,15 +11,16 @@ ______________________________________________________________________
 
 - **BREAKING**: Switched to OpenAI as single provider for both embeddings and LLM
 - **BREAKING**: Removed Ollama/Claude support (single-provider architecture)
-- **Added**: Query normalization (pre-retrieval processing)
-- **Added**: LLM-based reranking with GPT-4.1
-- **Added**: Context budget enforcement (≤60k tokens)
-- **Added**: Retrieval confidence gating (code-enforced refusal)
-- **Added**: Debug/audit mode for transparency
-- **Added**: Evaluation set for clause retrieval accuracy
+- **Added**: Query normalization (pre-retrieval processing) - Phase 2
+- **Added**: LLM-based reranking with GPT-4.1 - Phase 4
+- **Added**: Context budget enforcement (≤60k tokens) - Phase 5
+- **Added**: Retrieval confidence gating (code-enforced refusal) - Phase 6
+- **Added**: LLM prompt discipline (accuracy-first prompting) - Phase 7
+- **Added**: Debug/audit mode for transparency - Phase 8 (planned)
+- **Added**: Evaluation set for clause retrieval accuracy - Phase 9 (planned)
 - **Removed**: Multi-LLM provider abstraction (Ollama, Anthropic)
 - **Removed**: Local embedding model support
-- **Updated**: Refusal is now enforced in code, not just prompts
+- **Updated**: Refusal is now enforced in code AND prompts (layered defense)
 
 ______________________________________________________________________
 
@@ -638,6 +639,164 @@ Context:
 
 Question: {question}
 ```
+
+______________________________________________________________________
+
+## 13. LLM Prompt Discipline (Phase 7)
+
+### Objective
+
+Enforce accuracy-first behavior through comprehensive prompt engineering that complements code-enforced gating. While Phase 6 prevents the LLM from being called with low-confidence retrieval, Phase 7 ensures the LLM responds accurately when it is called.
+
+### Core Principle
+
+> **Accuracy > Cost > Helpfulness**\
+> Legal accuracy takes absolute precedence. It is better to refuse than to answer with ANY uncertainty.
+
+### SYSTEM_PROMPT Enhancements
+
+**Strict Rules Section (26 enumerated rules):**
+
+1. **Grounding Requirements (7 rules)**:
+
+   - Answer ONLY using provided context
+   - Never use external knowledge, training data, or assumptions
+   - Never infer, extrapolate, deduce, or fill gaps
+   - Every claim must be traceable to specific quoted text
+   - Never "improve" or "clarify" document text - quote verbatim
+
+1. **Mandatory Refusal (6 rules)**:
+
+   - Refuse if complete answer not explicitly in context
+   - Exact refusal format: "This is not addressed in the provided [PROVIDER] documents."
+   - Explain what specific information is missing
+   - Never answer "based on typical practice" - refuse instead
+   - Partial information is NOT sufficient - refuse
+
+1. **Citation Requirements (5 rules)**:
+
+   - Always cite documents, sections, and page numbers
+   - Citations are mandatory audit trails, not optional
+   - Use provider-prefixed citations: [CME], [OPRA]
+   - Quote exact text for fees, requirements, definitions
+
+1. **Quality Verification (4 rules)**:
+
+   - Before responding: Can you point to exact text for each sentence?
+   - Are you making ANY assumptions?
+   - Would removing context leave answer unchanged?
+   - Are all citations complete and accurate?
+
+**Output Format Requirements:**
+
+Structured format with mandatory sections:
+
+- `## Answer` - Grounded answer with exact refusal format if refusing
+- `## Supporting Clauses` - MANDATORY verbatim quotes with citations
+- `## Definitions` - Optional, only if defined terms are relevant
+- `## Citations` - MANDATORY source document list
+- `## Notes` - Optional ambiguities or cross-references
+
+**Forbidden Patterns:**
+
+Explicitly listed patterns to avoid (with visual markers):
+
+- ❌ "Based on typical industry practice..."
+- ❌ "While not explicitly stated, it is likely..."
+- ❌ "Generally speaking..." or "In most cases..."
+- ❌ Providing context-less general knowledge
+- ❌ Paraphrasing when exact quotes are needed
+- ❌ Answering without citations
+
+**Visual Formatting:**
+
+Uses structured separators (═══) to improve LLM parsing and comprehension. This helps the LLM distinguish between different rule categories and requirements.
+
+### QA_PROMPT Enhancements
+
+**Pre-Response Verification Checklist:**
+
+Mandatory questions the LLM must answer before responding:
+
+1. Can I answer using ONLY the context above? (If NO → refuse)
+1. Can I provide specific citations for every claim? (If NO → refuse or remove uncited claims)
+1. Am I using ANY external knowledge or assumptions? (If YES → refuse)
+1. If definitions provided, am I applying them correctly? (If UNCERTAIN → refuse)
+
+**Refusal Criteria:**
+
+Enumerated conditions that should trigger refusal:
+
+- Context does not contain complete answer
+- Any part would require inference or assumption
+- Context is ambiguous with multiple interpretations
+- Question asks about something not covered
+- Would need general knowledge to complete answer
+
+**Accuracy Reminder:**
+
+Explicit reminder at end of prompt:
+
+> "Better to refuse than to answer with uncertainty. Legal accuracy > user satisfaction."
+
+### Implementation Details
+
+**Files Modified:**
+
+- `app/prompts.py`: Complete rewrite of SYSTEM_PROMPT and QA_PROMPT templates
+- `tests/test_prompts.py`: 40 new validation tests
+- `tests/test_budget.py`: Adjusted token budget test for longer prompts
+
+**Token Impact:**
+
+Enhanced prompts are ~800 tokens longer than original (now ~2500 tokens vs ~1700 tokens). This is an intentional trade-off for accuracy:
+
+- Cost increase: ~$0.002 per query (~7% of total)
+- Benefit: Significantly reduced hallucination risk
+- Rationale: Accuracy-first principle justifies additional tokens
+
+### Testing
+
+**Test Coverage (40 tests):**
+
+- 12 tests for SYSTEM_PROMPT structure and requirements
+- 10 tests for QA_PROMPT templates and placeholders
+- 4 tests for refusal message generation
+- 3 tests for prompt integration
+- 5 tests for accuracy requirements enforcement
+- 6 tests for format enforcement
+
+**Validation:**
+
+- ✅ All prompts contain strict rules
+- ✅ Refusal instructions are explicit
+- ✅ Citation requirements are mandatory
+- ✅ Quality verification checklists present
+- ✅ Forbidden patterns enumerated
+- ✅ Output format clearly specified
+
+### Deviations from Original Spec
+
+The implementation goes beyond the basic spec requirements with enhancements that add value:
+
+1. **Pre-response Verification Checklists**: Not in original spec, but critical for accuracy
+1. **Forbidden Patterns Section**: Visual examples of what NOT to do
+1. **Structured Formatting**: Separator lines for improved LLM comprehension
+1. **Enumerated Refusal Criteria**: Specific conditions for refusal
+1. **Quality Verification Section**: Numbered checklist before responding
+1. **Verbatim Quote Requirement**: Strengthened beyond basic "quote" to explicit anti-paraphrasing
+1. **Accuracy-First Principle Emphasis**: Made explicit throughout prompts
+
+**Rationale:** These enhancements align with the project's core principle that "The LLM is not a knowledge source—it is only the renderer" and the accuracy-first philosophy stated in README.md.
+
+### Benefits
+
+1. **Reduced Hallucinations**: Multi-layered accuracy enforcement
+1. **Consistent Refusals**: Explicit refusal format and criteria
+1. **Audit Trail**: Mandatory citations enable verification
+1. **Quality Assurance**: Built-in verification steps
+1. **Legal Defensibility**: Structured output with clear provenance
+1. **Cost-Effective**: Accuracy reduces need for human review/correction
 
 ______________________________________________________________________
 

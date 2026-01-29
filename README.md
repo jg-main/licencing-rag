@@ -34,9 +34,13 @@ This is **not** a general chatbot and **not** a trained LLM. It is a **retrieval
 - ✅ Uses OpenAI GPT-4.1 for answer generation
 - ✅ Supports hybrid search (vector + keyword with BM25 and RRF)
 - ✅ Auto-links defined terms to definitions
-- ⏳ Query normalization - **PHASE 2**
-- ⏳ LLM reranking - **PHASE 4**
-- ⏳ Confidence gating - **PHASE 6**
+- ✅ Query normalization - **PHASE 2 COMPLETE**
+- ✅ LLM reranking - **PHASE 4 COMPLETE**
+- ✅ Context budget enforcement (≤60k tokens) - **PHASE 5 COMPLETE**
+- ✅ Confidence gating (code-enforced refusal) - **PHASE 6 COMPLETE**
+- ✅ LLM prompt discipline (accuracy-first prompts) - **PHASE 7 COMPLETE**
+- ⏳ Debug & audit mode - **PHASE 8**
+- ⏳ Evaluation set - **PHASE 9**
 - ⏳ REST API for programmatic access - **DEFERRED**
 - ⏳ Deployable to AWS EC2 - **DEFERRED**
 

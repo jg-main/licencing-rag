@@ -661,7 +661,9 @@ class TestAccuracyFirstDefinitions:
         # Large definitions that would push over budget
         large_definitions = "**Term**: Definition. " * 200
         provider_label = "CME"
-        small_budget = 2000  # Tight budget
+        small_budget = (
+            3500  # Adjusted for enhanced Phase 7 prompts (more comprehensive)
+        )
 
         # Without definitions - should fit
         kept_no_def, info_no_def = enforce_full_prompt_budget(
