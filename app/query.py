@@ -953,7 +953,9 @@ def query(
             )
 
             # Retry once with stricter system prompt
-            stricter_prompt = get_stricter_system_prompt(formatted_system_prompt)
+            stricter_prompt = get_stricter_system_prompt(
+                formatted_system_prompt, sources
+            )
             answer = llm.generate(system=stricter_prompt, prompt=prompt)
 
             # Validate retry
