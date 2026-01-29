@@ -14,6 +14,9 @@ import re
 from dataclasses import dataclass
 
 from app.logging import get_logger
+from app.prompts import REFUSAL_TEMPLATE
+from app.prompts import REQUIRED_ANSWER_SECTIONS
+from app.prompts import REQUIRED_REFUSAL_SECTIONS
 
 log = get_logger(__name__)
 
@@ -96,6 +99,8 @@ def validate_llm_output(output: str, sources: list[str]) -> ValidationResult:
 def _is_refusal_response(output: str, sources: list[str]) -> bool:
     """Check if the output is a refusal rather than an answer.
 
+    Uses REFUSAL_TEMPLATE from prompts.py for consistency.
+
     Args:
         output: The LLM response text.
         sources: List of source names for matching refusal pattern.
@@ -103,24 +108,20 @@ def _is_refusal_response(output: str, sources: list[str]) -> bool:
     Returns:
         True if output appears to be a refusal, False otherwise.
     """
-    # Check for canonical refusal format
-    source_names = ", ".join(s.upper() for s in sources)
-    canonical_refusal = (
-        f"This is not addressed in the provided {source_names} documents."
-    )
-
-    # Also check for single-source variant
+    # Build canonical refusal using centralized template
     if len(sources) == 1:
-        single_source_refusal = (
-            f"This is not addressed in the provided {sources[0].upper()} documents."
-        )
-        return canonical_refusal in output or single_source_refusal in output
+        source_label = sources[0].upper()
+    else:
+        source_label = ", ".join(s.upper() for s in sources)
 
+    canonical_refusal = REFUSAL_TEMPLATE.format(source=source_label)
     return canonical_refusal in output
 
 
 def _validate_required_sections(output: str, is_refusal: bool) -> list[str]:
     """Validate that required sections are present.
+
+    Uses REQUIRED_ANSWER_SECTIONS and REQUIRED_REFUSAL_SECTIONS from prompts.py.
 
     Args:
         output: The LLM response text.
@@ -130,29 +131,20 @@ def _validate_required_sections(output: str, is_refusal: bool) -> list[str]:
         List of error messages for missing required sections.
     """
     errors = []
+    required = REQUIRED_REFUSAL_SECTIONS if is_refusal else REQUIRED_ANSWER_SECTIONS
 
-    # Answer section is always required
-    if "## Answer" not in output:
-        errors.append("Missing required '## Answer' section")
-
-    if is_refusal:
-        # For refusals, only Answer section is required
-        # Supporting Clauses should NOT be present
-        # Citations and Definitions are optional
-        pass
-    else:
-        # For answers, require Supporting Clauses and Citations
-        if "## Supporting Clauses" not in output:
-            errors.append("Missing required '## Supporting Clauses' section for answer")
-
-        if "## Citations" not in output:
-            errors.append("Missing required '## Citations' section for answer")
+    for section in required:
+        if section not in output:
+            section_type = "refusal" if is_refusal else "answer"
+            errors.append(f"Missing required '{section}' section for {section_type}")
 
     return errors
 
 
 def _validate_refusal_format(output: str, sources: list[str]) -> list[str]:
     """Validate that refusal follows canonical format.
+
+    Uses REFUSAL_TEMPLATE from prompts.py for consistency.
 
     Args:
         output: The LLM response text.
@@ -163,22 +155,19 @@ def _validate_refusal_format(output: str, sources: list[str]) -> list[str]:
     """
     errors = []
 
-    # Build expected refusal message (matches prompts.get_refusal_message)
+    # Build expected refusal message using centralized template
     if len(sources) == 1:
-        expected_start = (
-            f"This is not addressed in the provided {sources[0].upper()} documents."
-        )
+        source_label = sources[0].upper()
     else:
-        source_names = ", ".join(s.upper() for s in sources)
-        expected_start = (
-            f"This is not addressed in the provided {source_names} documents."
-        )
+        source_label = ", ".join(s.upper() for s in sources)
+
+    expected_refusal = REFUSAL_TEMPLATE.format(source=source_label)
 
     # Check if refusal message appears in Answer section
-    if expected_start not in output:
+    if expected_refusal not in output:
         errors.append(
             f"Refusal format does not match canonical template. "
-            f"Expected: '{expected_start}'"
+            f"Expected: '{expected_refusal}'"
         )
 
     return errors
@@ -193,7 +182,7 @@ def _validate_citations(output: str) -> list[str]:
     Returns:
         List of warning messages for citation issues (non-critical).
     """
-    warnings = []
+    warnings: list[str] = []
 
     # Extract Citations section
     citations_match = re.search(r"## Citations\s*\n(.*?)(?=\n##|\Z)", output, re.DOTALL)
@@ -220,21 +209,30 @@ def _validate_citations(output: str) -> list[str]:
     return warnings
 
 
-def get_stricter_system_prompt(original_prompt: str) -> str:
+def get_stricter_system_prompt(original_prompt: str, sources: list[str]) -> str:
     """Generate a stricter system prompt for retry after validation failure.
 
     Args:
         original_prompt: The original system prompt.
+        sources: List of source names for refusal format example.
 
     Returns:
         Enhanced system prompt with stronger validation warnings.
     """
+    # Build source label for refusal example
+    if len(sources) == 1:
+        source_label = sources[0].upper()
+    else:
+        source_label = ", ".join(s.upper() for s in sources)
+
+    refusal_example = REFUSAL_TEMPLATE.format(source=source_label)
+
     # Add a warning banner at the start
-    warning = """
+    warning = f"""
 ⚠️  CRITICAL VALIDATION WARNING ⚠️
 Your previous response failed format validation. You MUST follow the output format EXACTLY.
 - Include ALL required sections: ## Answer, ## Supporting Clauses, ## Citations
-- Use EXACT refusal format if refusing: "This is not addressed in the provided PROVIDER documents."
+- Use EXACT refusal format if refusing: "{refusal_example}"
 - Include page numbers in ALL citations
 - Skip Supporting Clauses section ONLY when refusing
 
