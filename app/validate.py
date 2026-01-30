@@ -67,7 +67,14 @@ def validate_llm_output(output: str, sources: list[str]) -> ValidationResult:
                 "Supporting Clauses section should be omitted when refusing to answer"
             )
     else:
-        # For answers, validate citations
+        # For answers, require Supporting Clauses and Citations (strict grounding)
+        # This enforces accuracy-first principle from Phase 7
+        if "## Supporting Clauses" not in output:
+            errors.append("Missing required '## Supporting Clauses' section for answer")
+        if "## Citations" not in output:
+            errors.append("Missing required '## Citations' section for answer")
+
+        # Validate citations format if present
         citation_warnings = _validate_citations(output)
         warnings.extend(citation_warnings)
 
