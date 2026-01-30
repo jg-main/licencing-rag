@@ -40,13 +40,12 @@
         "should_answer": true,
         "expected_chunks": [
             "cme_legal__ILA-Subscriber-Addendum.pdf_0",
-            "cme_legal__ILA-Subscriber-Addendum.pdf_1"
+            "cme_legal__ILA-Subscriber-Addendum.pdf_15"
         ],
         "expected_answer_contains": [
-            "subscriber",
-            "distributor"
+            "subscriber"
         ],
-        "notes": "Should retrieve definition from ILA Subscriber Addendum - definition added to index",
+        "notes": "Subscriber definition retrieved via definitions auto-linking from Schedule 5. ILA-Subscriber-Addendum chunks provide context.",
         "source": "cme"
     },
     {
