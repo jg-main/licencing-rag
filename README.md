@@ -34,13 +34,13 @@ This is **not** a general chatbot and **not** a trained LLM. It is a **retrieval
 - ✅ Uses OpenAI GPT-4.1 for answer generation
 - ✅ Supports hybrid search (vector + keyword with BM25 and RRF)
 - ✅ Auto-links defined terms to definitions
-- ✅ Query normalization - **PHASE 2 COMPLETE**
-- ✅ LLM reranking - **PHASE 4 COMPLETE**
-- ✅ Context budget enforcement (≤60k tokens) - **PHASE 5 COMPLETE**
-- ✅ Confidence gating (code-enforced refusal) - **PHASE 6 COMPLETE**
-- ✅ LLM prompt discipline (accuracy-first prompts) - **PHASE 7 COMPLETE**
-- ⏳ Debug & audit mode - **PHASE 8**
-- ⏳ Evaluation set - **PHASE 9**
+- ✅ Query normalization
+- ✅ LLM reranking
+- ✅ Context budget enforcement (≤60k tokens)
+- ✅ Confidence gating (code-enforced refusal)
+- ✅ LLM prompt discipline (accuracy-first prompts)
+- ✅ Debug & audit mode
+- ✅ Evaluation set
 - ⏳ REST API for programmatic access - **DEFERRED**
 - ⏳ Deployable to AWS EC2 - **DEFERRED**
 
@@ -48,7 +48,7 @@ This is **not** a general chatbot and **not** a trained LLM. It is a **retrieval
 
 | Provider  | Status     | Document Count | Priority |
 | --------- | ---------- | -------------- | -------- |
-| CME Group | ✅ Active  | ~35 documents  | P0       |
+| CME Group | ✅ Active  | ~44 documents  | P0       |
 | OPRA      | ⏳ Planned | TBD            | P1       |
 | CTA/UTP   | ⏳ Planned | TBD            | P2       |
 
@@ -71,12 +71,12 @@ ______________________________________________________________________
 
 - ✅ **PDF & DOCX Extraction** - Extract text with page tracking from PDF and DOCX files
 - ✅ **Smart Chunking** - Section-aware chunking with 500-800 word targets and metadata
-- ✅ **Vector Search** - ChromaDB with Ollama embeddings (nomic-embed-text)
+- ✅ **Vector Search** - ChromaDB with OpenAI embeddings (text-embedding-3-large, 3072 dimensions)
 - ✅ **Multi-Provider Support** - Organize documents by data source (CME, OPRA, etc.)
 - ✅ **Subdirectory Organization** - Nested folder structure (e.g., `CME/Fees/`, `CME/Agreements/`)
 - ✅ **Page-Level Citations** - Every answer includes exact document references
 - ✅ **Grounded Responses** - Explicit refusal when answer not in documents
-- ✅ **Dual LLM Support** - Claude API (primary) or Ollama (fallback)
+- ✅ **OpenAI Integration** - GPT-4.1 for answer generation and LLM reranking
 
 #### Quality & Testing
 
@@ -276,7 +276,7 @@ rag ingest --source opra
 - Recursively scans `data/raw/{source}/` for PDF and DOCX files
 - Extracts text with page tracking
 - Chunks documents with section detection
-- Generates embeddings via Ollama
+- Generates embeddings via OpenAI (text-embedding-3-large)
 - Stores in ChromaDB collection
 
 #### Querying
@@ -352,12 +352,17 @@ When using `--format json`, the output follows this structure:
 
 **What it does:**
 
-- Embeds question using Ollama
+- Normalizes query (removes filler words)
+- Embeds question using OpenAI (text-embedding-3-large)
 - Retrieves top-K relevant chunks from ChromaDB
 - ✅ Performs hybrid search (vector + BM25 with RRF)
 - ✅ Auto-links definitions (when enabled)
-- Generates answer via LLM (Claude or Ollama)
-- ⏳ (Sprint 3) Logs query to `logs/queries.jsonl` - NOT IMPLEMENTED YET
+- ✅ Reranks chunks with GPT-4.1 (0-3 relevance scoring)
+- ✅ Enforces confidence gate (refuses if evidence weak)
+- ✅ Enforces context budget (≤60k tokens)
+- Generates answer via GPT-4.1
+- ✅ Validates output format
+- ✅ Logs query to `logs/queries.jsonl`
 - Returns answer with citations
 
 #### Document Management
@@ -624,22 +629,22 @@ ______________________________________________________________________
 
 ### Technology Stack
 
-| Component        | Technology                | Purpose                           | Status      |
-| ---------------- | ------------------------- | --------------------------------- | ----------- |
-| Runtime          | Python 3.13+              | Application runtime               | ✅ Active   |
-| LLM (Primary)    | Claude Sonnet 4.5         | Answer generation (Anthropic API) | ✅ Active   |
-| LLM (Fallback)   | Llama 3.1/3.2 (Ollama)    | Local answer generation           | ✅ Active   |
-| Embeddings       | nomic-embed-text (Ollama) | 768-dim vectors                   | ✅ Active   |
-| Vector DB        | ChromaDB 1.4+             | Vector storage & search           | ✅ Active   |
-| Keyword Search   | rank-bm25 0.2+            | BM25 keyword search               | ✅ Active   |
-| PDF Extraction   | PyMuPDF 1.26+             | PDF text extraction               | ✅ Active   |
-| DOCX Extraction  | python-docx 1.2+          | DOCX text extraction              | ✅ Active   |
-| REST API         | FastAPI 0.115+            | HTTP API framework                | ⏳ Sprint 4 |
-| ASGI Server      | Uvicorn 0.32+             | Production web server             | ⏳ Sprint 4 |
-| CLI Formatting   | Rich 14.0+                | Terminal output formatting        | ✅ Active   |
-| Logging          | structlog 25.0+           | Structured logging                | ✅ Active   |
-| Testing          | pytest 8.0+               | Unit and integration tests        | ✅ Active   |
-| Containerization | Docker 27.0+              | Application containerization      | ⏳ Sprint 5 |
+| Component        | Technology             | Purpose                       | Status      |
+| ---------------- | ---------------------- | ----------------------------- | ----------- |
+| Runtime          | Python 3.13+           | Application runtime           | ✅ Active   |
+| LLM              | GPT-4.1 (OpenAI)       | Answer generation + reranking | ✅ Active   |
+| Embeddings       | text-embedding-3-large | 3072-dim vectors (OpenAI)     | ✅ Active   |
+| Vector DB        | ChromaDB 1.4+          | Vector storage & search       | ✅ Active   |
+| Keyword Search   | rank-bm25 0.2+         | BM25 keyword search           | ✅ Active   |
+| PDF Extraction   | PyMuPDF 1.26+          | PDF text extraction           | ✅ Active   |
+| DOCX Extraction  | python-docx 1.2+       | DOCX text extraction          | ✅ Active   |
+| Token Counting   | tiktoken 0.9+          | Accurate OpenAI token counts  | ✅ Active   |
+| REST API         | FastAPI 0.115+         | HTTP API framework            | ⏳ Deferred |
+| ASGI Server      | Uvicorn 0.32+          | Production web server         | ⏳ Deferred |
+| CLI Formatting   | Rich 14.0+             | Terminal output formatting    | ✅ Active   |
+| Logging          | structlog 25.0+        | Structured logging            | ✅ Active   |
+| Testing          | pytest 8.0+            | Unit and integration tests    | ✅ Active   |
+| Containerization | Docker 27.0+           | Application containerization  | ⏳ Sprint 5 |
 
 ### Key Design Decisions
 
@@ -736,7 +741,7 @@ docker run -p 8000:8000 \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/index:/app/index \
   -v $(pwd)/logs:/app/logs \
-  -e ANTHROPIC_API_KEY="sk-ant-..." \
+  -e OPENAI_API_KEY="sk-..." \
   rag-system
 
 # Use docker-compose
@@ -810,46 +815,17 @@ ______________________________________________________________________
 
 ### Common Issues
 
-#### "Cannot connect to Ollama"
+#### "OPENAI_API_KEY environment variable is required"
 
-**Problem:** Ollama server is not running.
-
-**Solution:**
-
-```bash
-# Start Ollama
-ollama serve
-
-# Or on macOS, ensure the Ollama app is running
-```
-
-#### "Model not found" (Ollama)
-
-**Problem:** The required model hasn't been downloaded.
+**Problem:** OpenAI API key not configured.
 
 **Solution:**
 
 ```bash
-# Pull embedding model (REQUIRED)
-ollama pull nomic-embed-text
-
-# Pull LLM model (if using Ollama for answers)
-ollama pull llama3.2:3b
-ollama pull llama3.1:8b
+export OPENAI_API_KEY="sk-..."
 ```
 
-#### "ANTHROPIC_API_KEY environment variable is required"
-
-**Problem:** Claude API key not configured.
-
-**Solution:**
-
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-export LLM_PROVIDER="anthropic"
-```
-
-Get an API key from [https://console.anthropic.com/](https://console.anthropic.com/)
+Get an API key from [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 
 #### "No index found" or "Collection not found"
 
@@ -861,15 +837,30 @@ Get an API key from [https://console.anthropic.com/](https://console.anthropic.c
 rag ingest --source cme
 ```
 
-#### "Rate limit exceeded" (Claude API)
+#### "Rate limit exceeded" (OpenAI API)
 
-**Problem:** Too many requests to Claude API.
+**Problem:** Too many requests to OpenAI API or insufficient tokens per minute.
 
 **Solution:**
 
 - Wait 60 seconds and try again
-- Upgrade API plan at [https://console.anthropic.com/](https://console.anthropic.com/)
-- Switch to Ollama: `export LLM_PROVIDER="ollama"`
+- Check your rate limits at [https://platform.openai.com/account/rate-limits](https://platform.openai.com/account/rate-limits)
+- Upgrade API tier for higher rate limits
+- Enable debug mode to see token usage: `rag query "..." --debug`
+
+#### "Embedding model mismatch"
+
+**Problem:** Index was built with a different embedding model.
+
+**Solution:**
+
+```bash
+# Delete old index
+rm -rf index/chroma/
+
+# Re-ingest documents with current embedding model
+rag ingest --source cme
+```
 
 #### Empty or poor extraction results
 
@@ -889,14 +880,14 @@ cat data/text/cme/your-document.pdf.txt
 
 #### Slow query performance
 
-**Problem:** Large document set or underpowered hardware.
+**Problem:** Large document set or high latency to OpenAI API.
 
 **Solutions:**
 
-- Use Claude API instead of Ollama for faster LLM response
-- Reduce `TOP_K` in config
-- Wait for Sprint 3 hybrid search for better precision (fewer chunks needed)
-- Upgrade hardware (more RAM for Ollama)
+- Reduce `TOP_K` in config to retrieve fewer chunks
+- Use vector-only search: `rag query "..." --search-mode vector`
+- Check network latency to OpenAI API
+- Monitor token usage with `--debug` flag
 
 #### ChromaDB version mismatch
 
@@ -940,27 +931,56 @@ ______________________________________________________________________
 
 ## Documentation
 
-### Main Documentation
+### Core Documentation
 
-- **[specs.v0.3.md](docs/specs.v0.3.md)** - Complete technical specifications
-- **[implementation-plan.md](docs/implementation-plan.md)** - Development roadmap and task breakdown
-- **[SUBDIRECTORY_IMPLEMENTATION.md](SUBDIRECTORY_IMPLEMENTATION.md)** - Subdirectory support details
+- **[Technical Specifications v0.4](docs/development/specs.v0.4.md)** - Complete OpenAI branch specifications
+- **[Implementation Plan](docs/development/implementation-plan.md)** - Phase-by-phase development roadmap
+- **[Data Sources](docs/data-sources.md)** - Track document sources and update dates
 
-### Additional Resources
+### User Guides
 
-- **[RAG Tutorial](docs/rag-tutorial.md)** - Beginner's guide to RAG concepts (if exists)
-- **[specs.v0.1.md](docs/specs.v0.1.md)** - Original MVP specifications
-- **[specs.v0.2.md](docs/specs.v0.2.md)** - Multi-source and page tracking specifications
+- **[Configuration Guide](docs/configuration.md)** - Environment variables and settings
+- **[Cost Estimation](docs/cost-estimation.md)** - OpenAI API cost breakdown and optimization
+- **[RAG Tutorial](docs/rag-tutorial.md)** - Beginner's guide to RAG concepts
+- **[Hybrid Search](docs/hybrid-search.md)** - How vector + keyword search works
 
-### Sprint Progress
+### Architecture & Concepts
 
-| Sprint | Status             | Features                                     |
-| ------ | ------------------ | -------------------------------------------- |
-| 1      | ✅ Complete        | MVP: Extraction, chunking, ingestion, query  |
-| 2      | ✅ Complete        | Robustness: Error handling, logging, testing |
-| 3      | ✅ Mostly Complete | Hybrid search, definitions, output formats   |
-| 4      | ⏳ Planned         | REST API (FastAPI), authentication, docs     |
-| 5      | ⏳ Planned         | Docker, AWS ECS/Fargate, CI/CD, monitoring   |
+_These documents explain the key components and design decisions._
+
+- **Query Normalization** - How queries are preprocessed (see `app/normalize.py`)
+- **Reranking** - How LLM scores chunks for relevance (see `app/rerank.py`)
+- **Confidence Gating** - How refusal decisions are made (see `app/gate.py`)
+- **Context Budget** - How token limits are enforced (see `app/budget.py`)
+- **Debug Mode** - Pipeline transparency and troubleshooting (see `app/debug.py`)
+- **Audit Logging** - Query logging for compliance (see `app/audit.py`)
+
+_Note: For now, refer to docstrings in the source files. Standalone docs coming in future updates._
+
+### Development Reference
+
+- **[specs.v0.1.md](docs/development/specs.v0.1.md)** - Original MVP specifications (legacy)
+- **[specs.v0.2.md](docs/development/specs.v0.2.md)** - Multi-source specifications (legacy)
+- **[specs.v0.3.md](docs/development/specs.v0.3.md)** - Pre-OpenAI specifications (legacy)
+
+### Progress Tracking
+
+Current branch: **openai** (v0.4)
+
+| Phase  | Status         | Features                                  |
+| ------ | -------------- | ----------------------------------------- |
+| 1      | ✅ Complete    | OpenAI embeddings migration               |
+| 2      | ✅ Complete    | Query normalization                       |
+| 3      | ✅ Complete    | Hybrid search (vector + BM25 + RRF)       |
+| 4      | ✅ Complete    | LLM reranking with GPT-4.1                |
+| 5      | ✅ Complete    | Context budget enforcement                |
+| 6      | ✅ Complete    | Confidence gating (code-enforced refusal) |
+| 7      | ✅ Complete    | LLM prompt discipline                     |
+| 8      | ✅ Complete    | Debug & audit logging                     |
+| 9      | ⚠️ Partial     | Evaluation set (87.5% chunk recall)       |
+| 10     | 🔄 In Progress | Cleanup & documentation                   |
+| API    | ⏳ Deferred    | REST API (FastAPI)                        |
+| Deploy | ⏳ Deferred    | AWS deployment                            |
 
 ______________________________________________________________________
 
