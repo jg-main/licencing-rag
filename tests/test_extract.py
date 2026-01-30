@@ -5,15 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from app.extract import (
-    ExtractedDocument,
-    ExtractionError,
-    detect_document_version,
-    extract_docx,
-    extract_document,
-    extract_pdf,
-    validate_extraction,
-)
+from app.extract import ExtractedDocument
+from app.extract import ExtractionError
+from app.extract import detect_document_version
+from app.extract import extract_document
+from app.extract import extract_docx
+from app.extract import extract_pdf
+from app.extract import validate_extraction
 
 
 class TestExtractPDF:
@@ -68,11 +66,19 @@ class TestExtractDocument:
 
     def test_extract_document_unsupported(self, tmp_path: Path) -> None:
         """extract_document raises for unsupported file types."""
-        unsupported = tmp_path / "file.txt"
+        unsupported = tmp_path / "file.xyz"
         unsupported.write_text("test")
 
         with pytest.raises(ExtractionError, match="Unsupported file type"):
             extract_document(unsupported)
+
+    def test_extract_document_txt(self, tmp_path: Path) -> None:
+        """extract_document handles TXT files."""
+        txt_file = tmp_path / "test.txt"
+        txt_file.write_text("This is a test document with some text content.")
+        result = extract_document(txt_file)
+        assert result.extraction_method == "plain-text"
+        assert result.word_count > 0
 
 
 class TestValidateExtraction:

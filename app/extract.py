@@ -187,6 +187,47 @@ def extract_docx(path: Path) -> ExtractedDocument:
         raise ExtractionError(f"Failed to extract DOCX {path.name}: {e}") from e
 
 
+def extract_txt(path: Path) -> ExtractedDocument:
+    """Extract text from a plain text file.
+
+    Args:
+        path: Path to the text file.
+
+    Returns:
+        ExtractedDocument with content.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        ExtractionError: If text extraction fails.
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"Text file not found: {path}")
+
+    try:
+        text = path.read_text(encoding="utf-8")
+
+        # Text files don't have page boundaries, treat as single page
+        pages = [PageContent(page_num=1, text=text)]
+
+        extracted = ExtractedDocument(
+            pages=pages,
+            page_count=1,
+            source_file=path.name,
+            extraction_method="plain-text",
+        )
+
+        if extracted.is_empty:
+            log.warning(
+                "extraction_empty", filename=path.name, words=extracted.word_count
+            )
+
+        log.debug("txt_extracted", filename=path.name, words=extracted.word_count)
+        return extracted
+    except Exception as e:
+        log.error("txt_extraction_failed", filename=path.name, error=str(e))
+        raise ExtractionError(f"Failed to extract text {path.name}: {e}") from e
+
+
 def extract_document(path: Path) -> ExtractedDocument:
     """Extract text from a document based on its extension.
 
@@ -204,6 +245,8 @@ def extract_document(path: Path) -> ExtractedDocument:
         return extract_pdf(path)
     elif suffix == ".docx":
         return extract_docx(path)
+    elif suffix == ".txt":
+        return extract_txt(path)
     else:
         log.error("unsupported_file_type", filename=path.name, suffix=suffix)
         raise ExtractionError(f"Unsupported file type: {suffix}")

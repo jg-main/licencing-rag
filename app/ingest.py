@@ -266,7 +266,7 @@ def ingest_provider(source: str, force: bool = False) -> dict[str, int | list[st
         bm25_index.clear()
 
     # Find all supported documents recursively (sorted by relative path for deterministic ordering)
-    supported_extensions = {".pdf", ".docx"}
+    supported_extensions = {".pdf", ".docx", ".txt"}
     doc_files = sorted(
         [
             f
