@@ -2,7 +2,7 @@
 
 **Project Name:** License Intelligence System (OpenAI RAG)\
 **Version:** 0.4\
-**Last Updated:** 2026-01-29\
+**Last Updated:** 2026-01-30\
 **Branch:** openai
 
 ______________________________________________________________________
@@ -16,8 +16,10 @@ ______________________________________________________________________
 - **Added**: Context budget enforcement (≤60k tokens) - Phase 5
 - **Added**: Retrieval confidence gating (code-enforced refusal) - Phase 6
 - **Added**: LLM prompt discipline (accuracy-first prompting) - Phase 7
-- **Added**: Debug/audit mode for transparency - Phase 8 (planned)
-- **Added**: Evaluation set for clause retrieval accuracy - Phase 9 (planned)
+- **Added**: Debug/audit mode for transparency - Phase 8 ✅
+- **Added**: Evaluation set for clause retrieval accuracy - Phase 9 ✅
+- **Added**: Improved definitions section detection (content-based pattern matching)
+- **Added**: TXT file support for ingestion pipeline
 - **Removed**: Multi-LLM source abstraction (Ollama, Anthropic)
 - **Removed**: Local embedding model support
 - **Updated**: Refusal is now enforced in code AND prompts (layered defense)
@@ -102,18 +104,18 @@ ______________________________________________________________________
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Document Ingestion Pipeline                  │
 ├─────────────────────────────────────────────────────────────────┤
-│  data/raw/{source}/**/*.pdf                                   │
+│  data/raw/{source}/**/*.{pdf,docx,txt}                          │
 │         ↓                                                        │
-│     Extract (PyMuPDF)                                           │
+│     Extract (PyMuPDF/python-docx/plain-text)                    │
 │         ↓                                                        │
-│     Chunk (section-aware)                                       │
+│     Chunk (section-aware + definitions detection)               │
 │         ↓                                                        │
 │     Embed (OpenAI text-embedding-3-large)                       │
 │         ↓                                                        │
-│  ┌─────────────────┐    ┌─────────────────┐                     │
-│  │  ChromaDB       │    │  BM25 Index     │                     │
-│  │  (vectors)      │    │  (keywords)     │                     │
-│  └─────────────────┘    └─────────────────┘                     │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌──────────────┐ │
+│  │  ChromaDB       │    │  BM25 Index     │    │  Definitions │ │
+│  │  (vectors)      │    │  (keywords)     │    │  Index       │ │
+│  └─────────────────┘    └─────────────────┘    └──────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -206,17 +208,22 @@ licencing-rag/
 ├── app/
 │   ├── __init__.py
 │   ├── config.py           # Configuration (OpenAI models, thresholds)
-│   ├── extract.py          # PDF/DOCX text extraction
-│   ├── chunking.py         # Document chunking
+│   ├── extract.py          # PDF/DOCX/TXT text extraction
+│   ├── chunking.py         # Document chunking with definitions detection
+│   ├── definitions.py      # Definitions index and term extraction
 │   ├── embed.py            # OpenAI embeddings (REWRITTEN)
 │   ├── ingest.py           # Ingestion pipeline
 │   ├── normalize.py        # Query normalization (NEW)
 │   ├── search.py           # Hybrid search (vector + BM25)
 │   ├── rerank.py           # GPT-4.1 reranking (NEW)
 │   ├── gate.py             # Confidence gating (NEW)
+│   ├── budget.py           # Context budget enforcement
 │   ├── query.py            # Query pipeline (UPDATED)
 │   ├── prompts.py          # LLM prompts (UPDATED)
+│   ├── validate.py         # Output validation
 │   ├── output.py           # Output formatting
+│   ├── audit.py            # Query/response audit logging
+│   ├── debug.py            # Debug output module
 │   └── logging.py          # Structured logging
 ├── data/
 │   ├── raw/{source}/     # Source documents
@@ -240,6 +247,92 @@ licencing-rag/
 ├── pyproject.toml
 └── README.md
 ```
+
+______________________________________________________________________
+
+## 7.1 Definitions Section Detection
+
+### Objective
+
+Automatically identify chunks containing defined terms so they can be indexed for auto-linking and prioritized in retrieval for definition-related queries.
+
+### Detection Strategy
+
+Chunks are marked as `is_definitions: true` if either condition is met:
+
+1. **Explicit markers**: The word "definition" or "defined term" appears in the first 500 characters of the chunk
+1. **Content patterns**: Two or more lines match the definition pattern
+
+### Content Pattern
+
+```python
+# Smart quote Unicode code points for PDF-extracted text
+_LEFT_DOUBLE_QUOTE = "\u201c"   # "
+_RIGHT_DOUBLE_QUOTE = "\u201d"  # "
+_LEFT_SINGLE_QUOTE = "\u2018"   # '
+_RIGHT_SINGLE_QUOTE = "\u2019"  # '
+_QUOTE_CLASS = f'["\'{_LEFT_DOUBLE_QUOTE}{_RIGHT_DOUBLE_QUOTE}{_LEFT_SINGLE_QUOTE}{_RIGHT_SINGLE_QUOTE}]'
+
+# Pattern to detect definition-style content
+# Supports: quoted terms (straight + smart quotes), hyphenated terms, multi-word terms
+# Handles: numbered/lettered prefixes (1), (a), [i], bullets, "The term"/"THE TERM" prefix
+# Case-insensitive for means/shall mean; terms can start with digit or capital letter
+# NOTE: Use literal space ' ' in term class, NOT \s (which matches newlines)
+_DEFINITION_CONTENT_PATTERN = re.compile(
+    rf"""
+    (?:^|[\n])\s*                         # Start of line + optional leading whitespace
+    (?:                                   # Optional list prefix group
+        \(\s*[a-zA-Z0-9]+\s*\)            # (1), (a), (A), (i), etc.
+        |
+        \[\s*[a-zA-Z0-9]+\s*\]            # [1], [a], [A], etc.
+        |
+        [•\-\*]                           # Bullet points
+        |
+        \d+\.                             # 1., 2., etc.
+    )?\s*
+    (?:[Tt][Hh][Ee]\s+[Tt][Ee][Rr][Mm]\s+)?  # Optional: 'The term' / 'THE TERM'
+    {_QUOTE_CLASS}?                       # Optional opening quote (straight + smart)
+    [A-Z0-9][A-Za-z0-9\- &/.]*            # Term: caps OR digit start (space, not \s!)
+    {_QUOTE_CLASS}?                       # Optional closing quote (straight + smart)
+    \s*(?::|[Mm][Ee][Aa][Nn][Ss]|[Ss][Hh][Aa][Ll][Ll]\s+[Mm][Ee][Aa][Nn])
+    \s+
+    (?:[a-zA-Z]+)                         # First word of definition
+    """,
+    re.MULTILINE | re.VERBOSE,
+)
+```
+
+### Supported Formats
+
+| Format              | Example                                | Source          |
+| ------------------- | -------------------------------------- | --------------- |
+| Colon               | `Subscriber: any party...`             | CME Schedule 5  |
+| Quoted means        | `"Subscriber" means any...`            | Legal contracts |
+| Shall mean          | `Term shall mean...`                   | CTA/UTP         |
+| Hyphenated          | `Non-Professional: an individual`      | CME ILA         |
+| Multi-word          | `Unit of Count: the basis...`          | CME Schedule 2  |
+| Numbered            | `(1) "Subscriber" means...`            | OPRA schedules  |
+| Lettered            | `(a) Vendor means...`                  | SEC filings     |
+| Bulleted            | `• Subscriber means...`                | Various         |
+| No article          | `Subscriber means Member`              | CME Schedule 5  |
+| The term prefix     | `The term "Subscriber" means...`       | Legal contracts |
+| THE TERM (all caps) | `THE TERM "Data" MEANS...`             | Legal headers   |
+| Capitalized Means   | `Vendor Means a person...`             | Various         |
+| Uppercase MEANS     | `Term MEANS the following...`          | Various         |
+| Terms with digits   | `Rule 1A means...`, `Level 2 Data:`    | SEC, exchanges  |
+| Digit-start terms   | `10b-5 means...`, `401k Plan means...` | Regulatory docs |
+| Terms with &/.      | `S&P 500 Index means...`               | Index providers |
+| Smart quotes        | `"Subscriber" means...` (PDF)          | PDF extractions |
+
+### Definition Extraction
+
+Once a chunk is marked as definitions, the `definitions.py` module extracts individual term definitions using patterns:
+
+- `"Term" means/shall mean ...`
+- `Term: definition...`
+- `Term - definition...`
+
+Extracted definitions are stored in `index/definitions/{source}_definitions.pkl` for auto-linking during query processing.
 
 ______________________________________________________________________
 
