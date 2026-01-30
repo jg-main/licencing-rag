@@ -3,10 +3,115 @@
 import pytest
 
 from app.rerank import MAX_CHUNK_LENGTH_FOR_RERANKING
+from app.rerank import apply_year_preference
 from app.rerank import parse_score_response
 from app.rerank import rerank_chunks
 from app.rerank import score_chunk
 from app.rerank import truncate_chunk
+
+
+class TestApplyYearPreference:
+    """Test year-based chunk preference logic."""
+
+    def test_no_year_returns_unchanged(self):
+        """No target year returns chunks unchanged."""
+        chunks = [{"chunk_id": "doc_1", "text": "Some text"}]
+        result = apply_year_preference(chunks, None)
+        assert result == chunks
+
+    def test_empty_chunks_returns_empty(self):
+        """Empty chunk list returns empty."""
+        result = apply_year_preference([], 2025)
+        assert result == []
+
+    def test_year_in_chunk_id_matches(self):
+        """Year in chunk_id should match."""
+        chunks = [
+            {"chunk_id": "doc-2024::chunk_0", "text": "Older doc"},
+            {"chunk_id": "doc-2025::chunk_0", "text": "Newer doc"},
+        ]
+        result = apply_year_preference(chunks, 2025)
+        assert result[0]["chunk_id"] == "doc-2025::chunk_0"
+
+    def test_year_in_metadata_matches(self):
+        """Year in metadata document_name should match."""
+        chunks = [
+            {
+                "chunk_id": "a",
+                "metadata": {"document_name": "fees-2024.pdf"},
+                "text": "Old",
+            },
+            {
+                "chunk_id": "b",
+                "metadata": {"document_name": "fees-2025.pdf"},
+                "text": "New",
+            },
+        ]
+        result = apply_year_preference(chunks, 2025)
+        assert result[0]["chunk_id"] == "b"
+
+    def test_effective_date_pattern_matches(self):
+        """Explicit 'Effective <date>' pattern in text should match."""
+        chunks = [
+            {"chunk_id": "a", "text": "Some random text about fees"},
+            {"chunk_id": "b", "text": "Effective January 1, 2025\nFee schedule..."},
+        ]
+        result = apply_year_preference(chunks, 2025)
+        assert result[0]["chunk_id"] == "b"
+
+    def test_effective_colon_pattern_matches(self):
+        """'Effective: 2025' pattern should match."""
+        chunks = [
+            {"chunk_id": "a", "text": "Old document content"},
+            {"chunk_id": "b", "text": "Effective: 2025\nNew fee schedule"},
+        ]
+        result = apply_year_preference(chunks, 2025)
+        assert result[0]["chunk_id"] == "b"
+
+    def test_casual_year_mention_does_not_match(self):
+        """Casual year mentions in text should NOT match (prevents false boosting)."""
+        # This is the key test - year in footnotes/examples should not boost
+        chunks = [
+            {
+                "chunk_id": "a",
+                "text": "The 2025 projections show growth",
+            },  # Casual mention
+            {"chunk_id": "b", "text": "Standard fee schedule content"},
+        ]
+        result = apply_year_preference(chunks, 2025)
+        # Neither should be boosted - order should remain same
+        assert result[0]["chunk_id"] == "a"
+        assert result[1]["chunk_id"] == "b"
+
+    def test_year_in_example_footnote_does_not_match(self):
+        """Year in example/footnote should not trigger boost."""
+        chunks = [
+            {
+                "chunk_id": "doc-2024::chunk_0",
+                "text": "See 2025 projections in appendix",
+            },
+            {"chunk_id": "doc-2025::chunk_0", "text": "Current schedule"},
+        ]
+        result = apply_year_preference(chunks, 2025)
+        # doc-2025 matches via chunk_id, doc-2024 doesn't match despite text mention
+        assert result[0]["chunk_id"] == "doc-2025::chunk_0"
+
+    def test_preserves_relative_order_within_groups(self):
+        """Year-matching chunks preserve their relative order."""
+        chunks = [
+            {"chunk_id": "old-doc::chunk_0", "text": "A"},
+            {"chunk_id": "new-2025::chunk_0", "text": "B"},
+            {"chunk_id": "old-doc::chunk_1", "text": "C"},
+            {"chunk_id": "new-2025::chunk_1", "text": "D"},
+        ]
+        result = apply_year_preference(chunks, 2025)
+        # Year matches first, preserving order: b, d, then non-matches: a, c
+        assert [c["chunk_id"] for c in result] == [
+            "new-2025::chunk_0",
+            "new-2025::chunk_1",
+            "old-doc::chunk_0",
+            "old-doc::chunk_1",
+        ]
 
 
 class TestTruncation:

@@ -151,6 +151,37 @@ PRESERVE_TERMS = {
 }
 
 
+def extract_year_from_query(query: str) -> int | None:
+    """Extract a year reference from a query for temporal filtering.
+
+    Looks for 4-digit years in the query. Returns the year if found,
+    particularly useful for fee-related queries where document freshness matters.
+
+    Args:
+        query: Raw user query string.
+
+    Returns:
+        Year as integer if found, None otherwise.
+
+    Examples:
+        >>> extract_year_from_query("What are the 2026 fees?")
+        2026
+        >>> extract_year_from_query("January 2025 fee schedule")
+        2025
+        >>> extract_year_from_query("What is the display device fee?")
+        None
+    """
+    # Look for 4-digit year pattern (1990-2099 range for broad source compatibility)
+    # Covers historical documents (1990s) through future schedules (2090s)
+    year_pattern = r"\b(19[9][0-9]|20[0-9]{2})\b"
+    match = re.search(year_pattern, query)
+    if match:
+        year = int(match.group(1))
+        log.debug("year_extracted_from_query", query=query[:50], year=year)
+        return year
+    return None
+
+
 def normalize_query(query: str) -> str:
     """Normalize a query for improved retrieval.
 

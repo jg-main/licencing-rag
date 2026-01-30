@@ -326,3 +326,96 @@ def rerank_chunks(
     )
 
     return kept_chunks, dropped_chunks
+
+
+def apply_year_preference(
+    chunks: list[dict[str, Any]],
+    target_year: int | None,
+) -> list[dict[str, Any]]:
+    """Apply year preference to retrieved chunks.
+
+    When a query mentions a specific year (e.g., "2026 fees"), this function
+    boosts chunks from documents matching that year. This prevents stale
+    citations (e.g., 2025 fees cited for 2026 queries).
+
+    The algorithm:
+    1. If no target_year, return chunks unchanged
+    2. Check each chunk's document name or metadata for year references
+    3. Boost matching chunks by sorting them first, preserving relative order
+
+    Args:
+        chunks: List of chunk dictionaries with chunk_id and metadata.
+        target_year: Year mentioned in query, or None if no year specified.
+
+    Returns:
+        Chunks reordered with year-matching documents first.
+    """
+    if not target_year or not chunks:
+        return chunks
+
+    import re
+
+    year_pattern = re.compile(rf"\b{target_year}\b")
+    # Pattern for explicit effective date: "Effective January 1, 2025" or "Effective: 2025"
+    effective_date_pattern = re.compile(
+        rf"[Ee]ffective[:\s]+(?:[A-Za-z]+\s+\d{{1,2}},?\s+)?{target_year}\b"
+    )
+
+    def has_target_year(chunk: dict[str, Any]) -> bool:
+        """Check if chunk matches target year via metadata or explicit effective date.
+
+        Only matches:
+        1. chunk_id (contains document filename with year)
+        2. metadata document_name or document_path
+        3. Explicit "Effective <date> <year>" patterns in text
+
+        Does NOT match arbitrary year mentions in text (footnotes, examples, etc.)
+        to avoid promoting irrelevant chunks.
+        """
+        # Check chunk_id (contains document name with year)
+        chunk_id = chunk.get("chunk_id", "")
+        if year_pattern.search(chunk_id):
+            return True
+
+        # Check metadata document_name or document_path
+        metadata = chunk.get("metadata", {})
+        doc_name = metadata.get("document_name", "") or metadata.get(
+            "document_path", ""
+        )
+        if year_pattern.search(doc_name):
+            return True
+
+        # Check text content ONLY for explicit "Effective <date>" patterns
+        # This prevents boosting chunks that merely mention the year in examples/footnotes
+        text = chunk.get("text", "")[:500]  # Only check start of chunk
+        if effective_date_pattern.search(text):
+            return True
+
+        return False
+
+    # Separate into year-matching and non-matching
+    year_matches = []
+    other_chunks = []
+
+    for chunk in chunks:
+        if has_target_year(chunk):
+            year_matches.append(chunk)
+        else:
+            other_chunks.append(chunk)
+
+    if year_matches:
+        log.info(
+            "year_preference_applied",
+            target_year=target_year,
+            matching_chunks=len(year_matches),
+            total_chunks=len(chunks),
+        )
+        # Year-matching chunks first, then others
+        return year_matches + other_chunks
+
+    log.debug(
+        "year_preference_no_matches",
+        target_year=target_year,
+        total_chunks=len(chunks),
+    )
+    return chunks

@@ -1,7 +1,56 @@
 # tests/test_normalize.py
 """Tests for query normalization."""
 
+from app.normalize import extract_year_from_query
 from app.normalize import normalize_query
+
+
+class TestExtractYearFromQuery:
+    """Tests for extract_year_from_query function."""
+
+    def test_extract_year_2025(self) -> None:
+        """Extract year 2025 from query."""
+        assert extract_year_from_query("What are the 2025 fees?") == 2025
+
+    def test_extract_year_2024(self) -> None:
+        """Extract year 2024 from query."""
+        assert extract_year_from_query("fee schedule for 2024") == 2024
+
+    def test_no_year_returns_none(self) -> None:
+        """Query without year returns None."""
+        assert extract_year_from_query("What is the display device fee?") is None
+
+    def test_extract_year_1990s(self) -> None:
+        """Extract historical years from 1990s."""
+        assert extract_year_from_query("What were the 1995 rates?") == 1995
+        assert extract_year_from_query("1999 fee schedule") == 1999
+
+    def test_extract_year_2000s(self) -> None:
+        """Extract years from 2000s."""
+        assert extract_year_from_query("2005 data fees") == 2005
+        assert extract_year_from_query("Show 2018 schedule") == 2018
+
+    def test_extract_year_future(self) -> None:
+        """Extract future years (2030+)."""
+        assert extract_year_from_query("projected 2035 fees") == 2035
+        assert extract_year_from_query("2050 schedule") == 2050
+
+    def test_extract_year_boundary_1990(self) -> None:
+        """Year 1990 is the lower boundary."""
+        assert extract_year_from_query("1990 data") == 1990
+        # 1989 is out of range
+        assert extract_year_from_query("1989 data") is None
+
+    def test_extract_year_boundary_2099(self) -> None:
+        """Year 2099 is the upper boundary."""
+        assert extract_year_from_query("2099 projections") == 2099
+        # 2100 is out of range
+        assert extract_year_from_query("2100 projections") is None
+
+    def test_extract_first_year_when_multiple(self) -> None:
+        """When multiple years present, extract first one."""
+        result = extract_year_from_query("Compare 2024 vs 2025 fees")
+        assert result == 2024
 
 
 class TestQueryNormalization:
