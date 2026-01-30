@@ -287,6 +287,7 @@ def query(
             "citations": [],
             "definitions": [],
             "chunks_retrieved": 0,
+            "chunk_ids": [],  # No chunks retrieved
             "sources": sources,
             "search_mode": search_mode,
             "effective_search_mode": effective_search_mode,
@@ -337,6 +338,15 @@ def query(
         return response
 
     log.debug("chunks_retrieved", count=len(all_search_results))
+
+    # Apply year preference to prevent stale document citations
+    # (e.g., 2025 fees cited for 2026 query)
+    from app.normalize import extract_year_from_query
+    from app.rerank import apply_year_preference
+
+    target_year = extract_year_from_query(question)
+    if target_year:
+        all_search_results = apply_year_preference(all_search_results, target_year)
 
     # Phase 4: LLM Reranking (optional)
     rerank_info: dict[str, Any] = {}
@@ -535,12 +545,16 @@ def query(
             refusal_message = get_refusal_message(sources)
             reason_detail = get_refusal_reason_message(refusal_reason)
 
+            # Extract chunk_ids from retrieved results (before gate refused)
+            retrieved_chunk_ids = [r["chunk_id"] for r in all_search_results]
+
             response = {
                 "answer": refusal_message,
                 "context": "",
                 "citations": [],
                 "definitions": [],
                 "chunks_retrieved": len(all_documents),
+                "chunk_ids": retrieved_chunk_ids,  # Include chunk IDs for eval tracking
                 "sources": sources,
                 "search_mode": search_mode,
                 "effective_search_mode": effective_search_mode,
@@ -964,12 +978,16 @@ def query(
         refusal_message = get_refusal_message(sources)
         reason_detail = get_refusal_reason_message("empty_context_after_budget")
 
+        # Extract chunk_ids from original search results
+        retrieved_chunk_ids = [r["chunk_id"] for r in all_search_results]
+
         response = {
             "answer": refusal_message,
             "context": "",
             "citations": [],
             "definitions": [],
             "chunks_retrieved": budget_info.get("original_count", 0),
+            "chunk_ids": retrieved_chunk_ids,  # Include chunk IDs for eval tracking
             "sources": sources,
             "search_mode": search_mode,
             "effective_search_mode": effective_search_mode,
@@ -1139,12 +1157,16 @@ The system could not generate a properly formatted response. Please try rephrasi
         format_definitions_for_output(definitions_dict) if definitions_dict else []
     )
 
+    # Extract chunk_ids from search results for eval tracking
+    retrieved_chunk_ids = [r["chunk_id"] for r in all_search_results]
+
     response = {
         "answer": answer,
         "context": context,
         "citations": citations,
         "definitions": definitions_output,
         "chunks_retrieved": len(all_documents),
+        "chunk_ids": retrieved_chunk_ids,  # Include chunk IDs for eval tracking
         "sources": sources,
         "search_mode": search_mode,
         "effective_search_mode": effective_search_mode,
