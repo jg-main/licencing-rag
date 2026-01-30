@@ -78,6 +78,48 @@ class TestExtractQuotedTerms:
         terms = extract_quoted_terms("No quoted terms here.")
         assert terms == []
 
+    def test_smart_quotes_double(self) -> None:
+        """Extracts terms with smart double quotes."""
+        text = "\u201cS&P 500\u201d means the Standard and Poor index."
+        terms = extract_quoted_terms(text)
+        assert "S&P 500" in terms
+
+    def test_smart_quotes_single(self) -> None:
+        """Extracts terms with smart single quotes."""
+        text = "\u2018Tier 1 Data\u2019 means premium data."
+        terms = extract_quoted_terms(text)
+        assert "Tier 1 Data" in terms
+
+    def test_allows_slash_in_terms(self) -> None:
+        """Allows forward slash in terms (not URLs)."""
+        text = '"Tier 1/Tier 2" means the data tiers.'
+        terms = extract_quoted_terms(text)
+        assert "Tier 1/Tier 2" in terms
+
+    def test_allows_period_in_terms(self) -> None:
+        """Allows periods in terms (not file extensions)."""
+        text = '"Rule 10b-5" means the SEC regulation.'
+        terms = extract_quoted_terms(text)
+        assert "Rule 10b-5" in terms
+
+    def test_allows_numeric_suffix_section(self) -> None:
+        """Allows numeric suffixes like Section 2.01 (not file extensions)."""
+        text = '"Section 2.01" defines the fee structure.'
+        terms = extract_quoted_terms(text)
+        assert "Section 2.01" in terms
+
+    def test_allows_numeric_suffix_rule(self) -> None:
+        """Allows numeric suffixes like Rule 2.1 (not file extensions)."""
+        text = '"Rule 2.1" applies to all subscribers.'
+        terms = extract_quoted_terms(text)
+        assert "Rule 2.1" in terms
+
+    def test_still_filters_file_extensions(self) -> None:
+        """Still filters actual file extensions like .pdf, .txt."""
+        text = '"document.pdf" should be downloaded.'
+        terms = extract_quoted_terms(text)
+        assert len(terms) == 0
+
 
 class TestExtractInitialCapsTerms:
     """Tests for initial caps term extraction."""
@@ -126,6 +168,46 @@ class TestExtractDefinedTerms:
         normalized = [normalize_term(t) for t in terms]
         assert normalized.count("subscriber") <= 1
 
+    def test_unquoted_digit_leading_terms(self) -> None:
+        """Extracts unquoted terms starting with digits in definition chunks."""
+        text = (
+            "10b-5 means the SEC anti-fraud rule.\n401k Plan means a retirement plan."
+        )
+        terms = extract_defined_terms(text, is_definitions_chunk=True)
+        normalized = {normalize_term(t) for t in terms}
+        assert "10b-5" in normalized
+        assert "401k plan" in normalized
+
+    def test_unquoted_terms_not_extracted_from_regular_chunks(self) -> None:
+        """Unquoted digit-leading terms NOT extracted from regular text."""
+        text = "Violations of 10b-5 are serious."
+        terms = extract_defined_terms(text, is_definitions_chunk=False)
+        normalized = {normalize_term(t) for t in terms}
+        # Should not find 10b-5 when it's not in a definition context
+        assert "10b-5" not in normalized
+
+    def test_smart_quotes_in_combined(self) -> None:
+        """Smart quotes work in combined extraction."""
+        text = "\u201cSubscriber\u201d means a person receiving data."
+        terms = extract_defined_terms(text)
+        normalized = {normalize_term(t) for t in terms}
+        assert "subscriber" in normalized
+
+    def test_unquoted_colon_format_terms(self) -> None:
+        """Extracts unquoted terms using colon format in definition chunks."""
+        text = "10b-5: The SEC anti-fraud rule.\n401k Plan: A retirement plan."
+        terms = extract_defined_terms(text, is_definitions_chunk=True)
+        normalized = {normalize_term(t) for t in terms}
+        assert "10b-5" in normalized
+        assert "401k plan" in normalized
+
+    def test_unquoted_colon_single_term(self) -> None:
+        """Extracts single unquoted term using colon format."""
+        text = "Rule 144A: Allows resale of restricted securities."
+        terms = extract_defined_terms(text, is_definitions_chunk=True)
+        normalized = {normalize_term(t) for t in terms}
+        assert "rule 144a" in normalized
+
 
 class TestExtractDefinitionFromChunk:
     """Tests for definition extraction from chunk text."""
@@ -162,6 +244,20 @@ class TestExtractDefinitionFromChunk:
         chunk = '"subscriber" MEANS any person receiving data.'
         definition = extract_definition_from_chunk(chunk, "Subscriber")
         assert definition is not None
+
+    def test_smart_quotes(self) -> None:
+        """Definition extraction works with smart quotes."""
+        chunk = "\u201cSubscriber\u201d means any person receiving Information."
+        definition = extract_definition_from_chunk(chunk, "Subscriber")
+        assert definition is not None
+        assert "person" in definition
+
+    def test_unquoted_digit_term(self) -> None:
+        """Definition extraction works with unquoted digit-leading terms."""
+        chunk = "10b-5 means the Securities Exchange Act anti-fraud provision."
+        definition = extract_definition_from_chunk(chunk, "10b-5")
+        assert definition is not None
+        assert "Securities Exchange Act" in definition
 
 
 class TestDefinitionsIndex:

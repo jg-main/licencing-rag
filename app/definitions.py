@@ -74,11 +74,34 @@ COMMON_DEFINED_TERMS = frozenset(
 )
 
 # Pattern to extract quoted terms like "Subscriber" or 'Derived Data'
-QUOTED_TERM_PATTERN = re.compile(r'["\']([^"\']{2,50})["\']')
+# Supports straight quotes ("') and smart quotes ("" '')
+# Term body allows digits, &, /, ., hyphen for terms like "S&P 500", "10b-5", "Tier 1/Tier 2"
+_LEFT_QUOTES = "\"'\u201c\u2018"  # " ' " '
+_RIGHT_QUOTES = "\"'\u201d\u2019"  # " ' " '
+QUOTED_TERM_PATTERN = re.compile(
+    rf"[{_LEFT_QUOTES}]([A-Za-z0-9][A-Za-z0-9 &/.\-]{{1,50}})[{_RIGHT_QUOTES}]"
+)
 
 # Pattern to detect initial caps terms (likely defined terms)
 # Matches 2-5 word phrases where each word starts with uppercase
 INITIAL_CAPS_PATTERN = re.compile(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,4})\b")
+
+# Pattern to extract unquoted defined terms from definition sections
+# Matches: "Term means ...", "10b-5 means ...", "THE TERM Data MEANS ...", "10b-5: ..."
+# Only applied to chunks already marked as definitions to reduce false positives
+UNQUOTED_DEFINED_TERM_PATTERN = re.compile(
+    r"""
+    (?:^|[\n])\s*                         # Start of line + optional whitespace
+    (?:\(\s*[a-zA-Z0-9]+\s*\)|\[\s*[a-zA-Z0-9]+\s*\]|[•\-\*]|\d+\.)?\s*  # Optional list prefix
+    (?:[Tt][Hh][Ee]\s+[Tt][Ee][Rr][Mm]\s+)?  # Optional: 'The term' / 'THE TERM'
+    ([A-Z0-9][A-Za-z0-9 &/.\-]{0,50}?)    # Capture: Term (non-greedy)
+    \s*(?:
+        (?:[Mm][Ee][Aa][Nn][Ss]|[Ss][Hh][Aa][Ll][Ll]\s+[Mm][Ee][Aa][Nn])\s+  # means/shall mean + space
+        | :\s+                            # OR colon + space (for "Term: definition" format)
+    )
+    """,
+    re.MULTILINE | re.VERBOSE,
+)
 
 
 @dataclass
@@ -192,13 +215,24 @@ def extract_quoted_terms(text: str) -> list[str]:
     # Filter out common non-definition quoted strings
     filtered = []
     for match in matches:
-        # Skip if it's a URL, file path, or code-like string
-        if "/" in match or "\\" in match or "." in match.split()[-1]:
+        # Skip if it's a URL (contains http:// or www.)
+        if "http://" in match or "https://" in match or "www." in match:
+            continue
+        # Skip if it's a file path (contains backslash)
+        if "\\" in match:
+            continue
+        # Skip if it ends with a file extension (.txt, .pdf, etc.)
+        # Must have at least one letter in extension to avoid matching "Section 2.01"
+        if re.search(r"\.[a-zA-Z]\w{1,3}$", match):
             continue
         # Skip if it's all lowercase (likely not a defined term)
+        # Exception: known defined terms that might appear lowercase
         if match.islower() and match not in ["subscriber", "vendor", "user"]:
             continue
-        filtered.append(match)
+        # Strip trailing whitespace from match
+        match = match.strip()
+        if match:
+            filtered.append(match)
     return filtered
 
 
@@ -235,26 +269,38 @@ def extract_initial_caps_terms(text: str) -> list[str]:
     return filtered
 
 
-def extract_defined_terms(text: str) -> list[str]:
+def extract_defined_terms(text: str, is_definitions_chunk: bool = False) -> list[str]:
     """Extract all potential defined terms from text.
 
     Combines quoted term extraction and initial caps detection.
+    When processing definition chunks, also extracts unquoted defined terms
+    (including digit-leading and symbol terms like "10b-5", "S&P 500").
 
     Args:
         text: Text to extract terms from.
+        is_definitions_chunk: If True, also extract unquoted defined terms
+            using the stricter pattern that requires "means" keyword.
 
     Returns:
         List of unique terms found (not normalized).
     """
     terms = set()
 
-    # Extract quoted terms
+    # Extract quoted terms (now supports smart quotes and special chars)
     for term in extract_quoted_terms(text):
         terms.add(term)
 
     # Extract initial caps terms
     for term in extract_initial_caps_terms(text):
         terms.add(term)
+
+    # For definition chunks, also extract unquoted defined terms
+    # This catches digit-leading and symbol terms like "10b-5", "S&P 500"
+    if is_definitions_chunk:
+        for match in UNQUOTED_DEFINED_TERM_PATTERN.finditer(text):
+            term = match.group(1).strip()
+            if term and len(term) >= 2:
+                terms.add(term)
 
     return list(terms)
 
@@ -281,14 +327,15 @@ def extract_definition_from_chunk(
     # Escape special regex characters in the term
     escaped_term = re.escape(term)
 
-    # Patterns to match definition text
+    # Patterns to match definition text (support straight and smart quotes)
+    quote_chars = r'["\'\u201c\u201d\u2018\u2019]'
     patterns = [
         # "Term" means/shall mean ...
-        rf'["\']?{escaped_term}["\']?\s+(?:shall\s+)?means?\s+(.{{10,500}}?)(?:\.|;|\n\n)',
+        rf"{quote_chars}?{escaped_term}{quote_chars}?\s+(?:shall\s+)?means?\s+(.{{10,500}}?)(?:\.|;|\n\n)",
         # "Term": definition
-        rf'["\']?{escaped_term}["\']?\s*:\s*(.{{10,500}}?)(?:\.|;|\n\n)',
+        rf"{quote_chars}?{escaped_term}{quote_chars}?\s*:\s*(.{{10,500}}?)(?:\.|;|\n\n)",
         # Term - definition
-        rf'["\']?{escaped_term}["\']?\s*[-–—]\s*(.{{10,500}}?)(?:\.|;|\n\n)',
+        rf"{quote_chars}?{escaped_term}{quote_chars}?\s*[-–—]\s*(.{{10,500}}?)(?:\.|;|\n\n)",
     ]
 
     for pattern in patterns:
@@ -331,7 +378,9 @@ def build_definitions_index(
         chunk_id = metadata.get("chunk_id", "")
 
         # Extract potential terms from the chunk
-        potential_terms = extract_defined_terms(chunk_text)
+        # Pass is_definitions_chunk=True to enable extraction of digit-leading
+        # and symbol terms (e.g., "10b-5", "S&P 500") using the stricter pattern
+        potential_terms = extract_defined_terms(chunk_text, is_definitions_chunk=True)
 
         # Also check for common defined terms that might not be capitalized
         for common_term in COMMON_DEFINED_TERMS:
