@@ -197,6 +197,182 @@ class TestIsDefinitionsSection:
         assert not is_definitions_section("General provisions apply")
         assert not is_definitions_section("Fee schedule for 2025")
 
+    # --- Content pattern tests for numbered/lettered definitions ---
+
+    def test_numbered_quoted_definition(self) -> None:
+        """Detects numbered quoted definitions like '(1) \"Subscriber\" means...'."""
+        text = """
+        (1) "Subscriber" means any natural person who receives data.
+        (2) "Vendor" means any entity that distributes data.
+        """
+        assert is_definitions_section(text)
+
+    def test_lettered_definition(self) -> None:
+        """Detects lettered definitions like '(a) Vendor means...'."""
+        text = """
+        (a) Vendor means a person who receives and redistributes data.
+        (b) Subscriber means any party who accesses the feed.
+        """
+        assert is_definitions_section(text)
+
+    def test_bulleted_definition(self) -> None:
+        """Detects bulleted definitions."""
+        text = """
+        • Subscriber means any party authorized to receive data.
+        • Vendor means any redistributor of market data.
+        """
+        assert is_definitions_section(text)
+
+    def test_numbered_list_definition(self) -> None:
+        """Detects numbered list definitions like '1. \"Professional\" means...'."""
+        text = """
+        1. "Professional" means any person acting in a business capacity.
+        2. "Non-Professional" means an individual acting for personal use.
+        """
+        assert is_definitions_section(text)
+
+    # --- Case-insensitive means/shall mean tests ---
+
+    def test_capitalized_means(self) -> None:
+        """Detects definitions with capitalized 'Means'."""
+        text = """
+        Vendor Means a person who distributes data to subscribers.
+        Subscriber Means any natural person who receives data.
+        """
+        assert is_definitions_section(text)
+
+    def test_uppercase_means(self) -> None:
+        """Detects definitions with uppercase 'MEANS'."""
+        text = """
+        Subscriber MEANS any natural person who receives market data.
+        Vendor MEANS any entity that redistributes data feeds.
+        """
+        assert is_definitions_section(text)
+
+    def test_uppercase_shall_mean(self) -> None:
+        """Detects definitions with 'SHALL MEAN'."""
+        text = """
+        Term SHALL MEAN the following when used in this agreement.
+        Data SHALL MEAN all information provided by the exchange.
+        """
+        assert is_definitions_section(text)
+
+    def test_mixed_case_shall_mean(self) -> None:
+        """Detects definitions with mixed case 'Shall Mean'."""
+        text = """
+        Data Shall Mean information provided by the exchange.
+        Term Shall Mean any word defined in this section.
+        """
+        assert is_definitions_section(text)
+
+    # --- Terms with special characters tests ---
+
+    def test_term_with_digits(self) -> None:
+        """Detects terms containing digits like 'Rule 1A', 'Level 2'."""
+        text = """
+        Rule 1A means any regulation governing market data.
+        Level 2 Data means real-time quote information.
+        """
+        assert is_definitions_section(text)
+
+    def test_term_with_ampersand(self) -> None:
+        """Detects terms containing ampersand like 'S&P 500'."""
+        text = """
+        S&P 500 Index means the index published by Standard & Poor's.
+        Dow & Jones means the index provider.
+        """
+        assert is_definitions_section(text)
+
+    def test_term_with_period(self) -> None:
+        """Detects terms containing periods like 'Section 2.1'."""
+        text = """
+        Section 2.1 means this subsection of the agreement.
+        Rule 10b-5 means the SEC anti-fraud provision.
+        """
+        assert is_definitions_section(text)
+
+    def test_term_with_slash(self) -> None:
+        """Detects terms containing slashes like 'Tier 1/Tier 2'."""
+        text = """
+        Tier 1/Tier 2 means the data classification categories.
+        Buy/Sell Data means transaction information.
+        """
+        assert is_definitions_section(text)
+
+    # --- The term prefix tests ---
+
+    def test_the_term_prefix(self) -> None:
+        """Detects 'The term X means' format."""
+        text = """
+        The term "Subscriber" means any person who receives data.
+        The term "Vendor" means any entity that redistributes data.
+        """
+        assert is_definitions_section(text)
+
+    def test_the_term_all_caps(self) -> None:
+        """Detects 'THE TERM X means' format (all caps legal headers)."""
+        text = """
+        THE TERM "Subscriber" means any person who receives data.
+        THE TERM Vendor MEANS any entity that redistributes data.
+        """
+        assert is_definitions_section(text)
+
+    # --- Smart quotes tests ---
+
+    def test_smart_double_quotes(self) -> None:
+        """Detects definitions with smart double quotes from PDFs."""
+        # Use Unicode escapes for smart quotes: " = \u201c, " = \u201d
+        text = """
+        \u201cSubscriber\u201d means any natural person who receives data.
+        \u201cVendor\u201d means any entity that distributes data.
+        """
+        assert is_definitions_section(text)
+
+    def test_smart_single_quotes(self) -> None:
+        """Detects definitions with smart single quotes from PDFs."""
+        # Use Unicode escapes for smart quotes: ' = \u2018, ' = \u2019
+        text = """
+        \u2018Subscriber\u2019 means any natural person who receives data.
+        \u2018Vendor\u2019 means any entity that distributes data.
+        """
+        assert is_definitions_section(text)
+
+    # --- Terms starting with digits ---
+
+    def test_term_starting_with_digit(self) -> None:
+        """Detects terms starting with digits like '10b-5', '401k'."""
+        text = """
+        10b-5 means the SEC anti-fraud rule under the Exchange Act.
+        401k Plan means a qualified retirement savings plan.
+        """
+        assert is_definitions_section(text)
+
+    def test_term_starting_with_decimal(self) -> None:
+        """Detects terms starting with decimal numbers like '2.01A'."""
+        text = """
+        2.01A means the subsection governing data access.
+        3.14 Rate means the base calculation rate.
+        """
+        assert is_definitions_section(text)
+
+    # --- Negative tests ---
+
+    def test_narrative_text_not_detected(self) -> None:
+        """Narrative text without definitions is not detected."""
+        text = """
+        The subscriber then receives data from the vendor.
+        This process means that data flows continuously.
+        """
+        assert not is_definitions_section(text)
+
+    def test_lowercase_term_not_detected(self) -> None:
+        """Terms starting with lowercase are not detected as definitions."""
+        text = """
+        the vendor means nothing in this context.
+        this means that the process continues.
+        """
+        assert not is_definitions_section(text)
+
 
 class TestIsFeeTableContent:
     """Tests for fee table detection."""

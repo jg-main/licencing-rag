@@ -75,8 +75,49 @@ def detect_section_heading(text: str) -> str:
     return "N/A"
 
 
+# Smart quote Unicode code points for PDF-extracted text
+_LEFT_DOUBLE_QUOTE = "\u201c"  # "
+_RIGHT_DOUBLE_QUOTE = "\u201d"  # "
+_LEFT_SINGLE_QUOTE = "\u2018"  # '
+_RIGHT_SINGLE_QUOTE = "\u2019"  # '
+_QUOTE_CLASS = f"[\"'{_LEFT_DOUBLE_QUOTE}{_RIGHT_DOUBLE_QUOTE}{_LEFT_SINGLE_QUOTE}{_RIGHT_SINGLE_QUOTE}]"
+
+# Pattern to detect definition-style content (e.g., "Term: any party" or "Term means")
+# Supports: quoted terms (straight + smart quotes), hyphenated terms, multi-word terms
+# Handles: numbered/lettered prefixes (1), (a), [i], bullets, "The term"/"THE TERM" prefix
+# Case-insensitive for means/shall mean; terms can start with digit or capital letter
+# Terms can include digits, &, /, . (e.g., "Rule 1A", "S&P 500", "10b-5", "Section 2.1")
+# NOTE: Use literal space ' ' in term class, NOT \s (which matches newlines and causes greedy matching)
+_DEFINITION_CONTENT_PATTERN = re.compile(
+    rf"""
+    (?:^|[\n])\s*                         # Start of line + optional leading whitespace
+    (?:                                   # Optional list prefix group
+        \(\s*[a-zA-Z0-9]+\s*\)            # (1), (a), (A), (i), etc.
+        |
+        \[\s*[a-zA-Z0-9]+\s*\]            # [1], [a], [A], etc.
+        |
+        [•\-\*]                           # Bullet points
+        |
+        \d+\.                             # 1., 2., etc.
+    )?\s*
+    (?:[Tt][Hh][Ee]\s+[Tt][Ee][Rr][Mm]\s+)?  # Optional: 'The term' / 'THE TERM' (case-insensitive)
+    {_QUOTE_CLASS}?                       # Optional opening quote (straight + smart)
+    [A-Z0-9][A-Za-z0-9\- &/.]*            # Term: caps OR digit start (space, not \s!)
+    {_QUOTE_CLASS}?                       # Optional closing quote (straight + smart)
+    \s*(?::|[Mm][Ee][Aa][Nn][Ss]|[Ss][Hh][Aa][Ll][Ll]\s+[Mm][Ee][Aa][Nn])  # Separator (case-insensitive)
+    \s+                                   # Whitespace
+    (?:[a-zA-Z]+)                         # First word of definition
+    """,
+    re.MULTILINE | re.VERBOSE,
+)
+
+
 def is_definitions_section(text: str) -> bool:
     """Check if text appears to be a definitions section.
+
+    Detects definitions by:
+    1. Explicit markers: 'definition' or 'defined term' in first 500 chars
+    2. Content patterns: Multiple lines matching 'Term: any/the/a ...' format
 
     Args:
         text: Text to check.
@@ -84,8 +125,15 @@ def is_definitions_section(text: str) -> bool:
     Returns:
         True if this appears to be a definitions section.
     """
+    # Check for explicit definition markers
     lower_text = text[:500].lower()
-    return "definition" in lower_text or "defined term" in lower_text
+    if "definition" in lower_text or "defined term" in lower_text:
+        return True
+
+    # Check for definition content patterns throughout the text
+    # If we find 2+ definition-style lines, it's likely a definitions section
+    matches = _DEFINITION_CONTENT_PATTERN.findall(text[:2000])
+    return len(matches) >= 2
 
 
 def is_fee_table_content(text: str) -> bool:
