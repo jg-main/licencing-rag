@@ -1,0 +1,454 @@
+[
+    {
+        "id": 1,
+        "question": "What is the real-time display device fee for CME market data?",
+        "category": "fees_lookup",
+        "source": "cme",
+        "should_answer": true,
+        "expected_chunks": [
+            "cme_fees__january-2026-market-data-fee-list.pdf_0"
+        ],
+        "expected_answer_contains": [
+            "$134.50",
+            "device",
+            "real time"
+        ],
+        "notes": "Direct fee lookup from fee schedule"
+    },
+    {
+        "id": 2,
+        "question": "What are the non-display Category A1 fees for trading as a principal with 4+ applications?",
+        "category": "fees_lookup",
+        "should_answer": true,
+        "expected_chunks": [
+            "cme_fees__january-2026-market-data-fee-list.pdf_0",
+            "cme_fees__january-2026-market-data-fee-list.pdf_1"
+        ],
+        "expected_answer_contains": [
+            "$3,640",
+            "Enterprise",
+            "4+",
+            "applications"
+        ],
+        "notes": "Specific non-display fee tier - fees span chunks 0 and 1",
+        "source": "cme"
+    },
+    {
+        "id": 3,
+        "question": "What is a Subscriber according to CME licensing terms?",
+        "category": "definitions",
+        "should_answer": true,
+        "expected_chunks": [
+            "cme_legal__ILA-Subscriber-Addendum.pdf_0",
+            "cme_legal__ILA-Subscriber-Addendum.pdf_1"
+        ],
+        "expected_answer_contains": [
+            "subscriber",
+            "distributor"
+        ],
+        "notes": "Should retrieve definition from ILA Subscriber Addendum - definition added to index",
+        "source": "cme"
+    },
+    {
+        "id": 4,
+        "question": "What are the redistribution requirements for CME market data?",
+        "category": "licensing_terms",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "redistribution",
+            "license",
+            "agreement"
+        ],
+        "notes": "Should find clauses about redistribution in ILA schedules",
+        "source": "cme"
+    },
+    {
+        "id": 5,
+        "question": "What is the difference between delayed and real-time data fees?",
+        "category": "fees_comparison",
+        "should_answer": true,
+        "expected_chunks": [
+            "cme_fees__january-2026-market-data-fee-list.pdf_0"
+        ],
+        "expected_answer_contains": [
+            "delayed",
+            "real time",
+            "fee"
+        ],
+        "notes": "Should compare fees from fee schedule",
+        "source": "cme"
+    },
+    {
+        "id": 6,
+        "question": "What are the device fee waiver policies?",
+        "category": "policy",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "device",
+            "fee",
+            "waiver"
+        ],
+        "notes": "Should retrieve from device fee waiver policy document",
+        "source": "cme"
+    },
+    {
+        "id": 7,
+        "question": "What is the monthly cost for a non-professional depth of market subscription?",
+        "category": "fees_lookup",
+        "should_answer": true,
+        "expected_chunks": [
+            "cme_fees__january-2026-market-data-fee-list.pdf_0"
+        ],
+        "expected_answer_contains": [
+            "$12.10",
+            "non-professional",
+            "depth of market"
+        ],
+        "notes": "Non-professional subscriber fee",
+        "source": "cme"
+    },
+    {
+        "id": 8,
+        "question": "What are the entitlement reporting requirements?",
+        "category": "compliance",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "entitlement",
+            "reporting"
+        ],
+        "notes": "Should find information from entitlement reporting guide",
+        "source": "cme"
+    },
+    {
+        "id": 9,
+        "question": "What are CME Term SOFR licensing fees for January 2026?",
+        "category": "fees_lookup",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "term sofr",
+            "fee",
+            "2026"
+        ],
+        "notes": "Specific product fees",
+        "source": "cme"
+    },
+    {
+        "id": 10,
+        "question": "What is the maximum fee cap for Category A non-display licenses?",
+        "category": "fees_lookup",
+        "should_answer": true,
+        "expected_chunks": [
+            "cme_fees__january-2026-market-data-fee-list.pdf_0",
+            "cme_fees__january-2026-market-data-fee-list.pdf_1"
+        ],
+        "expected_answer_contains": [
+            "$7,340",
+            "maximum",
+            "Category A"
+        ],
+        "notes": "Fee cap for enterprise tier - fees span chunks 0 and 1",
+        "source": "cme"
+    },
+    {
+        "id": 11,
+        "question": "What are the fees for GME (Gulf Mercantile Exchange) real-time distribution?",
+        "category": "fees_lookup",
+        "should_answer": true,
+        "expected_chunks": [
+            "cme_fees__january-2026-market-data-fee-list.pdf_1"
+        ],
+        "expected_answer_contains": [
+            "$22,878",
+            "GME",
+            "real time"
+        ],
+        "notes": "GME specific fees",
+        "source": "cme"
+    },
+    {
+        "id": 12,
+        "question": "Are there fees for Event Contract Information?",
+        "category": "fees_lookup",
+        "should_answer": true,
+        "expected_chunks": [
+            "cme_fees__january-2026-market-data-fee-list.pdf_0"
+        ],
+        "expected_answer_contains": [
+            "$0",
+            "Event Contract",
+            "free"
+        ],
+        "notes": "Event contracts are free - should confirm this",
+        "source": "cme"
+    },
+    {
+        "id": 13,
+        "question": "What is Unit of Count in CME data licensing?",
+        "category": "definitions",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "unit of count",
+            "device",
+            "licensee"
+        ],
+        "notes": "Should find definition from policy guidelines",
+        "source": "cme"
+    },
+    {
+        "id": 14,
+        "question": "What are the historical data distribution fees?",
+        "category": "fees_lookup",
+        "should_answer": true,
+        "expected_chunks": [
+            "cme_fees__january-2026-market-data-fee-list.pdf_0"
+        ],
+        "expected_answer_contains": [
+            "$35,220",
+            "historical",
+            "distribution"
+        ],
+        "notes": "Historical data licensing fees",
+        "source": "cme"
+    },
+    {
+        "id": 15,
+        "question": "What are the AI data services policies?",
+        "category": "policy",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "AI",
+            "data",
+            "services"
+        ],
+        "notes": "Should retrieve from AI data services advisory",
+        "source": "cme"
+    },
+    {
+        "id": 16,
+        "question": "What is the weather forecast for Chicago next week?",
+        "category": "refusal_out_of_scope",
+        "should_answer": false,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "cannot answer",
+            "not found",
+            "documents"
+        ],
+        "notes": "Completely out of scope - should refuse",
+        "source": "cme"
+    },
+    {
+        "id": 17,
+        "question": "How do I cook a perfect steak?",
+        "category": "refusal_out_of_scope",
+        "should_answer": false,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "cannot answer",
+            "not found",
+            "documents"
+        ],
+        "notes": "Completely out of scope - should refuse",
+        "source": "cme"
+    },
+    {
+        "id": 18,
+        "question": "What are the tax implications of trading futures?",
+        "category": "refusal_adjacent_topic",
+        "should_answer": false,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "cannot answer",
+            "not found",
+            "documents"
+        ],
+        "notes": "Related to futures but not in licensing docs - should refuse",
+        "source": "cme"
+    },
+    {
+        "id": 19,
+        "question": "What is Nasdaq's market data pricing?",
+        "category": "refusal_wrong_provider",
+        "should_answer": false,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "cannot answer",
+            "not found",
+            "documents"
+        ],
+        "notes": "Wrong data provider - should refuse",
+        "source": "cme"
+    },
+    {
+        "id": 20,
+        "question": "What will CME fees be in 2030?",
+        "category": "refusal_future_prediction",
+        "source": "cme",
+        "should_answer": false,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "cannot answer",
+            "not found",
+            "documents"
+        ],
+        "notes": "Future prediction not in documents - should refuse"
+    },
+    {
+        "id": 21,
+        "question": "What is the modular structure of the Information License Agreement (ILA), and which specific schedules are mandatory for all clients?",
+        "category": "licensing_terms",
+        "source": "cme",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "ILA Core Terms",
+            "Schedule 1",
+            "Licensee Profile",
+            "Schedule 1a",
+            "mandatory"
+        ],
+        "notes": "Should explain ILA structure with core terms and mandatory schedules"
+    },
+    {
+        "id": 22,
+        "question": "What is the specific penalty fee for late submission of monthly usage reports?",
+        "category": "compliance",
+        "source": "cme",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "$3,000",
+            "Report Processing Fee",
+            "late",
+            "submission"
+        ],
+        "notes": "Penalty fee for late reporting"
+    },
+    {
+        "id": 23,
+        "question": "How is the Unit of Count defined by default for market data, and how does it apply to a single device running multiple services?",
+        "category": "definitions",
+        "source": "cme",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "Unit of Count",
+            "Device",
+            "multiple services",
+            "counted separately"
+        ],
+        "notes": "Unit of Count definition and multi-service device counting"
+    },
+    {
+        "id": 24,
+        "question": "How will Non-Display Use licensing change effective April 1, 2025?",
+        "category": "policy",
+        "source": "cme",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "April 1, 2025",
+            "Non-Display",
+            "single license type",
+            "Applications"
+        ],
+        "notes": "Non-Display licensing transition effective April 2025"
+    },
+    {
+        "id": 25,
+        "question": "What are the criteria for determining the CME Term SOFR Data License fees starting January 1, 2026?",
+        "category": "fees_lookup",
+        "source": "cme",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "Term SOFR",
+            "headcount",
+            "Financial Institution",
+            "January 1, 2026"
+        ],
+        "notes": "CME Term SOFR fee calculation criteria"
+    },
+    {
+        "id": 26,
+        "question": "What are the strict formatting requirements for a Subscriber displaying Historical Benchmark Information on a public website?",
+        "category": "compliance",
+        "source": "cme",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "Historical Benchmark",
+            "graphical format",
+            "not machine-readable",
+            "cannot be downloaded"
+        ],
+        "notes": "Historical benchmark display formatting requirements"
+    },
+    {
+        "id": 27,
+        "question": "How long must a Licensee or Subscriber Group retain records for audit purposes?",
+        "category": "compliance",
+        "source": "cme",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "five",
+            "5 year",
+            "records",
+            "audit"
+        ],
+        "notes": "Record retention period requirement"
+    },
+    {
+        "id": 28,
+        "question": "What are the three primary categories (A, B, and C) used to define Internal Non-Display Usage?",
+        "category": "definitions",
+        "source": "cme",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "Category A",
+            "Category B",
+            "Category C",
+            "Automated Trading",
+            "Internal Order Processing"
+        ],
+        "notes": "Three categories of Internal Non-Display usage"
+    },
+    {
+        "id": 29,
+        "question": "What is the mechanism for the automatic annual increase of market data fees?",
+        "category": "policy",
+        "source": "cme",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "January 1",
+            "consumer price inflation",
+            "IMF",
+            "automatic"
+        ],
+        "notes": "Annual fee increase mechanism based on IMF inflation rate"
+    },
+    {
+        "id": 30,
+        "question": "In the context of data redistribution, what is the legal role and purpose of the Subscriber Addendum?",
+        "category": "licensing_terms",
+        "source": "cme",
+        "should_answer": true,
+        "expected_chunks": [],
+        "expected_answer_contains": [
+            "Subscriber Addendum",
+            "Distributor",
+            "third-party beneficiary",
+            "enforce"
+        ],
+        "notes": "Subscriber Addendum role in redistribution and CME enforcement rights"
+    }
+]
