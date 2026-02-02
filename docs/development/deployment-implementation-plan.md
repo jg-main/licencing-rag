@@ -60,7 +60,7 @@ ______________________________________________________________________
   - [ ] `RAG_API_KEY` environment variable
   - [ ] `SLACK_SIGNING_SECRET` environment variable
   - [ ] `RAG_RATE_LIMIT` (default: 100)
-  - [ ] `RAG_CORS_ORIGINS` (default: "\*")
+  - [ ] `RAG_CORS_ORIGINS` (default: empty/none)
   - [ ] `API_VERSION` constant
 - [ ] Create `.env.example` with all required variables
 - [ ] Update README with API configuration section
@@ -105,7 +105,7 @@ Create `api/routes/health.py`:
 - [ ] Implement `GET /ready` endpoint
   - [ ] Check ChromaDB index exists
   - [ ] Check BM25 index exists
-  - [ ] Check OpenAI API key configured
+  - [ ] Check OpenAI API key configured (presence only)
   - [ ] Return individual check results
 - [ ] Implement `GET /version` endpoint
   - [ ] Return API version
@@ -251,9 +251,9 @@ Add to `api/middleware/auth.py`:
 Create `api/dependencies.py`:
 
 - [ ] Implement `authenticate()` dependency
-- [ ] Check for Slack headers first
-- [ ] If Slack headers present → verify Slack signature
-- [ ] If no Slack headers → verify Bearer token
+- [ ] Use path-based auth:
+  - [ ] `/slack/command` → verify Slack signature only
+  - [ ] `/query`, `/sources` → verify Bearer token only
 - [ ] Return authentication context (type: "api_key" | "slack")
 
 #### 4.4 Apply Authentication
@@ -269,9 +269,9 @@ Create `api/dependencies.py`:
 - [ ] Test request without auth returns 401
 - [ ] Test invalid API key returns 401
 - [ ] Test valid API key returns 200
-- [ ] Test invalid Slack signature returns 401
-- [ ] Test expired Slack timestamp returns 401
-- [ ] Test valid Slack signature returns 200
+- [ ] Test invalid Slack signature returns 401 (Slack endpoint)
+- [ ] Test expired Slack timestamp returns 401 (Slack endpoint)
+- [ ] Test valid Slack signature returns 200 (Slack endpoint)
 - [ ] Test health endpoints work without auth
 
 ______________________________________________________________________
@@ -284,7 +284,8 @@ ______________________________________________________________________
 
 Create `api/middleware/rate_limit.py`:
 
-- [ ] Implement in-memory rate limiter (sliding window)
+- [ ] Implement rate limiter (in-memory for single instance only)
+- [ ] Add Redis-backed option for multi-instance or multi-worker deployments
 - [ ] Track requests by API key
 - [ ] Track requests by IP (fallback for Slack)
 - [ ] Configure limit from `RAG_RATE_LIMIT` env var
@@ -329,7 +330,7 @@ Create `api/routes/slack.py`:
 - [ ] Extract `text` field as question
 - [ ] Extract `user_id` for audit logging
 - [ ] Extract `response_url` for async response
-- [ ] Validate Slack signature (use auth middleware)
+- [ ] Validate Slack signature (use auth middleware; no API key required)
 
 #### 6.2 Immediate Response
 
@@ -375,9 +376,9 @@ ______________________________________________________________________
 #### 7.1 Dockerfile
 
 - [ ] Create `Dockerfile` in project root
-- [ ] Use `python:3.13-slim` base image
+- [ ] Use a Python base image that matches `pyproject.toml` (e.g., `python:3.13-slim`)
 - [ ] Set environment variables (PYTHONUNBUFFERED, etc.)
-- [ ] Install system dependencies (build-essential)
+- [ ] Install system dependencies (build-essential, curl for HEALTHCHECK)
 - [ ] Install uv package manager
 - [ ] Copy and install Python dependencies
 - [ ] Copy application code (`app/`, `api/`)
@@ -432,7 +433,7 @@ ______________________________________________________________________
 - [ ] Configure security group:
   - [ ] SSH (22) from your IP
   - [ ] HTTPS (443) from anywhere
-  - [ ] HTTP (8000) from VPC only
+  - [ ] HTTP (8000) from ALB security group only
 - [ ] Attach EBS volume (30-50 GB gp3)
 - [ ] Assign Elastic IP (optional)
 
@@ -443,7 +444,7 @@ ______________________________________________________________________
 - [ ] Configure Docker to start on boot
 - [ ] Create application directory (`/opt/rag-api`)
 - [ ] Clone repository
-- [ ] Configure `.env` file with secrets
+- [ ] Configure `.env` file with secrets (prefer AWS SSM/Secrets Manager)
 - [ ] Copy data and index directories
 
 #### 8.3 HTTPS Configuration
@@ -487,6 +488,7 @@ ______________________________________________________________________
 - [ ] Log request method, path, status, latency
 - [ ] Log authentication type
 - [ ] Log client IP and user agent
+- [ ] Redact or hash sensitive identifiers (Slack user/channel IDs)
 - [ ] Configure JSON log format for production
 
 #### 9.2 Request Logging Middleware

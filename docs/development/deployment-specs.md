@@ -69,11 +69,11 @@ ______________________________________________________________________
 
 ### 3.1 Health & Status
 
-| Endpoint   | Method | Auth | Description                |
-| ---------- | ------ | ---- | -------------------------- |
-| `/health`  | GET    | No   | Liveness check             |
-| `/ready`   | GET    | No   | Readiness check (index OK) |
-| `/version` | GET    | No   | API and RAG version info   |
+| Endpoint   | Method | Auth | Description                      |
+| ---------- | ------ | ---- | -------------------------------- |
+| `/health`  | GET    | No   | Liveness check                   |
+| `/ready`   | GET    | No   | Readiness check (indexes loaded) |
+| `/version` | GET    | No   | API and RAG version info         |
 
 **GET /health**
 
@@ -88,7 +88,7 @@ Returns basic liveness status. Use for load balancer health checks.
 
 **GET /ready**
 
-Verifies the system is ready to serve requests (indexes loaded, OpenAI reachable).
+Verifies the system is ready to serve requests (indexes loaded, configuration present). Avoid live OpenAI calls in readiness checks to prevent flapping and unnecessary cost.
 
 ```json
 {
@@ -96,7 +96,7 @@ Verifies the system is ready to serve requests (indexes loaded, OpenAI reachable
   "checks": {
     "chroma_index": true,
     "bm25_index": true,
-    "openai_api": true
+    "openai_api_key_present": true
   },
   "timestamp": "2026-02-02T10:15:30Z"
 }
@@ -245,6 +245,14 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
+### 3.4 Slack Endpoints
+
+| Endpoint         | Method | Auth  | Description               |
+| ---------------- | ------ | ----- | ------------------------- |
+| `/slack/command` | POST   | Slack | Slash command integration |
+
+______________________________________________________________________
+
 ## 4. Authentication
 
 ### 4.1 Strategy: API Key + Slack Signature Verification
@@ -253,6 +261,12 @@ The API uses a **dual authentication** approach suitable for Slack integration:
 
 1. **API Key** — For direct API access and testing
 1. **Slack Request Signing** — For requests originating from Slack
+
+**Endpoint coverage:**
+
+- `/query`, `/sources`, `/sources/{name}` require API key authentication.
+- `/slack/command` requires Slack signature verification only.
+- Health endpoints (`/health`, `/ready`, `/version`) are public.
 
 ### 4.2 API Key Authentication
 
@@ -317,30 +331,29 @@ SLACK_SIGNING_SECRET="your-slack-signing-secret"
 Request Received
        │
        ▼
-┌──────────────────┐
-│ Has Slack headers? │
-└────────┬─────────┘
-         │
-    ┌────┴────┐
-    │         │
-   Yes        No
-    │         │
-    ▼         ▼
-┌─────────┐ ┌─────────────┐
-│ Verify  │ │ Check       │
-│ Slack   │ │ Bearer      │
-│ Sig     │ │ Token       │
-└────┬────┘ └──────┬──────┘
-     │             │
-     ▼             ▼
-  Valid?        Valid?
-     │             │
-  ┌──┴──┐       ┌──┴──┐
-  │     │       │     │
- Yes    No     Yes    No
-  │     │       │     │
-  ▼     ▼       ▼     ▼
- OK   401 ─────OK   401
+┌────────────────────────────┐
+│ Is /slack/command endpoint? │
+└───────────────┬────────────┘
+                │
+         ┌──────┴──────┐
+         │             │
+        Yes           No
+         │             │
+         ▼             ▼
+┌────────────────┐  ┌─────────────────┐
+│ Verify Slack   │  │ Check Bearer    │
+│ Signature      │  │ Token (API Key) │
+└───────┬────────┘  └────────┬────────┘
+        │                    │
+        ▼                    ▼
+     Valid?               Valid?
+        │                    │
+     ┌──┴──┐              ┌──┴──┐
+     │     │              │     │
+    Yes    No            Yes    No
+     │     │              │     │
+     ▼     ▼              ▼     ▼
+    OK    401            OK    401
 ```
 
 ______________________________________________________________________
@@ -441,6 +454,8 @@ ______________________________________________________________________
 
 ## 6. Rate Limiting
 
+For multi-worker or multi-instance deployments, use a shared store (e.g., Redis) or an upstream rate limiter (ALB/WAF) to ensure consistent enforcement.
+
 ### 6.1 Limits
 
 | Scope       | Limit         | Window   |
@@ -479,6 +494,8 @@ ______________________________________________________________________
 
 ### 7.1 Dockerfile
 
+Use a Python base image version that matches the `pyproject.toml` Python requirement.
+
 ```dockerfile
 FROM python:3.13-slim
 
@@ -492,6 +509,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -581,11 +599,11 @@ ______________________________________________________________________
 
 **Inbound:**
 
-| Port | Protocol | Source    | Description     |
-| ---- | -------- | --------- | --------------- |
-| 22   | TCP      | Your IP   | SSH access      |
-| 443  | TCP      | 0.0.0.0/0 | HTTPS (via ALB) |
-| 8000 | TCP      | VPC CIDR  | API (internal)  |
+| Port | Protocol | Source      | Description                   |
+| ---- | -------- | ----------- | ----------------------------- |
+| 22   | TCP      | Your IP     | SSH access                    |
+| 443  | TCP      | 0.0.0.0/0   | HTTPS (via ALB)               |
+| 8000 | TCP      | ALB SG only | API (internal, from ALB only) |
 
 **Outbound:**
 
@@ -611,6 +629,7 @@ git clone <your-repo-url> /opt/rag-api
 cd /opt/rag-api
 
 # 4. Configure environment
+# Prefer a secrets manager (AWS SSM/Secrets Manager) in production.
 cat > .env << EOF
 OPENAI_API_KEY=sk-...
 RAG_API_KEY=your-api-key
@@ -647,7 +666,7 @@ ______________________________________________________________________
 | `RAG_API_KEY`          | Yes      | —       | API authentication key      |
 | `SLACK_SIGNING_SECRET` | Yes\*    | —       | Slack app signing secret    |
 | `RAG_LOG_LEVEL`        | No       | `INFO`  | Logging level               |
-| `RAG_CORS_ORIGINS`     | No       | `*`     | Allowed CORS origins        |
+| `RAG_CORS_ORIGINS`     | No       | (none)  | Allowed CORS origins        |
 | `RAG_RATE_LIMIT`       | No       | `100`   | Requests per minute per key |
 
 \*Required if accepting Slack requests
@@ -658,7 +677,7 @@ ______________________________________________________________________
 
 ### 10.1 Logging
 
-All requests are logged in structured JSON format:
+All requests are logged in structured JSON format. Avoid logging Slack payloads or other sensitive data; redact or hash user identifiers where possible.
 
 ```json
 {
@@ -705,7 +724,7 @@ ______________________________________________________________________
 
 ### 11.2 Slash Command Endpoint
 
-The API should include a dedicated Slack endpoint:
+The API should include a dedicated Slack endpoint. This endpoint uses Slack signature verification (no API key required).
 
 **POST /slack/command**
 
