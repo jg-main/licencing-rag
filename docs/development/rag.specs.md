@@ -7,25 +7,6 @@
 
 ______________________________________________________________________
 
-## Changelog from v0.3
-
-- **BREAKING**: Switched to OpenAI as single source for both embeddings and LLM
-- **BREAKING**: Removed Ollama/Claude support (single-source architecture)
-- **Added**: Query normalization (pre-retrieval processing) - Phase 2
-- **Added**: LLM-based reranking with GPT-4.1 - Phase 4
-- **Added**: Context budget enforcement (≤60k tokens) - Phase 5
-- **Added**: Retrieval confidence gating (code-enforced refusal) - Phase 6
-- **Added**: LLM prompt discipline (accuracy-first prompting) - Phase 7
-- **Added**: Debug/audit mode for transparency - Phase 8 ✅
-- **Added**: Evaluation set for clause retrieval accuracy - Phase 9 ✅
-- **Added**: Improved definitions section detection (content-based pattern matching)
-- **Added**: TXT file support for ingestion pipeline
-- **Removed**: Multi-LLM source abstraction (Ollama, Anthropic)
-- **Removed**: Local embedding model support
-- **Updated**: Refusal is now enforced in code AND prompts (layered defense)
-
-______________________________________________________________________
-
 ## 1. Objective
 
 Build a **high-precision, clause-level Retrieval-Augmented Generation (RAG) system** for CME licensing documents that:
@@ -242,8 +223,8 @@ licencing-rag/
 │   └── routes.py           # API endpoints
 ├── docs/
 │   └── development/
-│       ├── specs.v0.4.md   # This document
-│       └── implementation-plan.md
+│       ├── rag.specs.md   # This document
+│       └── rag.implementation-plan.md
 ├── pyproject.toml
 └── README.md
 ```
@@ -1152,33 +1133,6 @@ ______________________________________________________________________
 | Light  | 3,000   | ~$90  |
 | Medium | 6,000   | ~$180 |
 | Heavy  | 10,000  | ~$300 |
-
-______________________________________________________________________
-
-## 18. Migration from v0.3
-
-### Breaking Changes
-
-1. **Re-embed all documents** — Ollama embeddings incompatible with OpenAI
-1. **Delete existing ChromaDB index** — Different dimensions (768 → 3072)
-1. **Remove Ollama/Claude config** — Single source only
-1. **Update environment variables** — `OPENAI_API_KEY` required
-
-### Migration Steps
-
-```bash
-# 1. Set OpenAI API key
-export OPENAI_API_KEY="sk-..."
-
-# 2. Delete old indexes
-rm -rf index/chroma index/bm25
-
-# 3. Re-ingest all documents
-rag ingest --source cme --force
-
-# 4. Verify with test query
-rag query "fee schedule" --debug
-```
 
 ______________________________________________________________________
 
