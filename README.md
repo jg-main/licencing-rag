@@ -292,6 +292,24 @@ rag query --debug "What are the fees?"
 | `OPENAI_API_KEY` | Yes      | -              | OpenAI API key      |
 | `CHROMA_DIR`     | No       | `index/chroma` | Vector DB directory |
 
+#### REST API Configuration
+
+For deploying the REST API, additional environment variables are required:
+
+| Variable                  | Required | Default | Description                          |
+| ------------------------- | -------- | ------- | ------------------------------------ |
+| `RAG_API_KEY`             | Yes\*    | -       | API key for `/query` and `/sources`  |
+| `SLACK_SIGNING_SECRET`    | Yes\*    | -       | Slack app signing secret             |
+| `RAG_RATE_LIMIT`          | No       | `100`   | Max requests per minute per API key  |
+| `RAG_CORS_ORIGINS`        | No       | (none)  | Comma-separated allowed origins      |
+| `RAG_TRUST_PROXY_HEADERS` | No       | `false` | Trust X-Forwarded-For (behind proxy) |
+
+\* Required when running the REST API
+
+See [`.env.example`](.env.example) for a complete configuration template.
+
+📖 **[Deployment guide →](docs/development/deployment-specs.md)**
+
 #### Advanced Settings
 
 Edit `app/config.py` to customize:

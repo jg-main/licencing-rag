@@ -660,14 +660,15 @@ ______________________________________________________________________
 
 ## 9. Environment Variables
 
-| Variable               | Required | Default | Description                 |
-| ---------------------- | -------- | ------- | --------------------------- |
-| `OPENAI_API_KEY`       | Yes      | —       | OpenAI API key              |
-| `RAG_API_KEY`          | Yes      | —       | API authentication key      |
-| `SLACK_SIGNING_SECRET` | Yes\*    | —       | Slack app signing secret    |
-| `RAG_LOG_LEVEL`        | No       | `INFO`  | Logging level               |
-| `RAG_CORS_ORIGINS`     | No       | (none)  | Allowed CORS origins        |
-| `RAG_RATE_LIMIT`       | No       | `100`   | Requests per minute per key |
+| Variable                  | Required | Default | Description                        |
+| ------------------------- | -------- | ------- | ---------------------------------- |
+| `OPENAI_API_KEY`          | Yes      | —       | OpenAI API key                     |
+| `RAG_API_KEY`             | Yes      | —       | API authentication key             |
+| `SLACK_SIGNING_SECRET`    | Yes\*    | —       | Slack app signing secret           |
+| `RAG_LOG_LEVEL`           | No       | `INFO`  | Logging level                      |
+| `RAG_CORS_ORIGINS`        | No       | (none)  | Allowed CORS origins               |
+| `RAG_RATE_LIMIT`          | No       | `100`   | Requests per minute per key        |
+| `RAG_TRUST_PROXY_HEADERS` | No       | `false` | Trust X-Forwarded-For (behind ALB) |
 
 \*Required if accepting Slack requests
 

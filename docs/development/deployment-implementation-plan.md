@@ -32,141 +32,141 @@ ______________________________________________________________________
 
 > Update this checklist as tasks are completed. Use `[x]` to mark done.
 
-### Phase 1: Project Setup ⏳
+### Phase 1: Project Setup ✅
 
-**Status**: ⏳ **NOT STARTED**
+**Status**: ✅ **COMPLETED**
 
 #### 1.1 Directory Structure
 
-- [ ] Create `api/` directory
-- [ ] Create `api/__init__.py`
-- [ ] Create `api/main.py` (FastAPI app entry point)
-- [ ] Create `api/routes/` directory for route modules
-- [ ] Create `api/middleware/` directory for middleware
-- [ ] Create `api/models/` directory for Pydantic schemas
+- [x] Create `api/` directory
+- [x] Create `api/__init__.py`
+- [x] Create `api/main.py` (FastAPI app entry point)
+- [x] Create `api/routes/` directory for route modules
+- [x] Create `api/middleware/` directory for middleware
+- [x] Create `api/models/` directory for Pydantic schemas
 
 #### 1.2 Dependencies
 
-- [ ] Add `fastapi` to pyproject.toml
-- [ ] Add `uvicorn[standard]` to pyproject.toml
-- [ ] Add `python-multipart` for form data (Slack)
-- [ ] Add `httpx` for async HTTP client (Slack response_url)
-- [ ] Run `uv sync` to install dependencies
-- [ ] Verify imports work correctly
+- [x] Add `fastapi` to pyproject.toml
+- [x] Add `uvicorn[standard]` to pyproject.toml
+- [x] Add `python-multipart` for form data (Slack)
+- [x] Add `httpx` for async HTTP client (Slack response_url)
+- [x] Run `uv sync` to install dependencies
+- [x] Verify imports work correctly
 
 #### 1.3 Configuration
 
-- [ ] Add API configuration to `app/config.py`:
-  - [ ] `RAG_API_KEY` environment variable
-  - [ ] `SLACK_SIGNING_SECRET` environment variable
-  - [ ] `RAG_RATE_LIMIT` (default: 100)
-  - [ ] `RAG_CORS_ORIGINS` (default: empty/none)
-  - [ ] `API_VERSION` constant
-- [ ] Create `.env.example` with all required variables
-- [ ] Update README with API configuration section
+- [x] Add API configuration to `app/config.py`:
+  - [x] `RAG_API_KEY` environment variable
+  - [x] `SLACK_SIGNING_SECRET` environment variable
+  - [x] `RAG_RATE_LIMIT` (default: 100)
+  - [x] `RAG_CORS_ORIGINS` (default: empty/none)
+  - [x] `API_VERSION` constant
+- [x] Create `.env.example` with all required variables
+- [x] Update README with API configuration section
 
 #### 1.4 Verification
 
-- [ ] `uv sync` completes without errors
-- [ ] `python -c "from api.main import app"` works
-- [ ] All existing tests still pass
+- [x] `uv sync` completes without errors
+- [x] `python -c "from api.main import app"` works
+- [x] All existing tests still pass
 
 ______________________________________________________________________
 
-### Phase 2: Core API Implementation ⏳
+### Phase 2: Core API Implementation ✅
 
-**Status**: ⏳ **NOT STARTED**
+**Status**: ✅ **COMPLETED**
 
 #### 2.1 Pydantic Models
 
 Create request/response schemas in `api/models/`:
 
-- [ ] Create `api/models/__init__.py`
-- [ ] Create `api/models/requests.py`:
-  - [ ] `QueryRequest` model with validation
-  - [ ] `QueryOptions` model (search_mode, top_k, etc.)
-- [ ] Create `api/models/responses.py`:
-  - [ ] `HealthResponse` model
-  - [ ] `ReadyResponse` model with checks
-  - [ ] `VersionResponse` model
-  - [ ] `QueryResponse` model with citations
-  - [ ] `ErrorResponse` model with code/message/details
-  - [ ] `SourcesResponse` model
-  - [ ] `SourceDocumentsResponse` model
-- [ ] Add field validators (question not empty, sources valid, etc.)
+- [x] Create `api/models/__init__.py`
+- [x] Create `api/models/requests.py`:
+  - [x] `QueryRequest` model with validation
+  - [x] `QueryOptions` model (search_mode, top_k, etc.)
+- [x] Create `api/models/responses.py`:
+  - [x] `HealthResponse` model
+  - [x] `ReadyResponse` model with checks
+  - [x] `VersionResponse` model
+  - [x] `QueryResponse` model with citations
+  - [x] `ErrorResponse` model with code/message/details
+  - [x] `SourcesResponse` model
+  - [x] `SourceDocumentsResponse` model
+- [x] Add field validators (question not empty, sources valid, etc.)
 
 #### 2.2 Health Endpoints
 
 Create `api/routes/health.py`:
 
-- [ ] Implement `GET /health` endpoint
-  - [ ] Return status and timestamp
-  - [ ] No authentication required
-- [ ] Implement `GET /ready` endpoint
-  - [ ] Check ChromaDB index exists
-  - [ ] Check BM25 index exists
-  - [ ] Check OpenAI API key configured (presence only)
-  - [ ] Return individual check results
-- [ ] Implement `GET /version` endpoint
-  - [ ] Return API version
-  - [ ] Return RAG version
-  - [ ] Return model information
+- [x] Implement `GET /health` endpoint
+  - [x] Return status and timestamp
+  - [x] No authentication required
+- [x] Implement `GET /ready` endpoint
+  - [x] Check ChromaDB index exists
+  - [x] Check BM25 index exists
+  - [x] Check OpenAI API key configured (presence only)
+  - [x] Return individual check results
+- [x] Implement `GET /version` endpoint
+  - [x] Return API version
+  - [x] Return RAG version
+  - [x] Return model information
 
 #### 2.3 Query Endpoint
 
 Create `api/routes/query.py`:
 
-- [ ] Implement `POST /query` endpoint
-- [ ] Parse and validate `QueryRequest`
-- [ ] Map request to `app.query.query()` parameters:
-  - [ ] `question` → `question`
-  - [ ] `sources` → `sources`
-  - [ ] `options.search_mode` → `search_mode`
-  - [ ] `options.top_k` → `top_k`
-  - [ ] `options.enable_reranking` → `enable_reranking`
-  - [ ] `options.enable_confidence_gate` → `enable_confidence_gate`
-  - [ ] `options.include_definitions` → `show_definitions` (map in response)
-- [ ] Call `app.query.query()` with parameters
-- [ ] Transform result to `QueryResponse` format
-- [ ] Handle refused queries (success=true, refused=true)
-- [ ] Generate unique `query_id` (UUID)
-- [ ] Include metadata (tokens, latency, chunks)
+- [x] Implement `POST /query` endpoint
+- [x] Parse and validate `QueryRequest`
+- [x] Map request to `app.query.query()` parameters:
+  - [x] `question` → `question`
+  - [x] `sources` → `sources`
+  - [x] `options.search_mode` → `search_mode`
+  - [x] `options.top_k` → `top_k`
+  - [x] `options.enable_reranking` → `enable_reranking`
+  - [x] `options.enable_confidence_gate` → `enable_confidence_gate`
+  - [x] `options.include_definitions` → `show_definitions` (map in response)
+- [x] Call `app.query.query()` with parameters
+- [x] Transform result to `QueryResponse` format
+- [x] Handle refused queries (success=true, refused=true)
+- [x] Generate unique `query_id` (UUID)
+- [x] Include metadata (tokens, latency, chunks)
 
 #### 2.4 Sources Endpoints
 
 Create `api/routes/sources.py`:
 
-- [ ] Implement `GET /sources` endpoint
-  - [ ] List all configured sources from `app.config.SOURCES`
-  - [ ] Include document count per source
-  - [ ] Include status (active/planned)
-- [ ] Implement `GET /sources/{name}` endpoint
-  - [ ] Validate source exists (404 if not)
-  - [ ] Call `app.ingest.list_indexed_documents()`
-  - [ ] Return document list with count
+- [x] Implement `GET /sources` endpoint
+  - [x] List all configured sources from `app.config.SOURCES`
+  - [x] Include document count per source
+  - [x] Include status (active/planned)
+- [x] Implement `GET /sources/{name}` endpoint
+  - [x] Validate source exists (404 if not)
+  - [x] Call `app.ingest.list_indexed_documents()`
+  - [x] Return document list with count
 
 #### 2.5 FastAPI Application
 
 Create `api/main.py`:
 
-- [ ] Initialize FastAPI app with metadata
-- [ ] Configure CORS middleware
-- [ ] Register health routes
-- [ ] Register query routes
-- [ ] Register sources routes
-- [ ] Add request ID middleware
-- [ ] Add request logging middleware
-- [ ] Configure OpenAPI documentation
+- [x] Initialize FastAPI app with metadata
+- [x] Configure CORS middleware
+- [x] Register health routes
+- [x] Register query routes
+- [x] Register sources routes
+- [x] Add request ID middleware
+- [x] Add request logging middleware
+- [x] Configure OpenAPI documentation
 
 #### 2.6 Verification
 
-- [ ] `uvicorn api.main:app --reload` starts successfully
-- [ ] `/health` returns 200 with status
-- [ ] `/ready` returns check results
-- [ ] `/version` returns version info
-- [ ] `/docs` shows OpenAPI documentation
-- [ ] Create `tests/test_api_health.py` with basic tests
-- [ ] All tests pass
+- [x] `uvicorn api.main:app --reload` starts successfully
+- [x] `/health` returns 200 with status
+- [x] `/ready` returns check results
+- [x] `/version` returns version info
+- [x] `/docs` shows OpenAPI documentation
+- [x] Create `tests/test_api_health.py` with basic tests
+- [x] All tests pass
 
 ______________________________________________________________________
 
