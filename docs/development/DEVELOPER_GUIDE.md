@@ -180,8 +180,8 @@ licencing-rag/
 │   ├── hybrid-search.md
 │   ├── rag-tutorial.md
 │   └── development/
-│       ├── specs.v0.4.md
-│       └── implementation-plan.md
+│       ├── rag.specs.md
+│       └── rag.implementation-plan.md
 ├── eval/               # Evaluation framework
 │   ├── questions.json
 │   ├── run_eval.py
@@ -358,11 +358,11 @@ ______________________________________________________________________
 
 ### Current Specification
 
-📄 **[specs.v0.4.md](development/specs.v0.4.md)** - Complete technical specification for the OpenAI branch
+📄 **[rag.specs.md](development/rag.specs.md)** - Complete technical specification for the OpenAI branch
 
 ### Implementation Phases
 
-📋 **[implementation-plan.md](development/implementation-plan.md)** - Detailed phase-by-phase development plan
+📋 **[rag.implementation-plan.md](development/rag.implementation-plan.md)** - Detailed phase-by-phase development plan
 
 **Phase Status:**
 
@@ -397,7 +397,7 @@ The system was developed in 10 phases, each building on the previous:
 **Phase 9:** Evaluation framework (chunk recall, refusal accuracy)\
 **Phase 10:** Documentation and cleanup
 
-See [implementation-plan.md](development/implementation-plan.md) for detailed breakdown.
+See [rag.implementation-plan.md](development/rag.implementation-plan.md) for detailed breakdown.
 
 ______________________________________________________________________
 

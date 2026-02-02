@@ -1,9 +1,9 @@
 # Implementation Plan - License Intelligence System (OpenAI Branch)
 
-**Version:** 2.0\
+**Version:** 0.1\
 **Created:** 2026-01-26\
 **Updated:** 2026-01-28\
-**Target:** specs.v0.4.md\
+**Target:** rag.specs.md\
 **Branch:** openai
 
 ______________________________________________________________________
@@ -335,7 +335,7 @@ ______________________________________________________________________
 **8.2.3 Output Format** ✅
 
 - [x] JSONL format (one entry per line)
-- [x] Includes all tracked metrics (see specs.v0.4.md for detailed format)
+- [x] Includes all tracked metrics (see rag.specs.md for detailed format)
 
 **8.2.4 Privacy & Compliance Considerations** ✅
 
@@ -407,7 +407,7 @@ ______________________________________________________________________
   - Supports numbered/lettered prefixes: `(1)`, `(a)`, `[i]`, `•`, `1.`
   - Supports "The term X means" format and definitions without articles
   - Supports: quoted terms, hyphenated terms (Non-Professional, Real-Time), multi-word terms
-  - Pattern uses VERBOSE mode for maintainability (see specs.v0.4.md section 7.1)
+  - Pattern uses VERBOSE mode for maintainability (see rag.specs.md section 7.1)
   - Tested with 18/18 definition formats across CME, OPRA, CTA/UTP styles
 - Q2, Q10: **FIXED** - Updated expected_chunks to accept both chunk 0 and chunk 1
   - Both chunks contain relevant fee data (fees span across chunks)
@@ -436,16 +436,16 @@ ______________________________________________________________________
 - [x] Documentation of individual concepts or features must be accessible from README.md
 - [x] Create [Configuration Guide](../configuration.md) - Environment variables and settings
 - [x] Create [Cost Estimation Guide](../cost-estimation.md) - OpenAI API cost breakdown
-- [ ] Update architecture diagram (if exists)
-- [ ] Sync implementation plan document and specs.v0.4.md
-- [ ] Create individual documents for:
-  - [ ] Ingestion process
-  - [ ] Query normalization
-  - [ ] Reranking process
-  - [ ] Confidence gating logic
-  - [ ] Debug mode usage
-  - [ ] Audit logging details
-- [ ] Update CLI help text
+- [x] Update architecture diagram (if exists)
+- [x] Sync implementation plan document and rag.specs.md
+- [x] Create individual documents for:
+  - [x] Ingestion process
+  - [x] Query normalization
+  - [x] Reranking process
+  - [x] Confidence gating logic
+  - [x] Debug mode usage
+  - [x] Audit logging details
+- [x] Update CLI help text
 
 **Note:** Core concepts (normalization, reranking, gating, budget, debug, audit) are documented in source code docstrings. Standalone docs are nice-to-have for future iterations.
 

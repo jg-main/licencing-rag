@@ -332,4 +332,4 @@ def should_refuse(chunks, **kwargs):
 - [Reranking Guide](reranking.md) - Previous pipeline stage (provides scores)
 - [Debug Mode Guide](debug-mode.md) - Inspect gating decisions
 - [Configuration Guide](configuration.md) - Threshold settings
-- [Evaluation Framework](development/implementation-plan.md#phase-9) - Testing gating accuracy
+- [Evaluation Framework](development/rag.implementation-plan.md#phase-9) - Testing gating accuracy
