@@ -73,7 +73,7 @@ ______________________________________________________________________
 
 ### Core Capabilities
 
-- **PDF & DOCX Support** - Automatic text extraction with page tracking
+- **TXT, PDF & DOCX Support** - Automatic text extraction with page tracking
 - **Multi-Provider** - Organize documents by data source (CME, OPRA, etc.)
 - **Hybrid Search** - Combines semantic (vector) and keyword (BM25) search
 - **Auto-Linking** - Automatically retrieves definitions when terms appear
@@ -156,7 +156,7 @@ data/raw/
         └── subscriber-terms.pdf
 ```
 
-**Supported formats:** PDF (text-based), DOCX
+**Supported formats:** PDF (text-based), DOCX, TXT
 
 ❌ **Not supported:** Scanned PDFs (OCR not included)
 
@@ -563,8 +563,8 @@ ______________________________________________________________________
 ### Developer Resources
 
 - **[Developer Guide](docs/development/DEVELOPER_GUIDE.md)** - Architecture and development
-- **[Technical Specs](docs/development/specs.v0.4.md)** - Complete specification
-- **[Implementation Plan](docs/development/implementation-plan.md)** - Development roadmap
+- **[Technical Specs](docs/development/rag.specs.md)** - Complete specification
+- **[Implementation Plan](docs/development/rag.implementation-plan.md)** - Development roadmap
 
 ### Component Guides
 
@@ -680,20 +680,6 @@ Include:
 1. Error message
 1. Debug output (`--debug` flag)
 1. OpenAI model versions (in `app/config.py`)
-
-______________________________________________________________________
-
-## License
-
-[Your License Here]
-
-## Acknowledgments
-
-Powered by:
-
-- [OpenAI](https://openai.com/) - GPT-4.1 and text-embedding-3-large
-- [ChromaDB](https://www.trychroma.com/) - Vector database
-- [PyMuPDF](https://pymupdf.readthedocs.io/) - PDF extraction
 
 ______________________________________________________________________
 
