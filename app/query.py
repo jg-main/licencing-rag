@@ -7,15 +7,24 @@ from typing import Any
 import chromadb
 from chromadb.errors import NotFoundError
 
+from app.audit import calculate_latency_ms
+from app.audit import log_query_response
+from app.budget import count_tokens
+from app.budget import enforce_full_prompt_budget
 from app.config import CHROMA_DIR
 from app.config import CONFIDENCE_GATE_ENABLED
 from app.config import CONTEXT_BUDGET_ENABLED
 from app.config import DEFAULT_SOURCES
 from app.config import EMBEDDING_DIMENSIONS
 from app.config import EMBEDDING_MODEL
+from app.config import MAX_CHUNKS_AFTER_RERANKING
+from app.config import MAX_CONTEXT_TOKENS
 from app.config import MIN_CHUNKS_REQUIRED
 from app.config import RELEVANCE_THRESHOLD
 from app.config import RERANKING_ENABLED
+from app.config import RERANKING_INCLUDE_EXPLANATIONS
+from app.config import RETRIEVAL_MIN_RATIO
+from app.config import RETRIEVAL_MIN_SCORE
 from app.config import SOURCES
 from app.config import TOP_K
 from app.debug import build_debug_output
@@ -30,11 +39,15 @@ from app.gate import should_refuse
 from app.llm import LLMConnectionError
 from app.llm import get_llm
 from app.logging import get_logger
+from app.normalize import extract_year_from_query
 from app.normalize import normalize_query
+from app.output import OutputFormat
+from app.output import print_result
 from app.prompts import QA_PROMPT
 from app.prompts import QA_PROMPT_NO_DEFINITIONS
 from app.prompts import SYSTEM_PROMPT
 from app.prompts import get_refusal_message
+from app.rerank import apply_year_preference
 from app.rerank import rerank_chunks
 from app.search import BM25Index
 from app.search import HybridSearcher
@@ -318,8 +331,6 @@ def query(
             write_debug_output(debug_dict, write_to_stderr=True)
 
         # Audit logging (always-on for compliance)
-        from app.audit import calculate_latency_ms
-        from app.audit import log_query_response
 
         log_query_response(
             query=question,
@@ -341,8 +352,6 @@ def query(
 
     # Apply year preference to prevent stale document citations
     # (e.g., 2025 fees cited for 2026 query)
-    from app.normalize import extract_year_from_query
-    from app.rerank import apply_year_preference
 
     target_year = extract_year_from_query(question)
     if target_year:
@@ -365,9 +374,6 @@ def query(
         # CRITICAL: If reranking dropped all chunks, fall back to original ranking
         # This prevents false refusals when reranker is overly strict (accuracy > cost)
         if not kept_chunks:
-            from app.config import MAX_CHUNKS_AFTER_RERANKING
-            from app.config import RERANKING_INCLUDE_EXPLANATIONS
-
             log.warning(
                 "reranking_dropped_all_chunks_fallback",
                 question=question,
@@ -428,8 +434,6 @@ def query(
 
             # Track reranking info for debug mode (only if not fallback)
             if debug:
-                from app.config import RERANKING_INCLUDE_EXPLANATIONS
-
                 rerank_info = {
                     "enabled": True,
                     "fallback_triggered": False,
@@ -496,9 +500,6 @@ def query(
     # Phase 6: Confidence Gating (apply after reranking, before budget/LLM)
     gate_info: dict[str, Any] = {}
     if enable_confidence_gate:
-        from app.config import RETRIEVAL_MIN_RATIO
-        from app.config import RETRIEVAL_MIN_SCORE
-
         # Build chunk objects for gating (need relevance scores)
         gate_chunks = []
         for _i, (_doc, meta) in enumerate(zip(all_documents, all_metadatas)):
@@ -592,8 +593,6 @@ def query(
                 write_debug_output(debug_dict, write_to_stderr=True)
 
             # Audit logging (always-on for compliance)
-            from app.audit import calculate_latency_ms
-            from app.audit import log_query_response
 
             log_query_response(
                 query=question,
@@ -618,9 +617,6 @@ def query(
     # Phase 5: Full-Prompt Budget Enforcement (apply after reranking)
     budget_info: dict[str, Any] = {}
     if enable_budget:
-        from app.budget import enforce_full_prompt_budget
-        from app.config import MAX_CONTEXT_TOKENS
-
         # Prepare chunks with metadata including relevance scores
         chunks_with_metadata = list(zip(all_documents, all_metadatas))
 
@@ -997,8 +993,6 @@ def query(
         }
 
         if debug:
-            from app.budget import count_tokens
-
             # Build comprehensive debug for refusal case
             # Use format_retrieval_info for rich debug output with scores/ranks
             retrieval_info = format_retrieval_info(all_search_results, sources)
@@ -1032,8 +1026,6 @@ def query(
             write_debug_output(debug_dict, write_to_stderr=True)
 
         # Audit logging (always-on for compliance)
-        from app.audit import calculate_latency_ms
-        from app.audit import log_query_response
 
         log_query_response(
             query=question,
@@ -1160,22 +1152,28 @@ The system could not generate a properly formatted response. Please try rephrasi
     # Extract chunk_ids from search results for eval tracking
     retrieved_chunk_ids = [r["chunk_id"] for r in all_search_results]
 
+    # Count tokens for response metadata
+
+    tokens_input = count_tokens(prompt) if "prompt" in locals() else 0
+    tokens_output = count_tokens(answer) if answer else 0
+
     response = {
         "answer": answer,
         "context": context,
         "citations": citations,
         "definitions": definitions_output,
         "chunks_retrieved": len(all_documents),
+        "chunks_used": len(all_documents),
         "chunk_ids": retrieved_chunk_ids,  # Include chunk IDs for eval tracking
         "sources": sources,
         "search_mode": search_mode,
         "effective_search_mode": effective_search_mode,
+        "tokens_input": tokens_input,
+        "tokens_output": tokens_output,
     }
 
     # Add debug information if requested
     if debug:
-        from app.budget import count_tokens
-
         # Count final context tokens
         final_context_tokens = count_tokens(context) if context else 0
 
@@ -1214,14 +1212,8 @@ The system could not generate a properly formatted response. Please try rephrasi
         write_debug_output(debug_dict, write_to_stderr=True)
 
     # Audit logging (always-on for compliance)
-    from app.audit import calculate_latency_ms
-    from app.audit import log_query_response
-    from app.budget import count_tokens
 
-    # Count tokens for audit (prompt + completion)
-    tokens_input = count_tokens(prompt) if "prompt" in locals() else 0
-    tokens_output = count_tokens(answer) if answer else 0
-
+    # Use tokens already counted above
     log_query_response(
         query=question,
         answer=answer,
@@ -1250,8 +1242,6 @@ def print_response(result: dict) -> None:
     Args:
         result: Query result dictionary.
     """
-    from app.output import OutputFormat
-    from app.output import print_result
 
     print_result(result, OutputFormat.CONSOLE)
 
