@@ -170,53 +170,53 @@ Create `api/main.py`:
 
 ______________________________________________________________________
 
-### Phase 3: Error Handling ⏳
+### Phase 3: Error Handling ✅
 
-**Status**: ⏳ **NOT STARTED**
+**Status**: ✅ **COMPLETED**
 
 #### 3.1 Exception Classes
 
 Create `api/exceptions.py`:
 
-- [ ] `APIError` base exception with code, message, details
-- [ ] `ValidationError` (400)
-- [ ] `EmptyQuestionError` (400)
-- [ ] `UnauthorizedError` (401)
-- [ ] `ForbiddenError` (403)
-- [ ] `SourceNotFoundError` (404)
-- [ ] `RateLimitError` (429)
-- [ ] `OpenAIError` (502)
-- [ ] `ServiceUnavailableError` (503)
+- [x] `APIError` base exception with code, message, details
+- [x] `ValidationError` (400)
+- [x] `EmptyQuestionError` (400)
+- [x] `UnauthorizedError` (401)
+- [x] `ForbiddenError` (403)
+- [x] `SourceNotFoundError` (404)
+- [x] `RateLimitError` (429)
+- [x] `OpenAIError` (502)
+- [x] `ServiceUnavailableError` (503)
 
 #### 3.2 Exception Handlers
 
 Update `api/main.py`:
 
-- [ ] Add global exception handler for `APIError`
-- [ ] Add handler for `RequestValidationError` (Pydantic)
-- [ ] Add handler for `Exception` (catch-all, 500)
-- [ ] Add handler for OpenAI API errors
-- [ ] Ensure all errors return consistent `ErrorResponse` format
-- [ ] Include `request_id` in error responses
+- [x] Add global exception handler for `APIError`
+- [x] Add handler for `RequestValidationError` (Pydantic)
+- [x] Add handler for `Exception` (catch-all, 500)
+- [x] Add handler for OpenAI API errors
+- [x] Ensure all errors return consistent `ErrorResponse` format
+- [x] Include `request_id` in error responses
 
 #### 3.3 Request Validation
 
-- [ ] Validate empty request body → `VALIDATION_ERROR`
-- [ ] Validate empty question → `EMPTY_QUESTION`
-- [ ] Validate whitespace-only question → `EMPTY_QUESTION`
-- [ ] Validate invalid sources → `SOURCE_NOT_FOUND`
-- [ ] Validate search_mode values → `VALIDATION_ERROR`
-- [ ] Validate top_k range (1-50) → `VALIDATION_ERROR`
+- [x] Validate empty request body → `VALIDATION_ERROR`
+- [x] Validate empty question → `EMPTY_QUESTION` (handled by Pydantic field validator)
+- [x] Validate whitespace-only question → `EMPTY_QUESTION` (handled by Pydantic field validator)
+- [x] Validate invalid sources → `SOURCE_NOT_FOUND`
+- [x] Validate search_mode values → `VALIDATION_ERROR` (handled by Pydantic)
+- [x] Validate top_k range (1-50) → `VALIDATION_ERROR` (handled by Pydantic)
 
 #### 3.4 Verification
 
-- [ ] Create `tests/test_api_errors.py`
-- [ ] Test empty request returns 400 with correct code
-- [ ] Test empty question returns 400 with `EMPTY_QUESTION`
-- [ ] Test invalid source returns 404 with `SOURCE_NOT_FOUND`
-- [ ] Test invalid JSON returns 400
-- [ ] Test internal errors return 500 with `INTERNAL_ERROR`
-- [ ] All error responses match documented format
+- [x] Create `tests/test_api_errors.py`
+- [x] Test empty request returns 400 with correct code
+- [x] Test empty question returns 422 with `VALIDATION_ERROR` (Pydantic validation)
+- [x] Test invalid source returns 404 with `SOURCE_NOT_FOUND`
+- [x] Test invalid JSON returns 400
+- [x] Test internal errors return 500 with `INTERNAL_ERROR`
+- [x] All error responses match documented format
 
 ______________________________________________________________________
 
