@@ -26,6 +26,11 @@ RAG_API_KEY = os.getenv("RAG_API_KEY")
 # Used for HMAC-SHA256 signature verification
 SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET")
 
+# Test mode flag - when enabled, skips authentication for /query and /sources
+# SECURITY WARNING: Never set this to true in production!
+# Only use for testing and development environments
+RAG_TEST_MODE = os.getenv("RAG_TEST_MODE", "false").lower() in ("true", "1", "yes")
+
 # =============================================================================
 # Rate Limiting
 # =============================================================================

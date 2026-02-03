@@ -100,8 +100,23 @@ async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
     """Handle custom APIError exceptions with consistent format.
 
     Converts APIError to ErrorResponse format and includes request ID.
+    Adds rate limit headers for RateLimitError.
     """
-    return _build_error_response(exc.status_code, exc.code, exc.message, exc.details)
+    from api.exceptions import RateLimitError
+
+    response = _build_error_response(
+        exc.status_code, exc.code, exc.message, exc.details
+    )
+
+    # Add rate limit headers for RateLimitError
+    if isinstance(exc, RateLimitError):
+        # Get headers from request state if available
+        rate_limit_headers = getattr(request.state, "rate_limit_headers", None)
+        if rate_limit_headers:
+            for header_name, header_value in rate_limit_headers.items():
+                response.headers[header_name] = header_value
+
+    return response
 
 
 @app.exception_handler(StarletteHTTPException)

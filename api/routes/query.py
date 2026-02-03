@@ -7,12 +7,15 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter
+from fastapi import Depends
 
+from api.dependencies import authenticate
 from api.exceptions import OpenAIError
 from api.exceptions import RateLimitError
 from api.exceptions import ServiceUnavailableError
 from api.exceptions import SourceNotFoundError
 from api.exceptions import ValidationError
+from api.middleware.rate_limit import check_rate_limit
 from api.models import Citation
 from api.models import Definition
 from api.models import QueryData
@@ -49,7 +52,10 @@ except ImportError as import_error:
     OPENAI_EXCEPTIONS = ()
     OPENAI_RATE_LIMIT_EXCEPTION = None
 
-router = APIRouter(tags=["Query"])
+# Apply authentication and rate limiting to all routes in this router
+router = APIRouter(
+    tags=["Query"], dependencies=[Depends(authenticate), Depends(check_rate_limit)]
+)
 
 
 def _extract_citations(response: dict[str, Any]) -> list[Citation]:
@@ -128,19 +134,25 @@ def _extract_definitions(response: dict[str, Any]) -> list[Definition]:
 
 
 @router.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest) -> QueryResponse:
+async def query(
+    request: QueryRequest,
+) -> QueryResponse:
     """Query the licensing knowledge base.
 
     Executes a RAG query against the configured sources and returns
     an answer with citations.
 
+    Requires authentication via Bearer token in Authorization header.
+
     Args:
         request: Query request with question and options.
+        auth: Authentication context (injected dependency).
 
     Returns:
         Query response with answer, citations, and metadata.
 
     Raises:
+        UnauthorizedError: If authentication fails (401).
         SourceNotFoundError: If unknown sources are specified.
         ValidationError: For other validation errors.
         ServiceUnavailableError: If index is not found.

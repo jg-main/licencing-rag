@@ -108,6 +108,12 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             # Calculate latency
             latency_ms = int((time.time() - start_time) * 1000)
 
+            # Add rate limit headers if they were set by rate limit dependency
+            rate_limit_headers = getattr(request.state, "rate_limit_headers", None)
+            if rate_limit_headers:
+                for header_name, header_value in rate_limit_headers.items():
+                    response.headers[header_name] = header_value
+
             # Log request end
             log.info(
                 "request_completed",

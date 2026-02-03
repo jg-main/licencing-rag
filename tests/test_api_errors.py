@@ -102,7 +102,7 @@ class TestValidationErrors:
         """Test that malformed JSON returns 400 validation error."""
         response = client.post(
             "/query",
-            data="{ invalid json }",
+            content=b"{ invalid json }",
             headers={"Content-Type": "application/json"},
         )
         assert response.status_code == 400

@@ -220,59 +220,70 @@ Update `api/main.py`:
 
 ______________________________________________________________________
 
-### Phase 4: Authentication ⏳
+### Phase 4: Authentication ✅
 
-**Status**: ⏳ **NOT STARTED**
+**Status**: ✅ **COMPLETED**
 
 #### 4.1 API Key Authentication
 
 Create `api/middleware/auth.py`:
 
-- [ ] Implement `get_api_key()` dependency
-- [ ] Extract Bearer token from `Authorization` header
-- [ ] Validate against `RAG_API_KEY` environment variable
-- [ ] Raise `UnauthorizedError` if missing/invalid
-- [ ] Skip auth for health endpoints (`/health`, `/ready`, `/version`)
+- [x] Implement `get_api_key()` dependency
+- [x] Extract Bearer token from `Authorization` header
+- [x] Validate against `RAG_API_KEY` environment variable
+- [x] Raise `UnauthorizedError` if missing/invalid
+- [x] Skip auth for health endpoints (`/health`, `/ready`, `/version`)
 
 #### 4.2 Slack Signature Verification
 
 Add to `api/middleware/auth.py`:
 
-- [ ] Implement `verify_slack_signature()` function
-- [ ] Extract `X-Slack-Signature` header
-- [ ] Extract `X-Slack-Request-Timestamp` header
-- [ ] Validate timestamp within 5 minutes (replay protection)
-- [ ] Compute HMAC-SHA256 signature
-- [ ] Compare using `hmac.compare_digest()`
-- [ ] Raise `UnauthorizedError` if invalid
+- [x] Implement `verify_slack_signature_async()` function
+- [x] Extract `X-Slack-Signature` header
+- [x] Extract `X-Slack-Request-Timestamp` header
+- [x] Validate timestamp within 5 minutes (replay protection)
+- [x] Compute HMAC-SHA256 signature
+- [x] Compare using `hmac.compare_digest()`
+- [x] Raise `UnauthorizedError` if invalid
 
 #### 4.3 Combined Authentication
 
 Create `api/dependencies.py`:
 
-- [ ] Implement `authenticate()` dependency
-- [ ] Use path-based auth:
-  - [ ] `/slack/command` → verify Slack signature only
-  - [ ] `/query`, `/sources` → verify Bearer token only
-- [ ] Return authentication context (type: "api_key" | "slack")
+- [x] Implement `authenticate()` dependency for API key authentication
+  - [x] Extract and validate Bearer token
+  - [x] Support test mode via `RAG_TEST_MODE` environment variable
+  - [x] Return authentication context (type: "api_key" | "none")
+- [x] Implement `authenticate_slack()` dependency for Slack endpoints
+  - [x] Verify HMAC-SHA256 signature
+  - [x] Return authentication context (type: "slack")
+- [x] Use router-level dependencies (cleaner than path-based routing)
 
 #### 4.4 Apply Authentication
 
-- [ ] Add `authenticate` dependency to `/query` endpoint
-- [ ] Add `authenticate` dependency to `/sources` endpoints
-- [ ] Keep health endpoints public (no auth)
-- [ ] Log authentication type in request logs
+- [x] Apply `authenticate` dependency to query router (`api/routes/query.py`)
+- [x] Apply `authenticate` dependency to sources router (`api/routes/sources.py`)
+- [x] Keep health endpoints public (no auth dependency)
+- [x] Log authentication type in request logs
+- [x] Document `RAG_TEST_MODE` in `.env.example` with security warning
+
+**Architecture Notes**:
+
+- ✅ Used per-router dependencies instead of path-based auth inspection
+- ✅ Explicit `RAG_TEST_MODE` flag prevents accidental auth bypass
+- ✅ Removed sync `verify_slack_signature` to prevent accidental misuse
+- ✅ Future Slack endpoints will need explicit `authenticate_slack` dependency
 
 #### 4.5 Verification
 
-- [ ] Create `tests/test_api_auth.py`
-- [ ] Test request without auth returns 401
-- [ ] Test invalid API key returns 401
-- [ ] Test valid API key returns 200
-- [ ] Test invalid Slack signature returns 401 (Slack endpoint)
-- [ ] Test expired Slack timestamp returns 401 (Slack endpoint)
-- [ ] Test valid Slack signature returns 200 (Slack endpoint)
-- [ ] Test health endpoints work without auth
+- [x] Create `tests/test_api_auth.py`
+- [x] Test request without auth returns 401
+- [x] Test invalid API key returns 401
+- [x] Test valid API key returns 200
+- [x] Test invalid Slack signature returns 401 (Slack endpoint)
+- [x] Test expired Slack timestamp returns 401 (Slack endpoint)
+- [x] Test valid Slack signature returns 200 (Slack endpoint)
+- [x] Test health endpoints work without auth
 
 ______________________________________________________________________
 

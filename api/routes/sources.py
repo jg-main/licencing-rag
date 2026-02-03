@@ -2,15 +2,23 @@
 """Source management endpoints for the License Intelligence API."""
 
 from fastapi import APIRouter
+from fastapi import Depends
 
+from api.dependencies import authenticate
 from api.exceptions import SourceNotFoundError
+from api.middleware.rate_limit import check_rate_limit
 from api.models import SourceDocumentsResponse
 from api.models import SourceInfo
 from api.models import SourcesResponse
 from app.config import SOURCES
 from app.ingest import list_indexed_documents
 
-router = APIRouter(prefix="/sources", tags=["Sources"])
+# Apply authentication and rate limiting to all routes in this router
+router = APIRouter(
+    prefix="/sources",
+    tags=["Sources"],
+    dependencies=[Depends(authenticate), Depends(check_rate_limit)],
+)
 
 
 @router.get("", response_model=SourcesResponse)
@@ -20,8 +28,16 @@ async def list_sources() -> SourcesResponse:
     Returns information about each source including document count
     and whether it's currently active (has indexed documents).
 
+    Requires authentication via Bearer token in Authorization header.
+
+    Args:
+        auth: Authentication context (injected dependency).
+
     Returns:
         List of sources with metadata.
+
+    Raises:
+        UnauthorizedError: If authentication fails (401).
     """
     sources_list: list[SourceInfo] = []
 
@@ -46,16 +62,22 @@ async def list_sources() -> SourcesResponse:
 
 
 @router.get("/{name}", response_model=SourceDocumentsResponse)
-async def get_source_documents(name: str) -> SourceDocumentsResponse:
+async def get_source_documents(
+    name: str,
+) -> SourceDocumentsResponse:
     """List all indexed documents for a specific source.
+
+    Requires authentication via Bearer token in Authorization header.
 
     Args:
         name: Source identifier (e.g., 'cme').
+        auth: Authentication context (injected dependency).
 
     Returns:
         List of document paths indexed for the source.
 
     Raises:
+        UnauthorizedError: If authentication fails (401).
         SourceNotFoundError: If source not found.
     """
     # Validate source exists in configuration

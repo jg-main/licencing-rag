@@ -54,6 +54,9 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
 addopts = "-v --tb=short"
+markers = [
+    "requires_auth: mark test as requiring actual authentication (disables test mode)",
+]
 filterwarnings = [
     "ignore:legacy embedding function config.*:DeprecationWarning:chromadb.api.collection_configuration",
 ]
