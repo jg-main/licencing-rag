@@ -4,7 +4,12 @@ PROJECT_NAME := licencing-rag
 PYTHON_VERSION := 3.13
 VENV := .venv
 BIN := $(VENV)/bin
-PYTHON_DIRS := app 
+PYTHON_DIRS := app api
+
+# API Server Configuration
+# ------------------------
+API_HOST := 0.0.0.0
+API_PORT := 8000
 
 # Terminal Colors
 # ---------------
@@ -62,6 +67,9 @@ help: ## 📚 Show this help message
 	@echo ""
 	@echo "$(BOLD)📓 Development Tools:$(END)"
 	@grep -E '^(setup-kernel|run-jupyter):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(END) %s\n", $$1, $$2}'
+	@echo ""
+	@echo "$(BOLD)🌐 API Server:$(END)"
+	@grep -E '^(api|api-dev|api-prod):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(END) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(BOLD)📈 QTrader:$(END)"
 	@grep -E '^(qtrader-project):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(END) %s\n", $$1, $$2}'
@@ -212,3 +220,29 @@ type-check: sync ## 🔬 Run type checking with MyPy
 .PHONY: qa
 qa: format lint-check type-check ## 🏆 Run all code quality checks
 	@echo "$(GREEN)✅ All code quality checks passed$(END)"
+
+
+################################################################################
+# API SERVER
+################################################################################
+
+.PHONY: api
+api: sync ## 🌐 Run API server locally with auto-reload (development)
+	@echo "$(BLUE)ℹ️  Starting API server in development mode...$(END)"
+	@echo "$(CYAN)📡 Server: http://$(API_HOST):$(API_PORT)$(END)"
+	@echo "$(CYAN)📚 Docs:   http://localhost:$(API_PORT)/docs$(END)"
+	@echo "$(CYAN)📖 ReDoc:  http://localhost:$(API_PORT)/redoc$(END)"
+	@uv run uvicorn api.main:app --host $(API_HOST) --port $(API_PORT) --reload
+
+.PHONY: api-dev
+api-dev: sync ## 🌐 Run API server with debug logging and reload
+	@echo "$(BLUE)ℹ️  Starting API server in debug mode...$(END)"
+	@echo "$(CYAN)📡 Server: http://$(API_HOST):$(API_PORT)$(END)"
+	@echo "$(CYAN)📚 Docs:   http://localhost:$(API_PORT)/docs$(END)"
+	@RAG_LOG_LEVEL=DEBUG uv run uvicorn api.main:app --host $(API_HOST) --port $(API_PORT) --reload --log-level debug
+
+.PHONY: api-prod
+api-prod: sync ## 🌐 Run API server in production mode (no reload, multiple workers)
+	@echo "$(BLUE)ℹ️  Starting API server in production mode...$(END)"
+	@echo "$(CYAN)📡 Server: http://$(API_HOST):$(API_PORT)$(END)"
+	@uv run uvicorn api.main:app --host $(API_HOST) --port $(API_PORT) --workers 4
