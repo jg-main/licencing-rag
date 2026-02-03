@@ -40,7 +40,6 @@ class QueryRequest(BaseModel):
 
     question: str = Field(
         ...,
-        min_length=1,
         max_length=2000,
         description="The question to ask about licensing documents",
     )
