@@ -29,6 +29,7 @@ from api.middleware import RequestLoggingMiddleware
 from api.middleware import get_request_id
 from api.routes import health_router
 from api.routes import query_router
+from api.routes import slack_router
 from api.routes import sources_router
 
 logger = logging.getLogger(__name__)
@@ -223,3 +224,4 @@ app.add_middleware(RequestIDMiddleware)
 app.include_router(health_router)
 app.include_router(query_router)
 app.include_router(sources_router)
+app.include_router(slack_router)
