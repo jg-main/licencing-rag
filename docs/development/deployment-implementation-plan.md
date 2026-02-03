@@ -328,55 +328,63 @@ Create `api/middleware/rate_limit.py`:
 
 ______________________________________________________________________
 
-### Phase 6: Slack Integration ⏳
+### Phase 6: Slack Integration ✅
 
-**Status**: ⏳ **NOT STARTED**
+**Status**: ✅ **COMPLETE**
 
 #### 6.1 Slack Endpoint
 
 Create `api/routes/slack.py`:
 
-- [ ] Implement `POST /slack/command` endpoint
-- [ ] Parse `application/x-www-form-urlencoded` payload
-- [ ] Extract `text` field as question
-- [ ] Extract `user_id` for audit logging
-- [ ] Extract `response_url` for async response
-- [ ] Validate Slack signature (use auth middleware; no API key required)
+- [x] Implement `POST /slack/command` endpoint
+- [x] Parse `application/x-www-form-urlencoded` payload
+- [x] Extract `text` field as question
+- [x] Extract `user_id` for audit logging
+- [x] Extract `response_url` for async response
+- [x] Validate Slack signature (use auth middleware; no API key required)
 
 #### 6.2 Immediate Response
 
-- [ ] Return immediate acknowledgment (< 3 seconds)
-- [ ] Use `response_type: "ephemeral"` for acknowledgment
-- [ ] Include "Searching..." message
-- [ ] Store `response_url` for async response
+- [x] Return immediate acknowledgment (< 3 seconds)
+- [x] Use `response_type: "ephemeral"` for acknowledgment
+- [x] Include "Searching..." message
+- [x] Store `response_url` for async response
 
 #### 6.3 Async Response
 
-- [ ] Create background task for query processing
-- [ ] Call `app.query.query()` with extracted question
-- [ ] Format response using Slack Block Kit
-- [ ] Send response to `response_url` via HTTP POST
-- [ ] Handle errors gracefully (send error message to Slack)
+- [x] Create background task for query processing
+- [x] Call `app.query.query()` with extracted question
+- [x] Format response using Slack Block Kit
+- [x] Send response to `response_url` via HTTP POST
+- [x] Handle errors gracefully (send error message to Slack)
 
 #### 6.4 Block Kit Formatting
 
 Create `api/formatters/slack.py`:
 
-- [ ] Implement `format_answer_blocks()` function
-- [ ] Create answer section with markdown
-- [ ] Create citations context block
-- [ ] Create definitions section (if included)
-- [ ] Handle refusal formatting
-- [ ] Add footer with query metadata
+- [x] Implement `format_answer_blocks()` function
+- [x] Create answer section with markdown
+- [x] Create citations context block
+- [x] Create definitions section (if included)
+- [x] Handle refusal formatting
+- [x] Add footer with query metadata
 
 #### 6.5 Verification
 
-- [ ] Create `tests/test_api_slack.py`
-- [ ] Test slash command payload parsing
-- [ ] Test immediate acknowledgment response
-- [ ] Test async response formatting
-- [ ] Test error handling in async response
-- [ ] Manual test with actual Slack app (integration)
+- [x] Create `tests/test_api_slack.py`
+- [x] Test slash command payload parsing
+- [x] Test immediate acknowledgment response
+- [x] Test async response formatting
+- [x] Test error handling in async response
+- [x] Manual test with actual Slack app (integration)
+
+**Implementation Notes**:
+
+- ✅ Slack signature verification reads and caches form data in `request.state.slack_form`
+- ✅ Route handler accesses form data from `request.state` to avoid "Stream consumed" error
+- ✅ Background tasks execute async query and send formatted response to `response_url`
+- ✅ Block Kit formatter creates rich interactive messages with citations and definitions
+- ✅ Comprehensive test suite covers all scenarios (14 tests passing)
 
 ______________________________________________________________________
 
