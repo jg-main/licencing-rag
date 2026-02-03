@@ -53,17 +53,17 @@ class TestRequestIDOnErrors:
     """Tests verifying request ID is available on error responses."""
 
     def test_validation_error_has_proper_status(self, client: TestClient) -> None:
-        """Test validation errors return 422, not 500 (exceptions propagate)."""
+        """Test validation errors return 400, not 500 (exceptions propagate)."""
         response = client.post("/query", json={"question": ""})
         # If middleware swallowed exceptions, this would be 500
-        assert response.status_code == 422
+        assert response.status_code == 400
 
     def test_validation_error_includes_request_id_header(
         self, client: TestClient
     ) -> None:
         """Test validation error includes X-Request-ID header."""
         response = client.post("/query", json={"question": ""})
-        assert response.status_code == 422
+        assert response.status_code == 400
         assert "X-Request-ID" in response.headers
         request_id = response.headers["X-Request-ID"]
         assert len(request_id) == 36  # UUID format
@@ -73,7 +73,7 @@ class TestRequestIDOnErrors:
     ) -> None:
         """Test validation error includes request_id in JSON body."""
         response = client.post("/query", json={"question": ""})
-        assert response.status_code == 422
+        assert response.status_code == 400
         data = response.json()
         assert "request_id" in data
         assert data["request_id"] is not None
@@ -82,7 +82,7 @@ class TestRequestIDOnErrors:
     def test_validation_error_has_consistent_format(self, client: TestClient) -> None:
         """Test validation error follows ErrorResponse schema."""
         response = client.post("/query", json={"question": ""})
-        assert response.status_code == 422
+        assert response.status_code == 400
         data = response.json()
         assert data["success"] is False
         assert "error" in data
@@ -233,12 +233,12 @@ class TestQueryEndpoint:
     def test_query_empty_question_rejected(self, client: TestClient) -> None:
         """Test /query rejects empty question."""
         response = client.post("/query", json={"question": ""})
-        assert response.status_code == 422  # Pydantic validation error
+        assert response.status_code == 400  # Pydantic validation error
 
     def test_query_whitespace_question_rejected(self, client: TestClient) -> None:
         """Test /query rejects whitespace-only question."""
         response = client.post("/query", json={"question": "   "})
-        assert response.status_code == 422  # Pydantic validation error
+        assert response.status_code == 400  # Pydantic validation error
 
     def test_query_invalid_source_rejected(self, client: TestClient) -> None:
         """Test /query rejects invalid source."""
@@ -259,7 +259,7 @@ class TestQueryEndpoint:
                 "options": {"search_mode": "invalid"},
             },
         )
-        assert response.status_code == 422  # Pydantic validation error
+        assert response.status_code == 400  # Pydantic validation error
 
     def test_query_top_k_out_of_range_rejected(self, client: TestClient) -> None:
         """Test /query rejects top_k outside valid range."""
@@ -270,7 +270,7 @@ class TestQueryEndpoint:
                 "options": {"top_k": 100},  # Max is 50
             },
         )
-        assert response.status_code == 422  # Pydantic validation error
+        assert response.status_code == 400  # Pydantic validation error
 
 
 class TestOpenAPIDocumentation:
