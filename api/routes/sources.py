@@ -2,8 +2,8 @@
 """Source management endpoints for the License Intelligence API."""
 
 from fastapi import APIRouter
-from fastapi import HTTPException
 
+from api.exceptions import SourceNotFoundError
 from api.models import SourceDocumentsResponse
 from api.models import SourceInfo
 from api.models import SourcesResponse
@@ -56,17 +56,13 @@ async def get_source_documents(name: str) -> SourceDocumentsResponse:
         List of document paths indexed for the source.
 
     Raises:
-        HTTPException: 404 if source not found.
+        SourceNotFoundError: If source not found.
     """
     # Validate source exists in configuration
     if name not in SOURCES:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "code": "SOURCE_NOT_FOUND",
-                "message": f"Source '{name}' not found",
-                "details": {"available_sources": list(SOURCES.keys())},
-            },
+        raise SourceNotFoundError(
+            source=name,
+            available_sources=list(SOURCES.keys()),
         )
 
     # Get indexed documents

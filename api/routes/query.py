@@ -1,13 +1,18 @@
 # api/routes/query.py
 """Query endpoint for the License Intelligence API."""
 
+import logging
 import time
 import uuid
 from typing import Any
 
 from fastapi import APIRouter
-from fastapi import HTTPException
 
+from api.exceptions import OpenAIError
+from api.exceptions import RateLimitError
+from api.exceptions import ServiceUnavailableError
+from api.exceptions import SourceNotFoundError
+from api.exceptions import ValidationError
 from api.models import Citation
 from api.models import Definition
 from api.models import QueryData
@@ -16,6 +21,33 @@ from api.models import QueryRequest
 from api.models import QueryResponse
 from app.config import SOURCES
 from app.query import query as rag_query
+
+logger = logging.getLogger(__name__)
+
+# Import OpenAI exceptions with fallback to prevent import errors during error handling
+try:
+    from openai import APIError as OpenAIAPIError
+    from openai import APITimeoutError
+    from openai import AuthenticationError
+    from openai import RateLimitError as OpenAIRateLimitError
+
+    OPENAI_EXCEPTIONS: tuple[type[Exception], ...] = (
+        OpenAIAPIError,
+        APITimeoutError,
+        AuthenticationError,
+    )
+    OPENAI_RATE_LIMIT_EXCEPTION: type[Exception] | None = OpenAIRateLimitError
+except ImportError as import_error:
+    # Fallback if OpenAI client changes import paths
+    # Log warning so we know the classifier is disabled
+    logger.warning(
+        "Failed to import OpenAI exception classes. "
+        "OpenAI errors will be classified as ServiceUnavailableError (503). "
+        "Error: %s",
+        import_error,
+    )
+    OPENAI_EXCEPTIONS = ()
+    OPENAI_RATE_LIMIT_EXCEPTION = None
 
 router = APIRouter(tags=["Query"])
 
@@ -109,22 +141,24 @@ async def query(request: QueryRequest) -> QueryResponse:
         Query response with answer, citations, and metadata.
 
     Raises:
-        HTTPException: 400 for validation errors, 404 for unknown sources.
+        SourceNotFoundError: If unknown sources are specified.
+        ValidationError: For other validation errors.
+        ServiceUnavailableError: If index is not found.
+        OpenAIError: If OpenAI API call fails.
     """
     start_time = time.time()
     query_id = str(uuid.uuid4())
+
+    # Note: Empty/whitespace questions are validated by Pydantic field validator
+    # in QueryRequest model, so no manual check needed here
 
     # Validate sources if provided
     if request.sources:
         invalid_sources = [s for s in request.sources if s not in SOURCES]
         if invalid_sources:
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "code": "SOURCE_NOT_FOUND",
-                    "message": f"Unknown sources: {invalid_sources}",
-                    "details": {"available_sources": list(SOURCES.keys())},
-                },
+            raise SourceNotFoundError(
+                source=invalid_sources,
+                available_sources=list(SOURCES.keys()),
             )
 
     try:
@@ -142,39 +176,32 @@ async def query(request: QueryRequest) -> QueryResponse:
         )
     except ValueError as e:
         # Invalid parameters (search mode, sources)
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "code": "VALIDATION_ERROR",
-                "message": str(e),
-            },
-        )
+        raise ValidationError(message=str(e))
     except RuntimeError as e:
         # Index not found or embedding mismatch
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "code": "SERVICE_UNAVAILABLE",
-                "message": str(e),
-            },
-        )
-    except Exception as e:
-        # Catch OpenAI errors or unexpected failures
         error_message = str(e)
-        if "openai" in error_message.lower() or "api" in error_message.lower():
-            raise HTTPException(
-                status_code=502,
-                detail={
-                    "code": "OPENAI_ERROR",
-                    "message": f"OpenAI API error: {error_message}",
-                },
+        if "index" in error_message.lower() or "chroma" in error_message.lower():
+            raise ServiceUnavailableError(message=error_message)
+        raise ServiceUnavailableError(message=f"RAG system error: {error_message}")
+    except Exception as e:
+        # Check for OpenAI-specific exceptions by type
+        # Handle rate limit errors separately (429) from other OpenAI errors (502)
+        if OPENAI_RATE_LIMIT_EXCEPTION and isinstance(e, OPENAI_RATE_LIMIT_EXCEPTION):
+            # OpenAI rate limit should surface as 429 for proper client backoff
+            # Note: retry_after is included in JSON body; Retry-After header
+            # will be added globally in Phase 5 (rate limiting middleware)
+            raise RateLimitError(
+                message="OpenAI API rate limit exceeded",
+                retry_after=getattr(e, "retry_after", None),
             )
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "code": "INTERNAL_ERROR",
-                "message": f"Unexpected error: {error_message}",
-            },
+        elif OPENAI_EXCEPTIONS and isinstance(e, OPENAI_EXCEPTIONS):
+            # Other OpenAI errors (auth, timeout, API errors) are 502 Bad Gateway
+            raise OpenAIError(message=str(e))
+
+        # Re-raise as ServiceUnavailableError for other unexpected errors
+        raise ServiceUnavailableError(
+            message=f"Unexpected error: {str(e)}",
+            details={"error_type": type(e).__name__},
         )
 
     # Calculate latency
