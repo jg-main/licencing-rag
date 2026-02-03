@@ -23,6 +23,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.config import API_VERSION
 from api.config import RAG_CORS_ORIGINS
+from api.exceptions import APIError
 from api.middleware import RequestIDMiddleware
 from api.middleware import RequestLoggingMiddleware
 from api.middleware import get_request_id
@@ -94,6 +95,15 @@ def _build_error_response(
     return response
 
 
+@app.exception_handler(APIError)
+async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
+    """Handle custom APIError exceptions with consistent format.
+
+    Converts APIError to ErrorResponse format and includes request ID.
+    """
+    return _build_error_response(exc.status_code, exc.code, exc.message, exc.details)
+
+
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(
     request: Request, exc: StarletteHTTPException
@@ -148,7 +158,7 @@ async def validation_exception_handler(
         ]
     }
 
-    return _build_error_response(422, "VALIDATION_ERROR", message, details)
+    return _build_error_response(400, "VALIDATION_ERROR", message, details)
 
 
 @app.exception_handler(Exception)
