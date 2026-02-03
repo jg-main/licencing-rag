@@ -127,10 +127,11 @@ async def verify_slack_signature_async(
             },
         )
 
-    # Read request body
+    # Read raw request body for signature verification
+    # We must read it before calling request.form() because the stream can only be read once
     body = await request.body()
 
-    # Compute expected signature
+    # Compute expected signature using the raw body
     # Format: v0=<hash> where hash is HMAC-SHA256 of "v0:{timestamp}:{body}"
     sig_basestring = f"v0:{x_slack_request_timestamp}:{body.decode('utf-8')}"
     expected_signature = (
@@ -148,3 +149,19 @@ async def verify_slack_signature_async(
             message="Invalid Slack signature",
             details={"reason": "Signature verification failed"},
         )
+
+    # Parse the form data from the body and cache it in request.state
+    # This avoids the "Stream consumed" error when the route handler tries to access form data
+    from urllib.parse import parse_qs
+
+    body_str = body.decode("utf-8")
+    parsed_data = parse_qs(body_str)
+
+    # Convert from dict[str, list[str]] to dict[str, str] (take first value of each list)
+    # Note: If Slack ever sends duplicate keys (e.g., key=value1&key=value2),
+    # only the first value will be preserved. This is acceptable for Slack's
+    # slash command payload format, which doesn't use repeated keys.
+    form_dict = {
+        key: values[0] if values else "" for key, values in parsed_data.items()
+    }
+    request.state.slack_form = form_dict

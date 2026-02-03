@@ -71,6 +71,11 @@ async def authenticate_slack(
     Validates HMAC-SHA256 signature from Slack headers.
     Use this dependency on /slack/* endpoints.
 
+    Note: This function parses and caches the form data in request.state.slack_form
+    during signature verification. Route handlers should access form data from
+    request.state.slack_form instead of using Form() parameters to avoid
+    "Stream consumed" errors.
+
     Args:
         request: FastAPI request object.
         x_slack_signature: Slack signature from X-Slack-Signature header.
