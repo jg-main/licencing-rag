@@ -1,0 +1,81 @@
+# License Intelligence API - Docker Compose Configuration
+# Provides a production-ready deployment setup with volume mounts,
+# environment configuration, and health monitoring.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Match container UID/GID to host user for volume permissions
+      # Override with: docker-compose build --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g)
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    image: rag-api:latest
+    container_name: rag-api
+    restart: unless-stopped
+
+    # Port mapping
+    ports:
+      - "8000:8000"
+
+    # Environment variables (load from .env file)
+    env_file:
+      - .env
+
+    # Additional environment variables
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Production workers (4 = 2 * CPU cores for typical I/O-bound workload)
+      # Adjust based on CPU cores: (2 * cores) + 1
+      - WORKERS=${WORKERS:-4}
+
+    # Volume mounts for persistence
+    volumes:
+      # Data directory (raw documents, processed text, chunks)
+      - ./data:/app/data:ro
+      # Index directory (ChromaDB, BM25, definitions)
+      - ./index:/app/index:rw
+      # Logs directory (query logs, debug logs)
+      - ./logs:/app/logs:rw
+
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    # IMPORTANT: Resource limits below are NOT enforced in standalone Docker Compose!
+    # These values only apply in Docker Swarm mode.
+    # For actual resource limits in standalone mode, use Docker CLI flags:
+    #   docker run --cpus=2 --memory=4g ...
+    # Or deploy to Kubernetes/Swarm for proper resource enforcement.
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Networks (optional - uncomment if you want custom networking)
+# networks:
+#   rag-network:
+#     driver: bridge
+
+# Volumes (optional - uncomment if you want named volumes instead of bind mounts)
+# volumes:
+#   rag-data:
+#   rag-index:
+#   rag-logs:

@@ -1,0 +1,76 @@
+# .dockerignore
+# Exclude unnecessary files from Docker build context
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables (should be passed at runtime)
+.env
+.env.*
+
+# Logs (should be mounted as volumes)
+logs/
+*.log
+
+# Test files and reports
+tests/
+eval/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Data and indexes (should be mounted as volumes)
+data/
+index/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Development tools
+Makefile
+.pre-commit-config.yaml
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
