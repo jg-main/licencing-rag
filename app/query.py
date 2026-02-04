@@ -2,6 +2,7 @@
 """Query pipeline for the License Intelligence System."""
 
 import sys
+import time
 from typing import Any
 
 import chromadb
@@ -127,7 +128,6 @@ def query(
         RuntimeError: If no collections are available.
         ValueError: If invalid source or search mode.
     """
-    import time
 
     start_time = time.time()  # Track query latency for audit logging
 
