@@ -111,7 +111,7 @@ rag query "What are the redistribution fees?"
 rag list --source cme
 ```
 
-**Cost:** ~$0.03 per query (~$90/month for 100 queries/day)
+**Cost:** ~$0.02 per query (~$60/month for 100 queries/day)
 
 📖 **[See cost breakdown →](docs/cost-estimation.md)**
 
@@ -670,17 +670,17 @@ ______________________________________________________________________
 
 ### Pricing Overview
 
-**Per Query (typical):** ~$0.03\
-**100 queries/day:** ~$90/month\
-**500 queries/day:** ~$450/month
+**Per Query (typical):** ~$0.02\
+**100 queries/day:** ~$60/month\
+**500 queries/day:** ~$300/month
 
 ### Cost Breakdown
 
 | Operation | Model                  | Cost per Query |
 | --------- | ---------------------- | -------------- |
-| Embedding | text-embedding-3-large | ~$0.002        |
-| Reranking | gpt-4.1                | ~$0.015        |
-| Answer    | gpt-4.1                | ~$0.015        |
+| Embedding | text-embedding-3-large | ~$0.000002     |
+| Reranking | gpt-4.1                | ~$0.005        |
+| Answer    | gpt-4.1                | ~$0.011        |
 
 ### Optimization Tips
 

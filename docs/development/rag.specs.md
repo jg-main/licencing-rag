@@ -1119,20 +1119,20 @@ ______________________________________________________________________
 
 ### Per Query
 
-| Operation             | Tokens  | Cost             |
-| --------------------- | ------- | ---------------- |
-| Embedding (query)     | ~50     | $0.00001         |
-| Reranking (12 chunks) | ~24,000 | $0.024           |
-| Answer generation     | ~5,000  | $0.005           |
-| **Total**             |         | **~$0.03/query** |
+| Operation             | Tokens | Cost             |
+| --------------------- | ------ | ---------------- |
+| Embedding (query)     | ~50    | $0.000002        |
+| Reranking (10 chunks) | ~2,500 | $0.005           |
+| Answer generation     | ~3,200 | $0.011           |
+| **Total**             |        | **~$0.02/query** |
 
 ### Monthly (100 queries/day)
 
 | Usage  | Queries | Cost  |
 | ------ | ------- | ----- |
-| Light  | 3,000   | ~$90  |
-| Medium | 6,000   | ~$180 |
-| Heavy  | 10,000  | ~$300 |
+| Light  | 3,000   | ~$60  |
+| Medium | 6,000   | ~$120 |
+| Heavy  | 10,000  | ~$200 |
 
 ______________________________________________________________________
 
@@ -1144,6 +1144,6 @@ After implementation:
 - ✅ Irrelevant context is eliminated (reranking)
 - ✅ Refusals are reliable and boring (code-enforced)
 - ✅ Input token usage drops materially (≤60k)
-- ✅ Cost per query is predictable (~$0.03)
+- ✅ Cost per query is predictable (~$0.02)
 - ✅ Answers are auditable and defensible (debug mode)
 - ✅ Evaluation set validates retrieval accuracy

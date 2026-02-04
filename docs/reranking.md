@@ -94,7 +94,7 @@ RERANKING_TIMEOUT = 30               # Seconds per chunk
 
 ## Performance
 
-**Cost:** ~$0.015 per query (10 chunks × ~150 tokens each)
+**Cost:** ~$0.005 per query (10 chunks × ~250 tokens each, 1 token output)
 
 **Latency:** ~1-2 seconds (parallel scoring)
 

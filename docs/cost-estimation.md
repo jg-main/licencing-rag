@@ -28,13 +28,14 @@ ______________________________________________________________________
 
 ### Current OpenAI Pricing (as of January 2026)
 
-| Service                | Operation | Cost per 1M tokens |
-| ---------------------- | --------- | ------------------ |
-| text-embedding-3-large | Embedding | $0.13              |
-| gpt-4.1 (GPT-4 Turbo)  | Input     | $2.50              |
-| gpt-4.1 (GPT-4 Turbo)  | Output    | $10.00             |
+| Service                | Operation    | Cost per 1M tokens |
+| ---------------------- | ------------ | ------------------ |
+| text-embedding-3-large | Embedding    | $0.13              |
+| gpt-4.1 (GPT-4 Turbo)  | Input        | $2.00              |
+| gpt-4.1 (GPT-4 Turbo)  | Cached Input | $0.50              |
+| gpt-4.1 (GPT-4 Turbo)  | Output       | $8.00              |
 
-**Note:** Verify current pricing at [https://openai.com/pricing](https://openai.com/pricing)
+**Note:** Verify current pricing at [https://platform.openai.com/docs/pricing](https://platform.openai.com/docs/pricing)
 
 ______________________________________________________________________
 
@@ -76,51 +77,58 @@ Cost = (query_tokens / 1_000_000) × $0.13
 
 #### 2. Reranking (10 chunks)
 
+**Based on actual usage (135 queries analyzed):**
+
 ```
-Input Cost = (10 chunks × ~600 tokens × 2 / 1_000_000) × $2.50
-Output Cost = (10 chunks × 1 token / 1_000_000) × $10.00
-Total Reranking Cost ≈ $0.03 per query
+Input Cost = (~2,500 tokens / 1_000_000) × $2.00 = $0.005
+Output Cost = (~10 tokens / 1_000_000) × $8.00 = $0.00008
+Total Reranking Cost ≈ $0.005 per query
 ```
 
-**Why `× 2` for input?**
+**Why lower than expected?**
 
-- Chunk text (~600 tokens)
-- Reranking prompt (~600 tokens)
-- Total: ~1,200 tokens per chunk
-
-**Optimization:**
-
-With `RERANKING_INCLUDE_EXPLANATIONS = False` (default), output is 1 token per chunk instead of ~50, saving ~$0.005 per query.
+- Reranking uses efficient prompts (~250 tokens per chunk)
+- With `RERANKING_INCLUDE_EXPLANATIONS = False` (default), output is 1 token per chunk
+- Some queries retrieve fewer than 10 chunks
 
 #### 3. Answer Generation
 
+**Based on actual usage (135 queries analyzed):**
+
 ```
-Input Cost = (prompt_tokens / 1_000_000) × $2.50
-Output Cost = (completion_tokens / 1_000_000) × $10.00
+Average input tokens: ~2,500 (after reranking)
+Average output tokens: ~700
+
+Input Cost = (2,500 / 1_000_000) × $2.00 = $0.005
+Output Cost = (700 / 1_000_000) × $8.00 = $0.0056
+Total Answer Cost ≈ $0.011 per query
 ```
 
-**Typical values:**
+**Token usage breakdown (from logs):**
 
-- Prompt: 8,000-12,000 tokens (system prompt + chunks + definitions)
-- Completion: 400-800 tokens (answer + citations)
-
-**Example calculation:**
-
-- Prompt: 10,000 tokens → (10,000 / 1_000_000) × $2.50 = **$0.025**
-- Completion: 500 tokens → (500 / 1_000_000) × $10.00 = **$0.005**
-- **Total: $0.030 per answer**
+- Input tokens: Min: 900, Max: 9,800, Avg: 5,075 (total pipeline)
+- Output tokens: Min: 40, Max: 1,900, Avg: 700
+- Reranking uses ~2,500 tokens input
+- Answer generation uses remaining ~2,500 tokens input
 
 #### Total Query Cost
 
+**Based on actual usage (135 queries):**
+
 ```
-Query Embedding:     $0.000002
-Reranking:           $0.030
-Answer Generation:   $0.030
+Query Embedding:     $0.000002 (negligible)
+Reranking:           $0.005
+Answer Generation:   $0.011
 ────────────────────────────
-Total per query:     $0.060
+Total per query:     $0.016
 ```
 
-**Cost per query: ~$0.06**
+**Cost per query: ~$0.02** (actual measured average)
+
+**Note:** Costs vary by query complexity:
+
+- Simple queries: ~$0.01 (fewer chunks, shorter answers)
+- Complex queries: ~$0.03-0.04 (more chunks, detailed answers)
 
 ______________________________________________________________________
 
@@ -132,30 +140,30 @@ ______________________________________________________________________
 
 ```
 Ingestion (one-time):  $0.08
-Monthly queries:       100 × $0.06 = $6.00
+Monthly queries:       100 × $0.02 = $2.00
 ────────────────────────────────────
-First month:           $6.08
-Subsequent months:     $6.00/month
+First month:           $2.08
+Subsequent months:     $2.00/month
 ```
 
 #### Medium Organization (500 queries/month)
 
 ```
 Ingestion (one-time):  $0.42
-Monthly queries:       500 × $0.06 = $30.00
+Monthly queries:       500 × $0.02 = $10.00
 ────────────────────────────────────
-First month:           $30.42
-Subsequent months:     $30.00/month
+First month:           $10.42
+Subsequent months:     $10.00/month
 ```
 
 #### Large Organization (2,000 queries/month)
 
 ```
 Ingestion (one-time):  $0.85
-Monthly queries:       2,000 × $0.06 = $120.00
+Monthly queries:       2,000 × $0.02 = $40.00
 ────────────────────────────────────
-First month:           $120.85
-Subsequent months:     $120.00/month
+First month:           $40.85
+Subsequent months:     $40.00/month
 ```
 
 ### Re-ingestion Costs
@@ -188,7 +196,7 @@ TOP_K_RETRIEVAL = 10  # Rerank 10 chunks
 TOP_K_RETRIEVAL = 5  # Rerank 5 chunks
 ```
 
-**Savings:** ~50% on reranking costs ($0.015 vs $0.030)
+**Savings:** ~50% on reranking costs ($0.0025 vs $0.005)
 
 **Trade-off:** Slightly lower recall (may miss relevant chunks)
 
@@ -223,7 +231,7 @@ For frequently asked questions:
 - Serve from cache before calling the API
 - Invalidate cache when documents are updated
 
-**Example:** 20% cache hit rate saves ~$1.20/month on 100 queries
+**Example:** 20% cache hit rate saves ~$0.40/month on 100 queries
 
 ### 6. Monitor and Adjust
 
@@ -235,7 +243,7 @@ jq -r '[.tokens_input, .tokens_output] | @csv' logs/queries.jsonl | \
   awk -F, '{input+=$1; output+=$2} END {print "Input:", input, "Output:", output}'
 
 # Average cost per query
-jq -r '[.tokens_input * 2.50 / 1000000 + .tokens_output * 10.00 / 1000000] | @csv' logs/queries.jsonl | \
+jq -r '[.tokens_input * 2.00 / 1000000 + .tokens_output * 8.00 / 1000000] | @csv' logs/queries.jsonl | \
   awk -F, '{sum+=$1; count++} END {print "Avg cost per query: $" sum/count}'
 ```
 
@@ -318,7 +326,7 @@ Set up monitoring:
 
 ```bash
 # Alert if daily cost exceeds threshold
-jq -r '[.tokens_input * 2.50 / 1000000 + .tokens_output * 10.00 / 1000000]' logs/queries.jsonl | \
+jq -r '[.tokens_input * 2.00 / 1000000 + .tokens_output * 8.00 / 1000000]' logs/queries.jsonl | \
   awk '{sum+=$1} END {if (sum > 5.00) print "ALERT: Daily cost exceeded $5.00"}'
 ```
 
