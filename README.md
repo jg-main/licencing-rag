@@ -296,15 +296,26 @@ rag query --debug "What are the fees?"
 
 For deploying the REST API, additional environment variables are required:
 
-| Variable                  | Required | Default | Description                          |
-| ------------------------- | -------- | ------- | ------------------------------------ |
-| `RAG_API_KEY`             | Yes\*    | -       | API key for `/query` and `/sources`  |
-| `SLACK_SIGNING_SECRET`    | Yes\*    | -       | Slack app signing secret             |
-| `RAG_RATE_LIMIT`          | No       | `100`   | Max requests per minute per API key  |
-| `RAG_CORS_ORIGINS`        | No       | (none)  | Comma-separated allowed origins      |
-| `RAG_TRUST_PROXY_HEADERS` | No       | `false` | Trust X-Forwarded-For (behind proxy) |
+| Variable                  | Required | Default | Description                            |
+| ------------------------- | -------- | ------- | -------------------------------------- |
+| `RAG_API_KEY`             | Yes\*    | -       | API key for `/query` and `/sources`    |
+| `SLACK_SIGNING_SECRET`    | Yes\*    | -       | Slack app signing secret               |
+| `RAG_TEST_MODE`           | No       | `false` | Disable auth for testing (⚠️ dev only) |
+| `RAG_RATE_LIMIT`          | No       | `100`   | Max requests per minute per API key    |
+| `RAG_CORS_ORIGINS`        | No       | (none)  | Comma-separated allowed origins        |
+| `RAG_TRUST_PROXY_HEADERS` | No       | `false` | Trust X-Forwarded-For (behind proxy)   |
 
 \* Required when running the REST API
+
+**Docker Deployment Variables:**
+
+| Variable   | Default | Description                                  |
+| ---------- | ------- | -------------------------------------------- |
+| `WORKERS`  | `1`     | Uvicorn workers (Compose overrides to 4)     |
+| `USER_UID` | `1000`  | Container user UID (match host for volumes)  |
+| `USER_GID` | `1000`  | Container group GID (match host for volumes) |
+
+> **Note**: The Dockerfile defaults `WORKERS=1` for development. The docker-compose.yml overrides this to `WORKERS=4` for production workloads. For manual `docker run`, set `WORKERS` based on CPU cores: `(2 * cores) + 1`.
 
 See [`.env.example`](.env.example) for a complete configuration template.
 
@@ -581,8 +592,10 @@ ______________________________________________________________________
 ### Developer Resources
 
 - **[Developer Guide](docs/development/DEVELOPER_GUIDE.md)** - Architecture and development
-- **[Technical Specs](docs/development/rag.specs.md)** - Complete specification
-- **[Implementation Plan](docs/development/rag.implementation-plan.md)** - Development roadmap
+- **[Technical Specs](docs/development/rag.specs.md)** - Complete RAG specification
+- **[Implementation Plan](docs/development/rag.implementation-plan.md)** - RAG development roadmap
+- **[Deployment Specs](docs/development/deployment-specs.md)** - API deployment architecture
+- **[Deployment Plan](docs/development/deployment-implementation-plan.md)** - API deployment progress
 
 ### Component Guides
 

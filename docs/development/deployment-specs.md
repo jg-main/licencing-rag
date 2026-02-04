@@ -494,66 +494,80 @@ ______________________________________________________________________
 
 ### 7.1 Dockerfile
 
-Use a Python base image version that matches the `pyproject.toml` Python requirement.
+**Production-Grade Features:**
+
+- Multi-stage build for reduced image size
+- Pinned `uv` version (0.5.18) via pip for supply-chain hardening
+- Uses `uv export --frozen` + `uv pip install` for fully lockfile-pinned builds
+- Configurable UID/GID with safe creation logic (checks username, then UID/GID availability, fails on conflicts)
+- Configurable workers via `WORKERS` env var (default: 1, Compose override: 4)
+- Non-root user execution
+- Health check integration
+- Proper signal handling (exec form with PID 1)
+
+**Key Configuration:**
 
 ```dockerfile
+FROM python:3.13-slim AS builder
+# Install pinned uv version
+RUN pip install --no-cache-dir uv==0.5.18
+COPY pyproject.toml uv.lock ./
+# Export locked deps (--no-emit-project excludes local package) and install to system
+RUN uv export --frozen --no-dev --no-hashes --no-emit-project -o requirements.txt && \
+    uv pip install --system --no-cache -r requirements.txt
+
 FROM python:3.13-slim
+# Configurable UID/GID for volume permissions
+# Logic: check username first, then verify UID/GID availability, fail on conflicts
+ARG USER_UID=1000
+ARG USER_GID=1000
+RUN set -e && \
+    # Handle group: use existing or create with requested GID if available
+    if getent group appuser >/dev/null; then echo "Group exists"; \
+    elif getent group ${USER_GID} >/dev/null; then echo "ERROR: GID in use" && exit 1; \
+    else groupadd -g ${USER_GID} appuser; fi && \
+    # Handle user: use existing or create with requested UID if available
+    if id appuser >/dev/null 2>&1; then echo "User exists"; \
+    elif getent passwd ${USER_UID} >/dev/null; then echo "ERROR: UID in use" && exit 1; \
+    else useradd -u ${USER_UID} -g appuser --create-home appuser; fi
 
-# Set environment
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
-
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY pyproject.toml ./
-RUN pip install uv && uv sync --frozen
-
-# Copy application
-COPY app/ ./app/
-COPY api/ ./api/
-
-# Create non-root user
-RUN useradd --create-home appuser && \
-    chown -R appuser:appuser /app
-USER appuser
-
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Run with uvicorn
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Configurable workers (default: 1, Compose sets 4 for production)
+ENV WORKERS=1
+# Signal-safe startup with exec (uvicorn becomes PID 1)
+CMD ["sh", "-c", "exec uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers ${WORKERS}"]
 ```
 
 ### 7.2 Docker Compose (Development)
+
+**Important Notes:**
+
+- `deploy.resources` are NOT enforced in Docker Compose standalone mode (only in Swarm)
+- For actual resource limits, use Docker CLI flags (`--cpus`, `--memory`) or deploy to Kubernetes/Swarm
+- Build with matching UID/GID to avoid volume permission issues
 
 ```yaml
 version: "3.9"
 
 services:
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    image: rag-api:latest
     ports:
       - "8000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - RAG_API_KEY=${RAG_API_KEY}
       - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
+      - WORKERS=${WORKERS:-4}  # Production: 4 workers
     volumes:
       - ./data:/app/data:ro
-      - ./index:/app/index:ro
-      - ./logs:/app/logs
+      - ./index:/app/index:rw
+      - ./logs:/app/logs:rw
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -564,22 +578,68 @@ services:
 
 ### 7.3 Build and Run
 
+**Production Deployment Considerations**:
+
+1. **Workers**: Set `WORKERS=4` (or `(2 * CPU_CORES) + 1`) for production load handling
+1. **Volume Permissions**: Build with matching UID/GID to avoid permission errors on bind mounts
+1. **Resource Limits**: `deploy.resources` in Compose are NOT enforced in standalone mode. For actual enforcement use Docker CLI `--cpus` / `--memory` flags, cgroup limits, or deploy to Kubernetes/Swarm
+1. **Dependency Updates**: Run `uv lock` after updating pyproject.toml, then rebuild image for reproducibility
+1. **Supply Chain Security**: uv pinned to version 0.5.18 via pip (not shell script) for verifiable builds
+
+**Development:**
+
+```bash
+# Build with host user permissions (avoids volume permission errors)
+docker-compose build --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g)
+
+# Run with docker-compose (4 workers for production load)
+WORKERS=4 docker-compose up -d
+
+# View logs
+docker-compose logs -f api
+
+# Stop
+docker-compose down
+```
+
+**Production (standalone):**
+
 ```bash
 # Build image
-docker build -t rag-api:latest .
+docker build \
+  --build-arg USER_UID=$(id -u) \
+  --build-arg USER_GID=$(id -g) \
+  -t rag-api:latest .
 
-# Run container
+# Run container with resource limits (enforced in standalone mode)
 docker run -d \
   --name rag-api \
   -p 8000:8000 \
+  --cpus=2 \
+  --memory=4g \
+  -e WORKERS=4 \
   -e OPENAI_API_KEY="$OPENAI_API_KEY" \
   -e RAG_API_KEY="$RAG_API_KEY" \
   -e SLACK_SIGNING_SECRET="$SLACK_SIGNING_SECRET" \
   -v $(pwd)/data:/app/data:ro \
-  -v $(pwd)/index:/app/index:ro \
-  -v $(pwd)/logs:/app/logs \
+  -v $(pwd)/index:/app/index:rw \
+  -v $(pwd)/logs:/app/logs:rw \
+  --restart unless-stopped \
   rag-api:latest
 ```
+
+**Worker Configuration:**
+
+- **Development**: `WORKERS=1` (default, single process)
+- **Production**: `WORKERS=4` or `(2 * CPU_CORES) + 1`
+- Example: 2 CPU cores → `WORKERS=5`
+
+**Volume Permissions:**
+
+If you encounter permission errors on `/app/index` or `/app/logs`:
+
+1. Build with matching UID/GID: `--build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g)`
+1. Or fix host directory permissions: `sudo chown -R $(id -u):$(id -g) index/ logs/`
 
 ______________________________________________________________________
 

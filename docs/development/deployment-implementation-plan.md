@@ -287,44 +287,55 @@ Create `api/dependencies.py`:
 
 ______________________________________________________________________
 
-### Phase 5: Rate Limiting ⏳
+### Phase 5: Rate Limiting ✅
 
-**Status**: ⏳ **NOT STARTED**
+**Status**: ✅ **COMPLETE**
 
 #### 5.1 Rate Limiter Implementation
 
 Create `api/middleware/rate_limit.py`:
 
-- [ ] Implement rate limiter (in-memory for single instance only)
-- [ ] Add Redis-backed option for multi-instance or multi-worker deployments
-- [ ] Track requests by API key
-- [ ] Track requests by IP (fallback for Slack)
-- [ ] Configure limit from `RAG_RATE_LIMIT` env var
-- [ ] Default: 100 requests per minute per key
-- [ ] Support burst limit (10 concurrent requests)
+- [x] Implement rate limiter (in-memory for single instance only)
+- [x] Add Redis-backed option for multi-instance or multi-worker deployments
+- [x] Track requests by API key
+- [x] Track requests by IP (fallback for Slack)
+- [x] Configure limit from `RAG_RATE_LIMIT` env var
+- [x] Default: 100 requests per minute per key
+- [x] Support burst limit (10 concurrent requests)
 
 #### 5.2 Rate Limit Headers
 
-- [ ] Add `X-RateLimit-Limit` header to responses
-- [ ] Add `X-RateLimit-Remaining` header to responses
-- [ ] Add `X-RateLimit-Reset` header to responses
-- [ ] Add `Retry-After` header on 429 responses
+- [x] Add `X-RateLimit-Limit` header to responses
+- [x] Add `X-RateLimit-Remaining` header to responses
+- [x] Add `X-RateLimit-Reset` header to responses
+- [x] Add `Retry-After` header on 429 responses
 
 #### 5.3 Rate Limit Middleware
 
-- [ ] Create rate limit dependency
-- [ ] Apply to `/query` endpoint
-- [ ] Apply to `/sources` endpoints
-- [ ] Skip for health endpoints
-- [ ] Return `RateLimitError` when exceeded
+- [x] Create rate limit dependency
+- [x] Apply to `/query` endpoint
+- [x] Apply to `/sources` endpoints
+- [x] Skip for health endpoints
+- [x] Return `RateLimitError` when exceeded
 
 #### 5.4 Verification
 
-- [ ] Create `tests/test_api_rate_limit.py`
-- [ ] Test rate limit headers present
-- [ ] Test exceeding limit returns 429
-- [ ] Test limit resets after window
-- [ ] Test different API keys have separate limits
+- [x] Create `tests/test_api_rate_limit.py`
+- [x] Test rate limit headers present
+- [x] Test exceeding limit returns 429
+- [x] Test limit resets after window
+- [x] Test different API keys have separate limits
+
+**Implementation Notes**:
+
+- ✅ Token bucket algorithm allows bursts while maintaining average rate
+- ✅ In-memory implementation with LRU eviction (max 10,000 buckets)
+- ✅ Rate limiting by API key (preferred) or client IP (fallback)
+- ✅ Respects `TRUST_PROXY_HEADERS` for X-Forwarded-For IP extraction
+- ✅ Headers always set in request.state before raising 429 errors
+- ✅ Applied to query and sources routers via router-level dependencies
+- ✅ Health endpoints excluded from rate limiting
+- ✅ Comprehensive test suite (12 tests covering all scenarios)
 
 ______________________________________________________________________
 
@@ -388,57 +399,71 @@ Create `api/formatters/slack.py`:
 
 ______________________________________________________________________
 
-### Phase 7: Docker Configuration ⏳
+### Phase 7: Docker Configuration ✅
 
-**Status**: ⏳ **NOT STARTED**
+**Status**: ✅ **COMPLETE**
 
 #### 7.1 Dockerfile
 
-- [ ] Create `Dockerfile` in project root
-- [ ] Use a Python base image that matches `pyproject.toml` (e.g., `python:3.13-slim`)
-- [ ] Set environment variables (PYTHONUNBUFFERED, etc.)
-- [ ] Install system dependencies (build-essential, curl for HEALTHCHECK)
-- [ ] Install uv package manager
-- [ ] Copy and install Python dependencies
-- [ ] Copy application code (`app/`, `api/`)
-- [ ] Create non-root user (`appuser`)
-- [ ] Set working directory and user
-- [ ] Expose port 8000
-- [ ] Add HEALTHCHECK instruction
-- [ ] Set CMD for uvicorn
+- [x] Create `Dockerfile` in project root
+- [x] Use a Python base image that matches `pyproject.toml` (e.g., `python:3.13-slim`)
+- [x] Set environment variables (PYTHONUNBUFFERED, etc.)
+- [x] Install system dependencies (build-essential, curl for HEALTHCHECK)
+- [x] Install uv package manager
+- [x] Copy and install Python dependencies
+- [x] Copy application code (`app/`, `api/`)
+- [x] Create non-root user (`appuser`)
+- [x] Set working directory and user
+- [x] Expose port 8000
+- [x] Add HEALTHCHECK instruction
+- [x] Set CMD for uvicorn
 
 #### 7.2 Docker Compose
 
-- [ ] Create `docker-compose.yml`
-- [ ] Define `api` service
-- [ ] Configure environment variables from `.env`
-- [ ] Mount volumes for data, index, logs
-- [ ] Configure health check
-- [ ] Set restart policy (`unless-stopped`)
-- [ ] Configure port mapping (8000:8000)
+- [x] Create `docker-compose.yml`
+- [x] Define `api` service
+- [x] Configure environment variables from `.env`
+- [x] Mount volumes for data, index, logs
+- [x] Configure health check
+- [x] Set restart policy (`unless-stopped`)
+- [x] Configure port mapping (8000:8000)
 
 #### 7.3 Docker Ignore
 
-- [ ] Create `.dockerignore` file
-- [ ] Exclude `.git/`
-- [ ] Exclude `__pycache__/`
-- [ ] Exclude `.pytest_cache/`
-- [ ] Exclude `*.pyc`
-- [ ] Exclude `.env` (use env vars instead)
-- [ ] Exclude `logs/` (mount as volume)
-- [ ] Exclude `tests/`
-- [ ] Exclude `eval/`
-- [ ] Exclude `docs/`
+- [x] Create `.dockerignore` file
+- [x] Exclude `.git/`
+- [x] Exclude `__pycache__/`
+- [x] Exclude `.pytest_cache/`
+- [x] Exclude `*.pyc`
+- [x] Exclude `.env` (use env vars instead)
+- [x] Exclude `logs/` (mount as volume)
+- [x] Exclude `tests/`
+- [x] Exclude `eval/`
+- [x] Exclude `docs/`
 
 #### 7.4 Verification
 
-- [ ] `docker build -t rag-api:latest .` succeeds
-- [ ] `docker run` starts container
-- [ ] Health check passes
-- [ ] `/health` endpoint accessible
-- [ ] `/query` endpoint works with auth
-- [ ] Logs written to mounted volume
-- [ ] Container runs as non-root user
+- [x] `docker build -t rag-api:latest .` succeeds
+- [x] `docker run` starts container
+- [x] Health check passes
+- [x] `/health` endpoint accessible
+- [x] `/query` endpoint works with auth
+- [x] Logs written to mounted volume
+- [x] Container runs as non-root user
+
+**Implementation Notes**:
+
+- ✅ Multi-stage build reduces final image size
+- ✅ Uses `uv export --frozen` + `uv pip install` for fully lockfile-pinned reproducible builds
+- ✅ Pinned uv version (0.5.18) installed via pip instead of pipe-to-shell for supply-chain hardening
+- ✅ Runs as non-root user `appuser` for security
+- ✅ Configurable UID/GID (USER_UID, USER_GID) with safe creation logic: checks username first, then UID/GID availability, fails clearly on conflicts
+- ✅ Configurable workers via WORKERS env var (Dockerfile default: 1, Compose override: 4)
+- ✅ Proper signal handling with exec form (uvicorn as PID 1 for graceful shutdown)
+- ✅ Health check uses `/health` endpoint with 30s interval
+- ✅ Volumes mounted for data, index, and logs directories
+- ✅ Resource limits documented (NOTE: not enforced in Compose standalone, only Swarm)
+- ✅ Log rotation configured (10MB max, 3 files)
 
 ______________________________________________________________________
 
