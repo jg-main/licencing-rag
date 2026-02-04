@@ -35,6 +35,46 @@ ______________________________________________________________________
 
 ### Installation
 
+**Option 1: Docker (Recommended for Production)**
+
+```bash
+# 1. Clone repository
+git clone <repo-url>
+cd licencing-rag
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env with your OPENAI_API_KEY and other settings
+
+# 3. Start with Docker Compose
+docker-compose up -d
+
+# 4. Verify API is running
+curl http://localhost:8000/health
+
+# 5. Install package locally for data ingestion
+pip install uv
+uv sync
+pip install -e .
+
+# 6. Add documents and ingest
+mkdir -p data/raw/cme
+cp your-documents/*.pdf data/raw/cme/
+rag ingest --source cme
+
+# 7. Now the API is ready to query
+curl -X POST http://localhost:8000/query \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What are the fees?"}'
+```
+
+**Note:** Data ingestion must be done before the API can answer queries. You need to install the package locally to run `rag ingest`, even when using Docker for the API.
+
+📖 **[Docker deployment guide →](docs/docker-deployment.md)**
+
+**Option 2: Local Development**
+
 ```bash
 # 1. Clone repository
 git clone <repo-url>
@@ -47,13 +87,21 @@ pip install -e .
 
 # 3. Set OpenAI API key
 export OPENAI_API_KEY="sk-..."  # Get from platform.openai.com
+
+# 4. Add documents
+mkdir -p data/raw/cme
+cp your-documents/*.pdf data/raw/cme/
+
+# 5. Ingest documents (REQUIRED before querying)
+rag ingest --source cme
 ```
 
 ### Basic Usage
 
+**⚠️ Important:** You must run `rag ingest` before querying. The system cannot answer questions until documents are indexed.
+
 ```bash
-# Load documents
-rag ingest --source cme
+# After ingestion, you can:
 
 # Ask questions
 rag query "What is a subscriber?"
@@ -400,6 +448,8 @@ ______________________________________________________________________
 
 ### Initial Setup
 
+**Complete workflow from scratch:**
+
 ```bash
 # 1. Install system
 uv sync && pip install -e .
@@ -411,12 +461,20 @@ export OPENAI_API_KEY="sk-..."
 mkdir -p data/raw/cme/Fees
 cp my-fee-schedule.pdf data/raw/cme/Fees/
 
-# 4. Ingest
+# 4. Ingest documents (REQUIRED - builds indexes)
 rag ingest --source cme
 
-# 5. Query
+# 5. Now you can query
 rag query "What are the fees?"
 ```
+
+**Why ingestion is required:**
+
+- Extracts text from PDFs/DOCX
+- Chunks documents into searchable segments
+- Generates embeddings via OpenAI
+- Builds ChromaDB vector index and BM25 keyword index
+- Without ingestion, there's nothing to query!
 
 ### Regular Use
 
@@ -599,12 +657,12 @@ ______________________________________________________________________
 
 ### Component Guides
 
-- **Query Normalization** - See `app/normalize.py` docstrings
-- **Reranking** - See `app/rerank.py` docstrings
-- **Confidence Gating** - See `app/gate.py` docstrings
-- **Context Budget** - See `app/budget.py` docstrings
-- **Debug Mode** - See `app/debug.py` docstrings
-- **Audit Logging** - See `app/audit.py` docstrings
+- **[Query Normalization](docs/query-normalization.md)** - Filler word removal and query optimization
+- **[Reranking](docs/reranking.md)** - LLM-based relevance scoring
+- **[Confidence Gating](docs/confidence-gating.md)** - Enforcing accurate refusals
+- **[Debug Mode](docs/debug-mode.md)** - Pipeline transparency and troubleshooting
+- **[Audit Logging](docs/audit-logging.md)** - Query tracking for compliance
+- **[Ingestion](docs/ingestion.md)** - Document processing and indexing
 
 ______________________________________________________________________
 
